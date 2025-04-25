@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35919.96
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsCUA", "FsOperator\FsOperator.fsproj", "{D43CC30F-7769-4CB8-A88D-2A9230A51417}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FAEC9823-5ABF-4F63-92B2-E9430B74C447}
+	EndGlobalSection
+EndGlobal
