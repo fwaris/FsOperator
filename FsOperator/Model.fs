@@ -1,9 +1,22 @@
 ﻿namespace FsOperator
+open System.Threading.Channels
+open Microsoft.Playwright
 
-type Model = {data:string}
-with static member Default = {data="data1"}
+type Model = {
+    playwright:IPlaywright option
+    instructions: string
+    toModel : Channel<FsResponses.Request>
+    fromModel : Channel<FsResponses.Response>
+    tokenSource : System.Threading.CancellationTokenSource option
+    log : string
+}
 
 type ClientMsg =
     | Initialize
-    | Connect
+    | Start
+    | Stop
+    | BrowserConnected of IPlaywright
+    | SetInstructions of string
+    | AppendLog of string
+    | ClearLog
 
