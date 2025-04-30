@@ -1,75 +1,11 @@
-﻿#load "packages.fsx"
+﻿module FsResponses
+open System
 open System.Net.Http.Headers
 open System.Threading.Tasks
-open System
-open System.IO
-open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
 open System.Text.Json.Nodes
 open System.Net.Http
-open System.Net.Http.Json
-open System.Text.Json
-open System.Text.Json.Serialization
-
-let jsonObt = """
-{
-  "id": "resp_67ccd3a9da748190baa7f1570fe91ac604becb25c45c1d41",
-  "object": "response",
-  "created_at": 1741476777,
-  "status": "completed",
-  "error": null,
-  "incomplete_details": null,
-  "instructions": null,
-  "max_output_tokens": null,
-  "model": "gpt-4o-2024-08-06",
-  "output": [
-    {
-      "type": "message",
-      "id": "msg_67ccd3acc8d48190a77525dc6de64b4104becb25c45c1d41",
-      "status": "completed",
-      "role": "assistant",
-      "content": [
-        {
-          "type": "output_text",
-          "text": "The image depicts a scenic landscape with a wooden boardwalk or pathway leading through lush, green grass under a blue sky with some clouds. The setting suggests a peaceful natural area, possibly a park or nature reserve. There are trees and shrubs in the background.",
-          "annotations": []
-        }
-      ]
-    }
-  ],
-  "parallel_tool_calls": true,
-  "previous_response_id": null,
-  "reasoning": {
-    "effort": null,
-    "summary": null
-  },
-  "store": true,
-  "temperature": 1.0,
-  "text": {
-    "format": {
-      "type": "text"
-    }
-  },
-  "tool_choice": "auto",
-  "tools": [],
-  "top_p": 1.0,
-  "truncation": "disabled",
-  "usage": {
-    "input_tokens": 328,
-    "input_tokens_details": {
-      "cached_tokens": 0
-    },
-    "output_tokens": 52,
-    "output_tokens_details": {
-      "reasoning_tokens": 0
-    },
-    "total_tokens": 380
-  },
-  "user": null,
-  "metadata": {}
-}
-"""
 
 type ResponseError = {
     code : string
@@ -89,6 +25,7 @@ type IncompleteDetails = {
 type Reasoning = {
   effort : string option
   summary : string option    
+  generate_summary : string option
 }
 
 type TextOutputFormat = 
@@ -154,42 +91,63 @@ with static member Default = {
         content = []
     }
 
-type ResponseOutput = 
-  | Message of Message
-  | Image of {|image: string; annotations: JsonElement option|}
-  | File of {|file: string; annotations: JsonElement option|}
-  | Function_call of {|name:string; arguments:string|}
-  | Web_search of {|search_context_size : string; user_location : User_Location option|}
-  | [<JsonName "computer_use_preview" >] Computer_use of {|display_height : int; display_width: int; environment:string;|}
-
-type Response = {
+type SafetyCheck = {
     id : string
-    ``object`` : string
-    created_at : int64
-    status : string
-    error : ResponseError option
-    incomplete_details : IncompleteDetails option
-    instructions : string option
-    max_output_tokens : int option
-    model : string
-    output : ResponseOutput list
-    parallel_tool_calls : bool
-    previous_response_id : string option
-    reasoning : Reasoning option
-    store : bool
-    temperature : float32
-    text : TextOutput option
-    tool_choice : string
-    tools : Tool list
-    top_p : float32
-    truncation : string option //auto, disabled
-    usage : JsonObject option
-    user : string option
+    code : string
+    message : string
 }
+
+type OutputDetail = 
+    | [<JsonPropertyName "computer_screenshot">] Screenshot of {|image_url:string|}
+
+[<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+type ComputerCallOutput = {
+    call_id : string
+    acknowledged_safety_checks : SafetyCheck list    
+    output : OutputDetail
+    current_url : string option
+}
+
+type ReasoningSummary = {text:string; ``type``: string}
+
+[<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+type ReasoningOutput = {
+    id : string
+    summary : ReasoningSummary list
+    status : string option
+}
+
+type Action = 
+    | [<JsonPropertyName "click">] Click of {| button:string; x:int; y:int|}
+    | [<JsonPropertyName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
+    | [<JsonPropertyName "keypress">] Keypress of {|id:string; key:string list;|} //ctrl, alt, shift
+    | [<JsonPropertyName "type">] Type of {| text:string|}
+    | [<JsonPropertyName "wait">] Wait 
+    | [<JsonPropertyName "screenshot">] Screenshot 
+
+
+type ComputerCall = {
+    id : string
+    status : string
+    action : Action
+    call_id : string
+    pending_safety_checks : SafetyCheck list
+}
+
+type InputOutputItem = 
+  | [<JsonName "message" >] Message of Message
+  | [<JsonName "image" >] Image of {|image: string; annotations: JsonElement option|}
+  | [<JsonName "file" >] File of {|file: string; annotations: JsonElement option|}
+  | [<JsonName "function_call" >] Function_call of {|name:string; arguments:string|}
+  | [<JsonName "web_search" >] Web_search of {|search_context_size : string; user_location : User_Location option|}
+  | [<JsonName "computer_use_preview" >] Computer_use of {|display_height : int; display_width: int; environment:string;|}
+  | [<JsonName "reasoning" >] Reasoning of ReasoningOutput
+  | [<JsonName "computer_call" >] Computer_call of ComputerCall
+  | [<JsonName "computer_call_output">] ComputerCallOuput of ComputerCallOutput
 
 type Request = {
     model : string
-    input : Message list
+    input : InputOutputItem list
     instructions : string option
     max_output_tokens : int option
     metadata : Map<string,string> option
@@ -228,6 +186,31 @@ type Request = {
             user  = None
         }
 
+type Response = {
+    id : string
+    ``object`` : string
+    created_at : int64
+    status : string
+    error : ResponseError option
+    incomplete_details : IncompleteDetails option
+    instructions : string option
+    max_output_tokens : int option
+    model : string
+    output : InputOutputItem list
+    parallel_tool_calls : bool
+    previous_response_id : string option
+    reasoning : Reasoning option
+    store : bool
+    temperature : float32
+    text : TextOutput option
+    tool_choice : string
+    tools : Tool list
+    top_p : float32
+    truncation : string option //auto, disabled
+    usage : JsonObject option
+    user : string option
+}
+
 let runT (t:Task<'t>) = t.Result
 
 exception ApiError of ResponseErrorObj
@@ -250,18 +233,21 @@ module RUtils =
         let imageBytes = System.Convert.ToBase64String bytes
         $"data:image/jpeg;base64,{imageBytes}"
 
-module service =
+module Api =
     let serOpts = 
         let opts = 
             JsonFSharpOptions.Default()
                 .WithUnionInternalTag()
                 .WithUnionTagName("type")
                 .WithUnionUnwrapRecordCases()
-                .WithUnionTagCaseInsensitive()        
+                .WithUnionTagCaseInsensitive()     
+                .WithAllowNullFields()
+                .WithAllowOverride()
                 .ToJsonSerializerOptions()
         opts.WriteIndented <- true
         opts
 
+    //let testRespos = JsonSerializer.Deserialize<Response>(jsonObt, options=serOpts)
 
     let newClient(key:string) = 
         let client = new HttpClient()
@@ -302,50 +288,7 @@ module service =
         create 
             ({Request.Default with 
                 input=[
-                    {Message.Default with content=[Input_text {|text=input|}]}
+                   Message {Message.Default with content=[Input_text {|text=input|}]}
                 ]}) 
             (defaultClient())
-
-let test() =
-    let resp = service.createWithDefaults "write a haiku about F#" |> runT
-
-    let resp2 = 
-        let client = service.defaultClient()
-        let cont = Input_text {|text = "List good F# learning resources" |}
-        let input = { Message.Default with content=[cont]}
-        let req = {Request.Default with input = [input]; tools=[Tool.DefaultWebSearch]}
-        client |> service.create req |> runT
-
-    RUtils.outputText resp2 |> printfn "%s"
-
-    let resp3 = 
-        let image = File.ReadAllBytes(@"C:\Users\Faisa\Pictures\Screenshots\Screenshot 2024-09-20 061619.png") |> RUtils.toImageUri
-        let client = service.defaultClient()
-        let cont = Input_text {|text = "Describe the image" |}
-        let contImg = Input_image {|image_url = image|}
-        let input = { Message.Default with content=[cont; contImg]}
-        let req = {Request.Default with input = [input]}
-        client |> service.create req |> runT
-
-    RUtils.outputText resp3 |> printfn "%s"
-
-    let resp4  = 
-        let image = File.ReadAllBytes(@"C:\Users\Faisa\Pictures\Screenshots\Screenshot 2024-09-20 061619.png") 
-        let imUrl = image |> RUtils.toImageUri
-        let ms = new MemoryStream(image)
-        let i2 = System.Drawing.Image.FromStream(ms)
-        let client = service.defaultClient()
-        let contImg = Input_image {|image_url = imUrl|}
-        let input = { Message.Default with content=[contImg]}
-        let tool = Tool_Computer_use {|display_height=int i2.PhysicalDimension.Height; display_width = int i2.PhysicalDimension.Width; environment = ComputerEnvironment.browser|}
-        let req = {Request.Default with 
-                    input = [input]; tools=[tool]; 
-                    instructions= Some "drive the UI to get the answer for how to best use F# for async"; 
-                    model=Models.computer_use_preview
-                    truncation = Some "auto"
-                }
-        client |> service.create req |> runT
-
-    ()
-
 

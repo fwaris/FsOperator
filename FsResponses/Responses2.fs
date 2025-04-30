@@ -1,4 +1,5 @@
-﻿module Responses2
+﻿///deprecated, saved for comments to be added later to FsReponses.fs
+module Responses2
 open System
 open System.Text
 open System.Text.Json

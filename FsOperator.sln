@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsCUA", "FsOperator\FsOperator.fsproj", "{D43CC30F-7769-4CB8-A88D-2A9230A51417}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOperator", "FsOperator\FsOperator.fsproj", "{D43CC30F-7769-4CB8-A88D-2A9230A51417}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponses", "FsResponses\FsResponses.fsproj", "{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D43CC30F-7769-4CB8-A88D-2A9230A51417}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
