@@ -1,164 +1,102 @@
 ﻿module ResponsesApi
+open System
+open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
 open System.Text.Json.Nodes
+open System.Net.Http
+open System.Net.Http.Json
+open System.Text.Json
+open System.Text.Json.Serialization
 
-type ImageUrl(url:string) =
-    member val url : string = url with get, set
 
-[<AbstractClass>]
-[<JsonDerivedType(typeof<TextContent>)>]
-[<JsonDerivedType(typeof<ImageContent>)>]
-type Content(contentType:string) =
-    member val ``type`` : string = contentType with get, set
+let jsonObt = """
+{
+  "id": "resp_67ccd3a9da748190baa7f1570fe91ac604becb25c45c1d41",
+  "object": "response",
+  "created_at": 1741476777,
+  "status": "completed",
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": null,
+  "model": "gpt-4o-2024-08-06",
+  "output": [
+    {
+      "type": "message",
+      "id": "msg_67ccd3acc8d48190a77525dc6de64b4104becb25c45c1d41",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "The image depicts a scenic landscape with a wooden boardwalk or pathway leading through lush, green grass under a blue sky with some clouds. The setting suggests a peaceful natural area, possibly a park or nature reserve. There are trees and shrubs in the background.",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [],
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 328,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 52,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 380
+  },
+  "user": null,
+  "metadata": {}
+}
+"""
 
-and TextContent(text:string) =
-    inherit Content("input_text")
-    member val text : string = text with get, set
 
-and ImageContent(data:string) =
-    inherit Content("input_image")
-    member val image_url = ImageUrl(data) with get, set
+let options = 
+   JsonFSharpOptions.Default()
+    .WithUnionInternalTag()
+    .WithUnionTagName("type")
 
-type Message (role:string, cs:Content list) =
-    member val role : string = role with get, set
-    member val content : Content list  = cs with get, set
 
-[<AbstractClass>]
-[<JsonDerivedType(typeof<FileSearchTool>)>]
-[<JsonDerivedType(typeof<WebSearchTool>)>]
-[<JsonDerivedType(typeof<FunctionTool>)>]
-type Tool(toolType:string) =
-    member val ``type`` : string = toolType with get, set
-and FileSearchTool() =
-    inherit Tool("file_search")
-    member val vector_store_ids : string list = [] with get, set
-    member val max_num_results : int = 20 with get, set
-and WebSearchTool() =
-    inherit Tool("web_search_preview")
-    member val vector_store_ids : string list = [] with get, set
-    member val max_num_results : int = 20 with get, set
-and FunctionTool() =
-    inherit Tool("function")
-    member val name = "" with get, set
-    member val description = "" with get, set
-    member val parameters = Parameter() with get, set
-and Parameter() =
-    member val ``type`` : string = "object" with get, set
-    member val properties : Map<string,Property> = Map.empty with get, set
-    member val required = [] with get, set
-and Property() =
-    member val ``type`` = "string" with get, set
-    member val description = "" with get, set
-    member val enum : string list = [] with get, set
-
-type Reasoning() =
-    member val effort = "high" with get, set
-    member val summary : string option = None with get, set
-
-module Include =
-    let ``file_search_call.results`` = "file_search_call.results"
-    let ``message.input_image.image_url`` = "message.input_image.image_url"
-    let ``computer_call_output.output.image_url`` = "computer_call_output.output.image_url"
-
-type TextOutputFormat(outputType:string) =
-    member val ``type`` = outputType with get, set
-    static member json_schema_type = TextOutputFormat("json_schema")
-    static member text_type = TextOutputFormat("text")
-
-[<AbstractClass>]
-[<JsonDerivedType(typeof<TextOutputText>)>]
-[<JsonDerivedType(typeof<TextOutputJsonSchema>)>]
-type TextOutput(format) =
-    member val format : TextOutputFormat = format with get, set
-and TextOutputText() =
-    inherit TextOutput(TextOutputFormat.text_type)
-    member val text : string = "text" with get, set
-and TextOutputJsonSchema(name:string,schema:JsonElement) =
-    inherit TextOutput(TextOutputFormat.json_schema_type)
-    member val name = name with get, set
-    member val ``type`` : string = "json_schema" with get, set
-    member val description = "" with get, set
-    member val strict = false with get, set
-    member val schema = schema with get, set
-
-type Request(msgs:Message list) =
-    member val model = "gpt-4.1" with get, set
-    member val ``include`` : string list = [] with get, set
-    member val input = msgs
-    member val instructions : string = null with get, set
-    member val max_output_tokens : int option = None with get,set
-    member val metadata : Map<string,string> option = None with get, set
-    member val parallel_tool_calls = false with get, set
-    member val previous_response_id : string = null with get, set
-    member val reasoning : Reasoning option = None with get, set
-    member val service_tier = "auto" with get, set
-    member val store = true with get,set
-    member val stream = false with get, set
-    member val temperature = 1.0 with get, set
-    member val text : TextOutput option = None with get, set
-    member val tool_choice = "auto" with get, set
-    member val tools : Tool list = [] with get, set
-    member val top_p = 1.0 with get, set
-    member val truncation : string = null with get, set //auto, disabled
-    member val user = null with get, set
-
-type OutputContent(contentType:string) =
-    member val ``type`` = contentType with get, set
-
-type TextOutputContent() =
-    inherit OutputContent("output_text")
-    member val text = "" with get, set
-    member val annotations : string list = [] with get, set
-
-type OutputMessage() =
-    member val id = "" with get, set
-    member val ``type`` = "message" with get, set
-    member val role = "assistant" with get, set
-    member val content : OutputContent list = [] with get, set
-
-type ResponseError() =
-    member val code = "" with get, set
-    member val message = "" with get, set
-
-type IncompleteDetails() =
-    member val reason = "" with get, set
-
-type InputTokenDetails() =
-    member val cached_tokens = 0 with get, set
-
-type OutputTokenDetails() =
-    member val reasoning_tokens = 0 with get, set
-
-type Usage() =
-    member val input_tokens = 0 with get, set
-    member val input_token_details : InputTokenDetails = InputTokenDetails() with get, set
-    member val output_tokens = 0 with get, set
-    member val output_token_details : OutputTokenDetails = OutputTokenDetails() with get, set
-    member val total_tokens = 0 with get, set
-
-type Response() =
-    member val id = "" with get,set
-    member val ``object`` = "response" with get, set
-    member val created_at = 0L with get, set //unix timestamp in seconds
-    member val error : ResponseError option = None with get, set
-    member val incomplete_details : IncompleteDetails option = None with get, set
-    member val instructions : string = null with get, set
-    member val max_output_tokens : int option = None with get, set
-    member val metadata : Map<string,string> option = None with get, set
-    member val model = "" with get, set
-    member val output : OutputMessage list = [] with get, set
-    member val parallel_tool_calls = false with get, set
-    member val previous_response_id : string = null with get, set
-    member val reasoning : Reasoning option = None with get, set
-    member val service_tier = "auto" with get, set
-    member val status = "completed" with get, set
-    member val temperature = 1.0 with get, set
-    member val text : TextOutput option = None with get, set
-    member val tool_choice = "auto" with get, set
-    member val tools : Tool list = [] with get, set
-    member val top_p = 1.0 with get, set
-    member val truncation : string = null with get, set //auto, disabled
-    member val usage : JsonObject option = None with get, set
-    member val user : string = null with get, set
-
+// type Response2 = {
+//     id : string
+//     ``object`` : string
+//     created_at : int64
+//     status : string
+//     error : ResponseError option
+//     incomplete_details : IncompleteDetails option
+//     instructions : string option
+//     max_output_tokens : int option
+//     model : string
+//     output : OutputMessage list
+//     parallel_tool_calls : bool
+//     previous_response_id : string option
+//     reasoning : Reasoning option
+//     store : bool
+//     temperature : float32
+//     text : TextOutput option
+//     tool_choice : string
+//     tools : Tool list
+//     top_p : float32
+//     truncation : string option //auto, disabled
+//     usage : JsonObject option
+//     user : string option
+// }

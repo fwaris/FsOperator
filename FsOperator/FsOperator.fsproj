@@ -8,11 +8,14 @@
   <ItemGroup>
     <None Include="scripts\packages.fsx" />
     <None Include="scripts\testoperator.fsx" />
+    <None Include="scripts\test_serialization.fsx" />
+    <Compile Include="Responses2.fs" />
     <Compile Include="ResponsesApi.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
     <PackageReference Include="Microsoft.Playwright" Version="1.51.0" />
   </ItemGroup>
 
