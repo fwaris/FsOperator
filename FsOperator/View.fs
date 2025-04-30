@@ -1,5 +1,10 @@
 ﻿namespace FsOperator
 
+open WebViewCore
+open Avalonia.WebView.Windows.Core
+open Microsoft.Web.WebView2.Core
+open Microsoft.Playwright
+
 #nowarn "57"
 #nowarn "40"
 open System
@@ -18,10 +23,34 @@ type Views =
                 WebView.create [
                     WebView.url (Uri "https://linkedin.com")
                     WebView.init (fun wv -> 
+
+                        wv.WebViewCreated.Add(fun args -> 
+                            task {
+                                try
+                                    //let options =  CoreWebView2EnvironmentOptions(
+                                    //        AdditionalBrowserArguments = "--remote-debugging-port=9222"
+                                    //)
+                                    //let! env = CoreWebView2Environment.CreateAsync(null,null,options)                    
+                                    //let cwv = wv.PlatformWebView :?> CoreWebView2                                    
+                                    //do! cwv.EnsureCoreWebView2Async(env)
+                                    let! pw = Playwright.CreateAsync()
+                                    let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")
+                                    let contex = browser.Contexts.[0]
+                                    let page = contex.Pages.[0]
+                                    let! ss = page.ScreenshotAsync()
+                                    IO.File.WriteAllBytes(@"C:\Users\Faisa\Pictures\Screenshots\playwright.png", ss)                                    
+                                    ()
+                                with ex ->                                     
+                                    Diagnostics.Debug.WriteLine($"Error: {ex.Message}")
+                            }
+                            |> ignore
+                            ()
+                        )
                         wv.WebViewNewWindowRequested.Add(fun args ->
                             args.UrlLoadingStrategy <- WebViewCore.Enums.UrlRequestStrategy.OpenInWebView
                         ))   
                 ]
+
             //root view
         //DockPanel.create [                
         //    DockPanel.children [

@@ -14,6 +14,7 @@ open Avalonia.WebView.Desktop
 open Avalonia.Diagnostics
 open Avalonia.Logging
 open System
+open Microsoft.Web.WebView2.Core
 
 
 type MainWindow() as this =
@@ -39,14 +40,16 @@ type App() =
         this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
         this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"
 
+
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
         | :? IClassicDesktopStyleApplicationLifetime as desktopLifetime ->
             let win = MainWindow()
             //U.initNotfications(win)
             //win.Closing.Add(fun _ -> Connection.disconnect())
-            DevToolsExtensions.AttachDevTools(this)
+            //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
+            System.Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-port=9222")
         | _ -> ()
 
 module Program =
