@@ -1,20 +1,41 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFrameworks>net9.0</TargetFrameworks>
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+	</PropertyGroup>
+	
+	<PropertyGroup>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="Program.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Playwright" Version="1.51.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="9.0.202" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="app.manifest" />
+		<Compile Include="WebView.fs" />
+		<Compile Include="Model.fs" />
+		<Compile Include="Update.fs" />
+		<Compile Include="View.fs" />
+		<Compile Include="Program.fs" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Avalonia.Desktop" Version="11.2.8" />
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.2.8" />
+		<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
+		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.8" />
+		<PackageReference Include="FSharp.Control.AsyncSeq" Version="3.2.1" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.4" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.4" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.4" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.4" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
+		<PackageReference Include="WebView.Avalonia.Cross" Version="11.2.4" />
+		<PackageReference Include="WebView.Avalonia.Desktop.Cross" Version="11.2.4" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
+	</ItemGroup>
 
 </Project>
