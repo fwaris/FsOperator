@@ -17,3 +17,4 @@ module WebView =
 
         static member htmlContent(value:string) : IAttr<'t> =
             AttrBuilder<'t>.CreateProperty<string>(WebView.HtmlContentProperty, value, ValueNone)
+

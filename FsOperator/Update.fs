@@ -24,6 +24,9 @@ Don't go beyone 5 pages.
             fromModel = Channel.CreateBounded(10)
             tokenSource = None
             log = ""
+            output = ""
+            url = Uri "https://linkedin.com"
+            webview = ref None
         }        
         model,Cmd.ofMsg Initialize
 
@@ -53,6 +56,12 @@ Don't go beyone 5 pages.
                 let log = if log.Length > 10000 then log.Substring(0,10000) else log
                 {model with log=log}, Cmd.none
             | ClearLog -> {model with log = ""}, Cmd.none
+            | AppendOutput txt -> 
+                let output = txt + Environment.NewLine + model.output
+                let output = if output.Length > 10000 then output.Substring(0,10000) else output
+                {model with output=output}, Cmd.none
+            | ClearOutput -> {model with output = ""}, Cmd.none
+            | SetUrl txt -> {model with url=Uri txt}, Cmd.none
     
             | _ -> model, Cmd.none
         with ex -> 

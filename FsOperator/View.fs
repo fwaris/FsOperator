@@ -1,7 +1,7 @@
 ﻿namespace FsOperator
 #nowarn "57"
 #nowarn "40"
-
+open Avalonia.FuncUI
 open System
 open WebViewCore
 open Avalonia.WebView.Windows.Core
@@ -16,12 +16,40 @@ open Avalonia.FuncUI.Types
 open AvaloniaWebView
 open AvaloniaWebView.Ext
 
+module Nav = 
+    let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
+
 [<AbstractClass; Sealed>]
-type Views =
+type Views =    
+    static member navigationBar model dispatch = 
+        TextBox.create [
+            TextBox.init (fun x -> Nav.nav.Value <- x)
+            Grid.row 0
+            TextBox.text (model.url.ToString())
+            TextBox.borderThickness 1.0
+            TextBox.borderBrush Brushes.LightBlue
+            TextBox.verticalAlignment VerticalAlignment.Top
+            TextBox.horizontalAlignment HorizontalAlignment.Stretch
+            TextBox.onKeyDown (fun e -> 
+                if e.Key = Avalonia.Input.Key.Enter then
+                    if Nav.nav.Value<> Unchecked.defaultof<_> then
+                        let url = Nav.nav.Value.Text
+                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
+                            dispatch (SetUrl url)
+                        else
+                            Diagnostics.Debug.WriteLine($"Invalid URL: {url}")
+                    else
+                        Diagnostics.Debug.WriteLine("URL is empty")            
+            )
+            TextBox.margin 2.0
+        ]
+
     static member webview model dispatch = 
         WebView.create [
-            WebView.url (Uri "https://linkedin.com")
+            Grid.row 1 
+            WebView.url model.url
             WebView.init (fun wv -> 
+                model.webview.Value <- Some wv
                 wv.WebViewCreated.Add(fun args -> 
                     task {
                         try
@@ -78,7 +106,8 @@ type Views =
         let leftMargin = 10.
         Grid.create [
             Grid.column 1
-            Grid.rowDefinitions "30,30,*,30,*"
+            Grid.rowSpan 2
+            Grid.rowDefinitions "30,30,*,40,*"
             Grid.children [
                 ToggleSwitch.create [
                     Grid.row 0 
@@ -115,12 +144,31 @@ type Views =
                 ]
                 TextBlock.create  [
                     Grid.row 3
-                    TextBlock.text "Log"
+                    TextBlock.text "Output"
                     TextBlock.horizontalAlignment HorizontalAlignment.Left
                     TextBlock.verticalAlignment VerticalAlignment.Top
                     TextBlock.fontSize 14.
                     TextBlock.fontWeight FontWeight.Bold
                     TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
+                ]
+                Button.create [
+                    Grid.row 3
+                    Button.content "\u2715"
+                    Button.tip "Clear output"
+                    Button.onClick (fun _ -> ())//dispatch ClearOutput)
+                    Button.margin (Thickness(5.))
+                    Button.horizontalAlignment HorizontalAlignment.Right
+                    Button.verticalAlignment VerticalAlignment.Top                    
+                    Button.fontSize 10.
+                ]
+                TextBlock.create  [
+                    Grid.row 4
+                    TextBlock.text model.output
+                    TextBlock.horizontalAlignment HorizontalAlignment.Stretch
+                    TextBlock.verticalAlignment VerticalAlignment.Stretch
+                    TextBlock.fontSize 14.                    
+                    TextBlock.background Brushes.DarkSlateBlue
+                    TextBlock.margin (Thickness(leftMargin,0.,2.,6.))
                 ]
             ]
         ]
@@ -129,6 +177,7 @@ type Views =
         DockPanel.create [               
             DockPanel.children [
                 Expander.create [
+                    Expander.margin (Thickness(2.))
                     Expander.dock Dock.Right
                     Expander.expandDirection ExpandDirection.Left
                     Expander.verticalAlignment VerticalAlignment.Stretch
@@ -142,13 +191,13 @@ type Views =
                     )
                 ]
                 Grid.create [
-//                    Grid.rowDefinitions "*,30."
+                    Grid.rowDefinitions "35,*"
                     Grid.columnDefinitions "*,300"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch                    
                     Grid.children [
+                        Views.navigationBar model dispatch
                         Views.webview model dispatch
                         Views.instructions model dispatch
-//                        Views.statusBar model dispatch
                         GridSplitter.create [
                             Grid.column 1
                             Grid.rowSpan 2
