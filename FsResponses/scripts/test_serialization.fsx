@@ -134,3 +134,5 @@ let test() =
     ()
 
 
+let(==) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
+"Enter" == "ENTER"

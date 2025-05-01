@@ -15,9 +15,9 @@ module ComputerUse =
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
-                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"Sending request: {request}") |> ignore
+                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"--> {request}") |> ignore
                     let! response = Api.create request (Api.defaultClient()) |> Async.AwaitTask
-                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"Received response: {response}") |> ignore
+                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"<-- {response}") |> ignore
                     do! runState.fromModel.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
                 }
             )
@@ -128,14 +128,14 @@ module ComputerUse =
                 | Keypress p -> 
                     for k in p.keys do
                         debug $"Keypress {k}"
+                        let mappedKey = 
+                            if k == "Enter" then "Enter"                            
+                            elif k == "space" then " "
+                            elif k == "ESC" then "Escape"
+                            elif k == "CTRL" then "Control"
+                            else k
                         let opts = KeyboardPressOptions()
-                        do! page.Keyboard.PressAsync(k, opts) |> Async.AwaitTask
-                        if k == "Enter" then
-                            do! page.Keyboard.PressAsync("Enter", opts) |> Async.AwaitTask
-                        elif k == "space" then
-                            do! page.Keyboard.PressAsync(" ", opts) |> Async.AwaitTask
-                        else 
-                            do! page.Keyboard.PressAsync(k, opts) |> Async.AwaitTask                            
+                        do! page.Keyboard.PressAsync(mappedKey, opts) |> Async.AwaitTask                            
                 | Type p ->
                     debug $"Type %s{p.text}"
                     do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
@@ -146,7 +146,7 @@ module ComputerUse =
             }
         async{
             match! Async.Catch task with 
-            | Choice1Of2 _ -> debug "dispose doAction"
+            | Choice1Of2 _ -> ()
             | Choice2Of2 ex -> debug $"Error in doAction: %s{ex.Message}"
         }
                 

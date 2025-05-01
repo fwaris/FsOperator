@@ -17,6 +17,33 @@ open AvaloniaWebView
 open AvaloniaWebView.Ext
 
 module Nav = 
+    let clickIndicatorScript = """
+if (!window.__clickIndicatorInjected) {
+    window.__clickIndicatorInjected = true;
+    console.log('✅ Click indicator script injected');
+
+    function addClickIndicator() {
+        document.addEventListener('click', event => {
+            console.log('🖱 Click at', event.pageX, event.pageY);
+            const circle = document.createElement('div');
+            circle.style.position = 'absolute';
+            circle.style.width = '20px';
+            circle.style.height = '20px';
+            circle.style.border = '2px solid red';
+            circle.style.borderRadius = '50%';
+            circle.style.pointerEvents = 'none';
+            circle.style.left = `${event.pageX - 10}px`;
+            circle.style.top = `${event.pageY - 10}px`;
+            circle.style.zIndex = '9999';
+            document.body.appendChild(circle);
+            setTimeout(() => circle.remove(), 1000);
+        }, true);
+    }
+
+    addClickIndicator();
+}
+"""
+
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
 [<AbstractClass; Sealed>]
@@ -55,6 +82,8 @@ type Views =
                         try
                             let! pw = Playwright.CreateAsync()
                             let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")                            
+                            let page = browser.Contexts.[0].Pages.[0]
+                            do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
                             dispatch (BrowserConnected browser)
                         with ex ->                                                                         
                             debug (sprintf "%A" ex)
