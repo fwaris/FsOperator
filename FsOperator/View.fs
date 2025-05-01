@@ -37,9 +37,9 @@ type Views =
                         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
                             dispatch (SetUrl url)
                         else
-                            Diagnostics.Debug.WriteLine($"Invalid URL: {url}")
+                            debug($"Invalid URL: {url}")
                     else
-                        Diagnostics.Debug.WriteLine("URL is empty")            
+                        debug("URL is empty")            
             )
             TextBox.margin 2.0
         ]
@@ -54,14 +54,10 @@ type Views =
                     task {
                         try
                             let! pw = Playwright.CreateAsync()
-                            let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")
-                            let contex = browser.Contexts.[0]
-                            let page = contex.Pages.[0]
-                            let! ss = page.ScreenshotAsync()
-                            IO.File.WriteAllBytes(@"C:\Users\Faisa\Pictures\Screenshots\playwright.png", ss)                                    
-                            dispatch (BrowserConnected pw)
+                            let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")                            
+                            dispatch (BrowserConnected browser)
                         with ex ->                                                                         
-                            Diagnostics.Debug.WriteLine($"Error: {ex.Message}")
+                            debug (sprintf "%A" ex)
                     }
                     |> ignore
                     ()
@@ -111,7 +107,7 @@ type Views =
             Grid.children [
                 ToggleSwitch.create [
                     Grid.row 0 
-                    ToggleSwitch.isEnabled model.playwright.IsSome
+                    ToggleSwitch.isEnabled model.browser.IsSome
                     ToggleSwitch.onChecked (fun _ -> dispatch Start)
                     ToggleSwitch.onUnchecked (fun _ -> dispatch Stop)
                     ToggleSwitch.horizontalAlignment HorizontalAlignment.Left

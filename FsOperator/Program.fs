@@ -27,7 +27,7 @@ type MainWindow() as this =
 
         Program.mkProgram Update.init (Update.update this) Views.main
         |> Program.withHost this
-        //|> Program.withSubscription Update.subscriptions
+        |> Program.withSubscription Update.subscriptions
         |> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
@@ -62,6 +62,6 @@ module Program =
             //.UseSkia()
             .UseDesktopWebView()
 #if DEBUG
-            .LogToTrace(LogEventLevel.Debug)            
+            //.LogToTrace(LogEventLevel.Debug)            
 #endif
             .StartWithClassicDesktopLifetime(args)

@@ -7,6 +7,8 @@ open System.Text.Json.Serialization
 open System.Text.Json.Nodes
 open System.Net.Http
 
+let mutable debug_logging = false
+
 type ResponseError = {
     code : string
     message : string
@@ -55,9 +57,18 @@ module ComputerEnvironment =
     let windows = "windows"
     let ubuntu = "ubuntu"
 
+module Truncation = 
+    let auto = "auto"
+    let disabled = "disabled"
+
 module Models = 
     let gpt_41 = "gpt-4.1"
     let computer_use_preview = "computer-use-preview"
+
+module Buttons =
+    let [<Literal>] Left = "left"
+    let [<Literal>] Right = "right"
+    let [<Literal>] Middle = "middle"
 
 type Tool = 
   | [<JsonName "file_search" >] Tool_File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
@@ -98,7 +109,8 @@ type SafetyCheck = {
 }
 
 type OutputDetail = 
-    | [<JsonPropertyName "computer_screenshot">] Screenshot of {|image_url:string|}
+    | [<JsonPropertyName "input_image">] Computer_creenshot of {|image_url:string|}
+    | [<JsonPropertyName "not_used">] DoNotUse of {|text:string|} //this is only to make this multi-case union so that serializaton adds the type tag
 
 [<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
 type ComputerCallOutput = {
@@ -120,7 +132,7 @@ type ReasoningOutput = {
 type Action = 
     | [<JsonPropertyName "click">] Click of {| button:string; x:int; y:int|}
     | [<JsonPropertyName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
-    | [<JsonPropertyName "keypress">] Keypress of {|id:string; key:string list;|} //ctrl, alt, shift
+    | [<JsonPropertyName "keypress">] Keypress of {| keys:string list;|} //ctrl, alt, shift
     | [<JsonPropertyName "type">] Type of {| text:string|}
     | [<JsonPropertyName "wait">] Wait 
     | [<JsonPropertyName "screenshot">] Screenshot 
@@ -143,7 +155,7 @@ type InputOutputItem =
   | [<JsonName "computer_use_preview" >] Computer_use of {|display_height : int; display_width: int; environment:string;|}
   | [<JsonName "reasoning" >] Reasoning of ReasoningOutput
   | [<JsonName "computer_call" >] Computer_call of ComputerCall
-  | [<JsonName "computer_call_output">] ComputerCallOuput of ComputerCallOutput
+  | [<JsonName "computer_call_output">] Computer_call_output of ComputerCallOutput
 
 type Request = {
     model : string
@@ -262,20 +274,20 @@ module Api =
             let builder = UriBuilder(client.BaseAddress)
             builder.Path <- builder.Path + "/responses"
             let reqstr = JsonSerializer.Serialize(req,options=serOpts)
-            printfn "%s" reqstr
+            if debug_logging then Diagnostics.Debug.WriteLine $"Request: {reqstr} "            
             //use! resp = client.PostAsJsonAsync(builder.Uri, req,options=serOpts)
             use strContent = new StringContent(reqstr,MediaTypeHeaderValue("application/json"))
             use! resp = client.PostAsync(builder.Uri,strContent)
             if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then 
                 let! str = resp.Content.ReadAsStringAsync()
-                printfn "%A" str
+                if debug_logging then Diagnostics.Debug.WriteLine $"Response: {str} "
                 //return! resp.Content.ReadFromJsonAsync<Response>(options=serOpts)
                 return JsonSerializer.Deserialize<Response>(str,options=serOpts)            
             else 
                 let! str = resp.Content.ReadAsStringAsync()
                 let err = 
                     try 
-                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
+                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)                        
                         Some (ApiError err)
                     with ex -> 
                         None 

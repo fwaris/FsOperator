@@ -9,21 +9,47 @@ open FSharp.Control
 open Avalonia.FuncUI.Hosts
 
 module Update =
+    open Avalonia.Threading
+    open Avalonia.FuncUI.Hosts
+
+    let subscribeBackground (model:Model) =
+        let backgroundEvent dispatch =
+            let ctx = new System.Threading.CancellationTokenSource()
+            let comp =
+                async{
+                    let comp =
+                         model.mailbox.Reader.ReadAllAsync()
+                         |> AsyncSeq.ofAsyncEnum
+                         |> AsyncSeq.iter dispatch
+                    match! Async.Catch(comp) with
+                    | Choice1Of2 _ -> printfn "dispose subscribeBackground"
+                    | Choice2Of2 ex -> printfn "%s" ex.Message
+                }
+            Async.Start(comp,ctx.Token)
+            {new IDisposable with member _.Dispose() = ctx.Dispose(); printfn "disposing subscription backgroundEvent";}
+        backgroundEvent
+
+    let subscriptions model =
+
+        let sub2 = subscribeBackground model
+        [
+                [nameof sub2], sub2
+        ]
+
     let initialInstructions = """
-You should have a view of the my linkedin home page.
+You should have a view of the my linkedin feed.
 Starting from that find all interesting new items related
 to Generative AI and summarize them.
-Don't go beyone 5 pages.
+Don't go beyone 10 pages.
 """
 
     let init _   = 
         let model = {
-            playwright=None
+            browser = None
             instructions=initialInstructions
-            toModel = Channel.CreateBounded(10)
-            fromModel = Channel.CreateBounded(10)
-            tokenSource = None
-            log = ""
+            runState = None
+            mailbox = Channel.CreateBounded(10)
+            log = []
             output = ""
             url = Uri "https://linkedin.com"
             webview = ref None
@@ -36,26 +62,30 @@ Don't go beyone 5 pages.
         try
             match msg with
             | Initialize -> model, Cmd.none
-            | BrowserConnected pw -> {model with playwright=Some pw},Cmd.ofMsg Start
+            | BrowserConnected pw -> {model with browser=Some pw},Cmd.none
             | Start ->
-                match model.tokenSource with 
-                | None -> 
-                    let tkn = token()
-                    ComputerUse.start tkn model.fromModel model.toModel
-                    {model with tokenSource= Some tkn}, Cmd.none
-                | Some tkn -> model, Cmd.none
+                match model.runState with 
+                | None when model.browser.IsSome -> 
+                    let runState = RunState.Create model.browser.Value model.mailbox model.instructions
+                    ComputerUse.startMessaging runState
+                    ComputerUse.sendStartMessage runState |> Async.Start
+                    ComputerUse.loop runState 
+                    {model with runState =  Some runState}, Cmd.none
+                | _  -> debug "Already started or no browser set"; model, Cmd.none
             | Stop -> 
-                match model.tokenSource with
-                | Some tkn -> 
-                    tkn.Cancel()
-                    {model with tokenSource=None}, Cmd.none
-                | None -> model, Cmd.none
+                match model.runState with
+                | Some runState -> 
+                    runState.tokenSource.Cancel()
+                    runState.fromModel.Writer.TryComplete() |> ignore
+                    runState.toModel.Writer.TryComplete()   |> ignore                    
+                    {model with runState=None}, Cmd.none 
+                | None -> 
+                    model, Cmd.none
             | SetInstructions txt -> {model with instructions=txt}, Cmd.none
             | AppendLog txt -> 
-                let log = txt + Environment.NewLine + model.log
-                let log = if log.Length > 10000 then log.Substring(0,10000) else log
+                let log = txt :: model.log |> List.truncate 100
                 {model with log=log}, Cmd.none
-            | ClearLog -> {model with log = ""}, Cmd.none
+            | ClearLog -> {model with log = []}, Cmd.none
             | AppendOutput txt -> 
                 let output = txt + Environment.NewLine + model.output
                 let output = if output.Length > 10000 then output.Substring(0,10000) else output
