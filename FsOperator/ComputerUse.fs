@@ -1,8 +1,6 @@
 ﻿namespace FsOperator
 open System
 open FSharp.Control
-open System.Threading
-open System.Threading.Channels
 open Microsoft.Playwright
 open FsResponses
 open System.IO
@@ -61,7 +59,7 @@ module ComputerUse =
                 do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
-    let respnseIdsAndChecks (runState:RunState) = 
+    let getResponseIdsAndChecks (runState:RunState) = 
         runState.lastResponse.Value
         |> Option.bind (fun r -> 
             let safetyChecks = r.output |> List.choose (function Computer_call cb -> Some cb.pending_safety_checks | _ -> None) |> List.concat
@@ -76,7 +74,7 @@ module ComputerUse =
 
     let sendNext (runState:RunState) =
         async {
-            match respnseIdsAndChecks runState with
+            match getResponseIdsAndChecks runState with
             | None -> 
                 runState.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
                 runState.mailbox.Writer.TryWrite(TurnEnd) |> ignore
@@ -111,16 +109,21 @@ module ComputerUse =
         
     let private (==) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
-    let actionToString = function
-        | Click p -> $"click({p.x},{p.y})"
-        | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
-        | Double_click p -> $"dbl_click({p.x},{p.y})"
-        | Drag p -> $"drag"
-        | Keypress p -> $"keys {p.keys}"
-        | Move p -> $"move({p.x},{p.y})"
-        | Screenshot -> "screenshot"
-        | Type p -> $"type {p.text}"
-        | Wait  -> "wait"
+    let actionToString action = 
+        try
+            match action with
+            | Click p -> $"click({p.x},{p.y})"
+            | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
+            | Double_click p -> $"dbl_click({p.x},{p.y})"
+            | Drag p -> $"drag {p.path.Head} -> {List.last p.path}"
+            | Keypress p -> $"keys {p.keys}"
+            | Move p -> $"move({p.x},{p.y})"
+            | Screenshot -> "screenshot"
+            | Type p -> $"type {p.text}"
+            | Wait  -> "wait"
+        with ex -> 
+            debug $"Error in actionToString: %s{ex.Message}"
+            sprintf "%A" action
 
     let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
     let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
@@ -138,15 +141,17 @@ module ComputerUse =
                     let! _ = page.EvaluateAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
                     ()
                 | Keypress p -> 
-                    for k in p.keys do
-                        let mappedKey = 
-                            if k == "Enter" then "Enter"                            
+                    let mappeKeys = 
+                        p.keys 
+                        |> List.map (fun k -> 
+                            if k == "Enter" then "Enter"                             //Playwright does not support Enter key
                             elif k == "space" then " "
                             elif k == "ESC" then "Escape"
                             elif k == "CTRL" then "Control"
-                            else k
-                        let opts = KeyboardPressOptions()
-                        do! page.Keyboard.PressAsync(mappedKey, opts) |> Async.AwaitTask                            
+                            else k)
+                    let compositKey = mappeKeys |> String.concat "+"
+                    let opts = KeyboardPressOptions()
+                    do! page.Keyboard.PressAsync(compositKey, opts) |> Async.AwaitTask                            
                 | Type p ->
                     do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
                 | Wait  ->  do! Async.Sleep(2000)

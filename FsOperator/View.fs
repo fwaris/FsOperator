@@ -1,18 +1,11 @@
 ﻿namespace FsOperator
-#nowarn "57"
-#nowarn "40"
-open Avalonia.FuncUI
 open System
-open WebViewCore
-open Avalonia.WebView.Windows.Core
-open Microsoft.Web.WebView2.Core
 open Microsoft.Playwright
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open Avalonia.FuncUI.Types
 open AvaloniaWebView
 open AvaloniaWebView.Ext
 

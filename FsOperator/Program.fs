@@ -7,15 +7,8 @@ open Avalonia.Themes.Fluent
 open Avalonia.FuncUI
 open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Hosts
-open System.IO
-open Avalonia.Threading
-open Microsoft.Extensions.Configuration
 open Avalonia.WebView.Desktop
-open Avalonia.Diagnostics
-open Avalonia.Logging
 open System
-open Microsoft.Web.WebView2.Core
-
 
 type MainWindow() as this =
     inherit HostWindow()

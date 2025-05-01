@@ -2,16 +2,10 @@
 open System
 open System.Threading.Channels
 open Elmish
-open Avalonia.Media
-open Avalonia
-open Avalonia.Controls
 open FSharp.Control
 open Avalonia.FuncUI.Hosts
 
 module Update =
-    open Avalonia.Threading
-    open Avalonia.FuncUI.Hosts
-
     let subscribeBackground (model:Model) =
         let backgroundEvent dispatch =
             let ctx = new System.Threading.CancellationTokenSource()
@@ -37,10 +31,8 @@ module Update =
         ]
 
     let initialInstructions = """
-You should have a view of the my twitter feed.
-Starting from that find all interesting new items related
-to Generative AI and summarize them.
-Don't go beyond 10 pages.
+On Amazon, find me an iphone 16 pro max case that has 
+built in screen protector and is less than $40 with good rating
 """
 
     let init _   = 
@@ -51,7 +43,7 @@ Don't go beyond 10 pages.
             mailbox = Channel.CreateBounded(10)
             log = []
             output = ""
-            url = Uri "https://twitter.com"
+            url = Uri "https://amazon.com"
             webview = ref None
             action = ""
             warning = ""
