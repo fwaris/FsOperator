@@ -43,7 +43,6 @@ module ComputerUse =
     let sendStartMessage (runState:RunState) =
        async {
                 let imgUrl,(w,h) = snapshot runState.browser |> Async.RunSynchronously
-                let client = Api.defaultClient()
                 let contImg = Input_image {|image_url = imgUrl|}
                 let input = { Message.Default with content=[contImg]}
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
@@ -79,7 +78,8 @@ module ComputerUse =
         async {
             match respnseIdsAndChecks runState with
             | None -> 
-                debug "No response ids found"
+                runState.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
+                runState.mailbox.Writer.TryWrite(TurnEnd) |> ignore
                 return ()
             | Some (prevId, lastCallId, safetyChecks) -> 
                 let imgUrl,(w,h) = snapshot runState.browser |> Async.RunSynchronously
@@ -111,23 +111,34 @@ module ComputerUse =
         
     let private (==) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
+    let actionToString = function
+        | Click p -> $"click({p.x},{p.y})"
+        | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
+        | Double_click p -> $"dbl_click({p.x},{p.y})"
+        | Drag p -> $"drag"
+        | Keypress p -> $"keys {p.keys}"
+        | Move p -> $"move({p.x},{p.y})"
+        | Screenshot -> "screenshot"
+        | Type p -> $"type {p.text}"
+        | Wait  -> "wait"
+
+    let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
+    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
+
     let doAction (action:Action) (browser:IBrowser)  =
         let task = 
             async {
                 let page = browser.Contexts.[0].Pages.[0]
                 match action with 
                 | Click p -> 
-                    debug $"Click %A{p}"
                     let opts = MouseClickOptions(Button = mouseButton p.button)
                     do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
                 | Scroll p ->
-                    debug $"Scroll %A{p}"
                     do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask                                
                     let! _ = page.EvaluateAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
                     ()
                 | Keypress p -> 
                     for k in p.keys do
-                        debug $"Keypress {k}"
                         let mappedKey = 
                             if k == "Enter" then "Enter"                            
                             elif k == "space" then " "
@@ -137,12 +148,18 @@ module ComputerUse =
                         let opts = KeyboardPressOptions()
                         do! page.Keyboard.PressAsync(mappedKey, opts) |> Async.AwaitTask                            
                 | Type p ->
-                    debug $"Type %s{p.text}"
                     do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
-                | Wait  -> 
-                    debug "Wait"
-                    do! Async.Sleep(2000)
+                | Wait  ->  do! Async.Sleep(2000)
                 | Screenshot -> ()
+                | Move p -> do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
+                | Double_click p -> do! page.Mouse.DblClickAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
+                | Drag p ->                     
+                    let s = p.path.Head
+                    let t = List.last p.path 
+                    let opts = PageDragAndDropOptions()
+                    opts.SourcePosition <- SourcePosition(X = float32 s.x, Y = float32 s.y)
+                    opts.TargetPosition <- TargetPosition(X = float32 t.x, Y = float32 t.y)
+                    do! page.DragAndDropAsync("#source","#target",opts) |> Async.AwaitTask
             }
         async{
             match! Async.Catch task with 
@@ -161,9 +178,8 @@ module ComputerUse =
                     for o in response.output do
                         match o with
                         | Computer_call cb -> 
-                            match cb.pending_safety_checks with 
-                            | [] -> ()
-                            | scs -> for sc in scs do debug $"Pending safety check: %A{sc}"  //in future we may bring the human in loop to handle these warnings
+                            cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 100 |> postWarning runState
+                            cb.action |> actionToString |> postAction runState
                             do! doAction cb.action runState.browser                             
                         | _ -> ()
                     do! Async.Sleep(1000)

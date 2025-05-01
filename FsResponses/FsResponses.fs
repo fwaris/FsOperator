@@ -129,6 +129,11 @@ type ReasoningOutput = {
     status : string option
 }
 
+type Point = {x:int; y:int}
+type Path = {
+    path : Point list
+} 
+
 type Action = 
     | [<JsonPropertyName "click">] Click of {| button:string; x:int; y:int|}
     | [<JsonPropertyName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
@@ -136,6 +141,9 @@ type Action =
     | [<JsonPropertyName "type">] Type of {| text:string|}
     | [<JsonPropertyName "wait">] Wait 
     | [<JsonPropertyName "screenshot">] Screenshot 
+    | [<JsonPropertyName "double_click">] Double_click of {|x:int; y:int|}
+    | [<JsonPropertyName "drag">] Drag of Path
+    | [<JsonPropertyName "move">] Move of {| x:int; y:int |}
 
 
 type ComputerCall = {

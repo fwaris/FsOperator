@@ -37,10 +37,10 @@ module Update =
         ]
 
     let initialInstructions = """
-You should have a view of the my linkedin feed.
+You should have a view of the my twitter feed.
 Starting from that find all interesting new items related
 to Generative AI and summarize them.
-Don't go beyone 10 pages.
+Don't go beyond 10 pages.
 """
 
     let init _   = 
@@ -51,8 +51,10 @@ Don't go beyone 10 pages.
             mailbox = Channel.CreateBounded(10)
             log = []
             output = ""
-            url = Uri "https://linkedin.com"
+            url = Uri "https://twitter.com"
             webview = ref None
+            action = ""
+            warning = ""
         }        
         model,Cmd.ofMsg Initialize
 
@@ -92,6 +94,10 @@ Don't go beyone 10 pages.
                 {model with output=output}, Cmd.none
             | ClearOutput -> {model with output = ""}, Cmd.none
             | SetUrl txt -> {model with url=Uri txt}, Cmd.none
+
+            | SetAction txt -> {model with action=txt}, Cmd.none
+            | SetWarning txt -> {model with warning = txt},Cmd.none
+            | TurnEnd -> {model with warning = "Current turn ended"}, Cmd.ofMsg Stop
     
             | _ -> model, Cmd.none
         with ex -> 

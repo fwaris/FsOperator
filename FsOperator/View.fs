@@ -98,7 +98,7 @@ type Views =
 
     static member statusBar model dispatch = 
         Border.create [
-            Grid.row 1
+            Grid.row 2
             Grid.columnSpan 2
             Border.horizontalAlignment HorizontalAlignment.Stretch
             Border.verticalAlignment VerticalAlignment.Bottom
@@ -110,17 +110,16 @@ type Views =
                 StackPanel.create [
                     StackPanel.orientation Orientation.Horizontal
                     StackPanel.children [
-                        Button.create [
-                            Button.background Brushes.Transparent
-                            Button.content (
-                                Ellipse.create [
-                                    Shapes.Ellipse.tip $"Service connection: "
-                                    Shapes.Ellipse.width 10.
-                                    Shapes.Ellipse.height 10.
-                                    Shapes.Ellipse.margin (Thickness(5.,0.,5.,0.))
-                                    Shapes.Ellipse.verticalAlignment VerticalAlignment.Center
-                                ])
-                            Button.onClick (fun _ -> ())
+                        TextBlock.create [
+                            TextBlock.margin (Thickness(5,0,0,0))
+                            TextBlock.verticalAlignment VerticalAlignment.Center
+                            TextBlock.text model.action
+                        ]
+                        TextBlock.create [
+                            TextBlock.verticalAlignment VerticalAlignment.Center
+                            TextBlock.fontStyle FontStyle.Italic
+                            TextBlock.margin (Thickness(10,0,0,0))
+                            TextBlock.text model.warning
                         ]
                     ]
                 ]
@@ -139,6 +138,7 @@ type Views =
                     ToggleSwitch.isEnabled model.browser.IsSome
                     ToggleSwitch.onChecked (fun _ -> dispatch Start)
                     ToggleSwitch.onUnchecked (fun _ -> dispatch Stop)
+                    ToggleSwitch.isChecked model.runState.IsSome
                     ToggleSwitch.horizontalAlignment HorizontalAlignment.Left
                     ToggleSwitch.verticalAlignment VerticalAlignment.Center
                     ToggleSwitch.margin (Thickness(leftMargin,2.,2.,2.))
@@ -178,9 +178,9 @@ type Views =
                 ]
                 Button.create [
                     Grid.row 3
-                    Button.content "\u2715"
+                    Button.content "\u232b"
                     Button.tip "Clear output"
-                    Button.onClick (fun _ -> ())//dispatch ClearOutput)
+                    Button.onClick (fun _ -> dispatch ClearOutput)
                     Button.margin (Thickness(5.))
                     Button.horizontalAlignment HorizontalAlignment.Right
                     Button.verticalAlignment VerticalAlignment.Top                    
@@ -193,6 +193,7 @@ type Views =
                     TextBlock.verticalAlignment VerticalAlignment.Stretch
                     TextBlock.fontSize 14.                    
                     TextBlock.background Brushes.DarkSlateBlue
+                    TextBlock.textWrapping TextWrapping.Wrap
                     TextBlock.margin (Thickness(leftMargin,0.,2.,6.))
                 ]
             ]
@@ -216,13 +217,14 @@ type Views =
                     )
                 ]
                 Grid.create [
-                    Grid.rowDefinitions "35,*"
+                    Grid.rowDefinitions "35,*,33"
                     Grid.columnDefinitions "*,300"
-                    Grid.horizontalAlignment HorizontalAlignment.Stretch                    
+                    Grid.horizontalAlignment HorizontalAlignment.Stretch   
                     Grid.children [
                         Views.navigationBar model dispatch
                         Views.webview model dispatch
                         Views.instructions model dispatch
+                        Views.statusBar model dispatch
                         GridSplitter.create [
                             Grid.column 1
                             Grid.rowSpan 2

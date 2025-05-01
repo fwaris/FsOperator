@@ -34,6 +34,8 @@ type Model = {
     url : Uri
     browser : IBrowser option
     webview : Ref<WebView option>
+    action : string
+    warning : string
 }
 
 type ClientMsg =
@@ -47,5 +49,8 @@ type ClientMsg =
     | AppendOutput of string
     | ClearOutput
     | SetUrl of string
+    | SetAction of string
+    | SetWarning of string
+    | TurnEnd
 
 
