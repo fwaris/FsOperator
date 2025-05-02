@@ -4,9 +4,10 @@
 		<TargetFrameworks>net9.0</TargetFrameworks>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 	</PropertyGroup>
-	
+
 	<PropertyGroup>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<PlatformTarget>x64</PlatformTarget>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -19,7 +20,7 @@
 		<Compile Include="View.fs" />
 		<Compile Include="Program.fs" />
 	</ItemGroup>
-	
+
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Desktop" Version="11.2.8" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.2.8" />
@@ -33,10 +34,13 @@
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
 		<PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+		<PackageReference Include="WebViewControl-Avalonia" Version="3.120.9" />
+		<!--
 		<PackageReference Include="WebView.Avalonia.Cross" Version="11.2.4" />
 		<PackageReference Include="WebView.Avalonia.Desktop.Cross" Version="11.2.4" />
+		-->
 	</ItemGroup>
-	
+
 	<ItemGroup>
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	</ItemGroup>

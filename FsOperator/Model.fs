@@ -2,7 +2,7 @@
 open System
 open System.Threading.Channels
 open Microsoft.Playwright
-open AvaloniaWebView
+open WebViewControl
 
 //need these stable for the duration of the run
 type RunState = {

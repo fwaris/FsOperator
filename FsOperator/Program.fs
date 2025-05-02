@@ -7,7 +7,6 @@ open Avalonia.Themes.Fluent
 open Avalonia.FuncUI
 open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Hosts
-open Avalonia.WebView.Desktop
 open System
 
 type MainWindow() as this =
@@ -21,7 +20,7 @@ type MainWindow() as this =
         Program.mkProgram Update.init (Update.update this) Views.main
         |> Program.withHost this
         |> Program.withSubscription Update.subscriptions
-        |> Program.withConsoleTrace        
+        |> Program.withConsoleTrace
         |> Program.runWithAvaloniaSyncDispatch ()
 
 
@@ -42,19 +41,24 @@ type App() =
             //win.Closing.Add(fun _ -> Connection.disconnect())
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
-            System.Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-port=9222")
+
         | _ -> ()
 
 module Program =
 
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
+        //System.Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-port=9222")
+        //System.Environment.SetEnvironmentVariable("WEBVIEW_REMOTE_DEBUGGING_PORT", "9222")
+        //System.Environment.SetEnvironmentVariable("CHROME_REMOTE_DEBUGGING_PORT","9222")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", "9222")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("auto-open-devtools-for-tabs", "")
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
             //.UseSkia()
-            .UseDesktopWebView()
+            //.UseDesktopWebView()
 #if DEBUG
-            //.LogToTrace(LogEventLevel.Debug)            
+            //.LogToTrace(LogEventLevel.Debug)
 #endif
             .StartWithClassicDesktopLifetime(args)

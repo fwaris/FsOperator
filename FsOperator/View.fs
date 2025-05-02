@@ -6,10 +6,10 @@ open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open AvaloniaWebView
-open AvaloniaWebView.Ext
+open WebViewControl
+open WebViewControl.Ext
 
-module Nav = 
+module Nav =
     let clickIndicatorScript = """
 if (!window.__clickIndicatorInjected) {
     window.__clickIndicatorInjected = true;
@@ -40,8 +40,8 @@ if (!window.__clickIndicatorInjected) {
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
 [<AbstractClass; Sealed>]
-type Views =    
-    static member navigationBar model dispatch = 
+type Views =
+    static member navigationBar model dispatch =
         TextBox.create [
             TextBox.init (fun x -> Nav.nav.Value <- x)
             Grid.row 0
@@ -50,46 +50,53 @@ type Views =
             TextBox.borderBrush Brushes.LightBlue
             TextBox.verticalAlignment VerticalAlignment.Top
             TextBox.horizontalAlignment HorizontalAlignment.Stretch
-            TextBox.onKeyDown (fun e -> 
+            TextBox.onKeyDown (fun e ->
                 if e.Key = Avalonia.Input.Key.Enter then
                     if Nav.nav.Value<> Unchecked.defaultof<_> then
                         let url = Nav.nav.Value.Text
-                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
+                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
                             dispatch (SetUrl url)
                         else
                             debug($"Invalid URL: {url}")
                     else
-                        debug("URL is empty")            
+                        debug("URL is empty")
             )
             TextBox.margin 2.0
         ]
 
-    static member webview model dispatch = 
+    static member webview model dispatch =
         WebView.create [
-            Grid.row 1 
-            WebView.url model.url
-            WebView.init (fun wv -> 
-                model.webview.Value <- Some wv
-                wv.WebViewCreated.Add(fun args -> 
-                    task {
-                        try
-                            let! pw = Playwright.CreateAsync()
-                            let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")                            
-                            let page = browser.Contexts.[0].Pages.[0]
-                            do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
-                            dispatch (BrowserConnected browser)
-                        with ex ->                                                                         
-                            debug (sprintf "%A" ex)
-                    }
-                    |> ignore
-                    ()
-                )
-                wv.WebViewNewWindowRequested.Add(fun args ->
-                    args.UrlLoadingStrategy <- WebViewCore.Enums.UrlRequestStrategy.OpenInWebView
-                ))   
+            Grid.row 1
+            WebView.address (model.url.ToString())
+            WebView.init (fun wv ->
+                match model.webview.Value with
+                | Some _ -> ()
+                | None ->
+                    model.webview.Value <- Some wv
+                    wv.Initialized.Add(fun args ->
+                        task {
+                            try
+
+                                let! pw = Playwright.CreateAsync()
+                                let opts = BrowserTypeConnectOptions()
+
+                                //let! browser = pw.Chromium.ConnectAsync("ws://localhost:9222/devtools/browser/")
+                                let opts = BrowserTypeConnectOverCDPOptions()
+
+                                let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")
+                                let page = browser.Contexts.[0].Pages.[0]
+                                do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
+                                dispatch (BrowserConnected browser)
+                            with ex ->
+                                debug (sprintf "%A" ex)
+                        }
+                        |> ignore
+                        ()
+                    )
+            )
         ]
 
-    static member statusBar model dispatch = 
+    static member statusBar model dispatch =
         Border.create [
             Grid.row 2
             Grid.columnSpan 2
@@ -98,7 +105,7 @@ type Views =
             Border.margin 3
             Border.background Brushes.DarkSlateGray
             Border.borderThickness 1.0
-            Border.borderBrush Brushes.LightBlue                            
+            Border.borderBrush Brushes.LightBlue
             Border.child(
                 StackPanel.create [
                     StackPanel.orientation Orientation.Horizontal
@@ -117,7 +124,7 @@ type Views =
                     ]
                 ]
             )
-        ]                            
+        ]
 
     static member instructions model dispatch =
         let leftMargin = 10.
@@ -127,7 +134,7 @@ type Views =
             Grid.rowDefinitions "30,30,*,40,*"
             Grid.children [
                 ToggleSwitch.create [
-                    Grid.row 0 
+                    Grid.row 0
                     ToggleSwitch.isEnabled model.browser.IsSome
                     ToggleSwitch.onChecked (fun _ -> dispatch Start)
                     ToggleSwitch.onUnchecked (fun _ -> dispatch Stop)
@@ -176,7 +183,7 @@ type Views =
                     Button.onClick (fun _ -> dispatch ClearOutput)
                     Button.margin (Thickness(5.))
                     Button.horizontalAlignment HorizontalAlignment.Right
-                    Button.verticalAlignment VerticalAlignment.Top                    
+                    Button.verticalAlignment VerticalAlignment.Top
                     Button.fontSize 10.
                 ]
                 TextBlock.create  [
@@ -184,7 +191,7 @@ type Views =
                     TextBlock.text model.output
                     TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                     TextBlock.verticalAlignment VerticalAlignment.Stretch
-                    TextBlock.fontSize 14.                    
+                    TextBlock.fontSize 14.
                     TextBlock.background Brushes.DarkSlateBlue
                     TextBlock.textWrapping TextWrapping.Wrap
                     TextBlock.margin (Thickness(leftMargin,0.,2.,6.))
@@ -193,7 +200,7 @@ type Views =
         ]
 
     static member main model dispatch =
-        DockPanel.create [               
+        DockPanel.create [
             DockPanel.children [
                 Expander.create [
                     Expander.margin (Thickness(2.))
@@ -212,7 +219,7 @@ type Views =
                 Grid.create [
                     Grid.rowDefinitions "35,*,33"
                     Grid.columnDefinitions "*,300"
-                    Grid.horizontalAlignment HorizontalAlignment.Stretch   
+                    Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.children [
                         Views.navigationBar model dispatch
                         Views.webview model dispatch
@@ -223,12 +230,12 @@ type Views =
                             Grid.rowSpan 2
                             GridSplitter.verticalAlignment VerticalAlignment.Center
                             GridSplitter.height 50.
-                            GridSplitter.horizontalAlignment HorizontalAlignment.Left                                
-                            GridSplitter.background Brushes.DarkGray                                
+                            GridSplitter.horizontalAlignment HorizontalAlignment.Left
+                            GridSplitter.background Brushes.DarkGray
                         ]
                     ]
                 ]
-               
+
             ]
         ]
-    
+
