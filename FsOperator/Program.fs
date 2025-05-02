@@ -14,14 +14,14 @@ type MainWindow() as this =
     inherit HostWindow()
 
     do
-        base.Title <- "WebView Test"
+        base.Title <- "Computer Use Agent"
         base.Width <- 800.0
         base.Height <- 500.0
 
         Program.mkProgram Update.init (Update.update this) Views.main
         |> Program.withHost this
         |> Program.withSubscription Update.subscriptions
-        |> Program.withConsoleTrace        
+        //|> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
 

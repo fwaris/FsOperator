@@ -8,6 +8,7 @@ open Avalonia.Media
 open Avalonia
 open AvaloniaWebView
 open AvaloniaWebView.Ext
+open Microsoft.Playwright
 
 module Nav = 
     let clickIndicatorScript = """
@@ -19,7 +20,7 @@ if (!window.__clickIndicatorInjected) {
         document.addEventListener('click', event => {
             console.log('🖱 Click at', event.pageX, event.pageY);
             const circle = document.createElement('div');
-            circle.style.position = 'absolute';
+            circle.style.position = 'fixed';
             circle.style.width = '20px';
             circle.style.height = '20px';
             circle.style.border = '2px solid red';
@@ -29,7 +30,7 @@ if (!window.__clickIndicatorInjected) {
             circle.style.top = `${event.pageY - 10}px`;
             circle.style.zIndex = '9999';
             document.body.appendChild(circle);
-            setTimeout(() => circle.remove(), 1000);
+            setTimeout(() => circle.remove(), 700);
         }, true);
     }
 
@@ -69,20 +70,25 @@ type Views =
             Grid.row 1 
             WebView.url model.url
             WebView.init (fun wv -> 
-                model.webview.Value <- Some wv
-                wv.WebViewCreated.Add(fun args -> 
-                    task {
-                        try
-                            let! pw = Playwright.CreateAsync()
-                            let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222")                            
-                            let page = browser.Contexts.[0].Pages.[0]
-                            do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
-                            dispatch (BrowserConnected browser)
-                        with ex ->                                                                         
-                            debug (sprintf "%A" ex)
-                    }
-                    |> ignore
-                    ()
+                match model.webview.Value with
+                | Some _ -> ()
+                | None -> 
+                    model.webview.Value <- Some wv
+                    wv.WebViewCreated.Add(fun args -> 
+                        task {
+                            try
+                                let! pw = Playwright.CreateAsync()
+                                let opts = BrowserTypeConnectOverCDPOptions()
+                                opts.SlowMo <- 100.f
+                                let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222", opts)                            
+                                let page = browser.Contexts.[0].Pages.[0]
+                                do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
+                                dispatch (BrowserConnected browser)
+                            with ex ->                                                                         
+                                debug (sprintf "%A" ex)
+                        }
+                        |> ignore
+                        ()
                 )
                 wv.WebViewNewWindowRequested.Add(fun args ->
                     args.UrlLoadingStrategy <- WebViewCore.Enums.UrlRequestStrategy.OpenInWebView

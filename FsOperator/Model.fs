@@ -52,5 +52,6 @@ type ClientMsg =
     | SetAction of string
     | SetWarning of string
     | TurnEnd
+    | StopWithError of exn
 
 

@@ -6,6 +6,7 @@ open FsResponses
 open System.IO
 
 module ComputerUse =
+    open Microsoft.Playwright
   
     let startMessaging (runState:RunState) =
         let sendLoop = 
@@ -23,7 +24,9 @@ module ComputerUse =
             async {
                 match! Async.Catch sendLoop with 
                 | Choice1Of2 _ -> debug "dispose sendLoop"
-                | Choice2Of2 ex -> debug $"Error in sendLoop: %s{ex.Message}"
+                | Choice2Of2 ex -> 
+                    debug $"Error in sendLoop: %s{ex.Message}"                    
+                    runState.mailbox.Writer.TryWrite(StopWithError ex) |> ignore
             }
         Async.Start(comp, runState.tokenSource.Token)
 
@@ -31,6 +34,8 @@ module ComputerUse =
         async {
             let wctx = browser.Contexts.[0]
             let page = wctx.Pages.[0]
+            let opts = PageScreenshotOptions()
+            opts.Type <- ScreenshotType.Png
             let! image = page.ScreenshotAsync() |> Async.AwaitTask
             use ms = new MemoryStream(image)
             use bmp = System.Drawing.Image.FromStream(ms)
@@ -101,11 +106,6 @@ module ComputerUse =
                 do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
-    let mouseButton = function 
-        | Buttons.Left -> MouseButton.Left
-        | Buttons.Middle -> MouseButton.Middle
-        | Buttons.Right -> MouseButton.Right
-        | x -> failwith $"Unknown button {x}"
         
     let private (==) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
@@ -115,12 +115,15 @@ module ComputerUse =
             | Click p -> $"click({p.x},{p.y})"
             | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
             | Double_click p -> $"dbl_click({p.x},{p.y})"
-            | Drag p -> $"drag {p.path.Head} -> {List.last p.path}"
             | Keypress p -> $"keys {p.keys}"
             | Move p -> $"move({p.x},{p.y})"
             | Screenshot -> "screenshot"
             | Type p -> $"type {p.text}"
             | Wait  -> "wait"
+            | Drag p -> 
+                let s = p.path.Head
+                let t = List.last p.path
+                $"drag {s.x},{s.y} -> {t.x},{t.y}"
         with ex -> 
             debug $"Error in actionToString: %s{ex.Message}"
             sprintf "%A" action
@@ -128,14 +131,32 @@ module ComputerUse =
     let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
     let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
 
+    type RequestAction = 
+        | Btn of MouseButton
+        | Back 
+        | Forward
+        | Unknown
+    let mouseButton = function 
+        | Buttons.Left          -> Btn MouseButton.Left
+        | Buttons.Middle        -> Btn MouseButton.Middle
+        | Buttons.Right         -> Btn MouseButton.Right
+        | "back" | "Back"       -> Back
+        | "forward" | "Forward" -> Forward
+        | x -> debug $"cannot use '{x}' button"; Unknown
+
     let doAction (action:Action) (browser:IBrowser)  =
         let task = 
             async {
                 let page = browser.Contexts.[0].Pages.[0]
                 match action with 
                 | Click p -> 
-                    let opts = MouseClickOptions(Button = mouseButton p.button)
-                    do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
+                    match mouseButton p.button with
+                    | Btn btn -> 
+                        let opts = MouseClickOptions(Button = btn)
+                        do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
+                    | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
+                    | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
+                    | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
                 | Scroll p ->
                     do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask                                
                     let! _ = page.EvaluateAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
@@ -146,8 +167,11 @@ module ComputerUse =
                         |> List.map (fun k -> 
                             if k == "Enter" then "Enter"                             //Playwright does not support Enter key
                             elif k == "space" then " "
+                            elif k = "backspace" then "Backspace"
                             elif k == "ESC" then "Escape"
+                            elif k == "SHIFT" then "Shift"
                             elif k == "CTRL" then "Control"
+                            elif k == "TAB" then "Tab"
                             else k)
                     let compositKey = mappeKeys |> String.concat "+"
                     let opts = KeyboardPressOptions()
@@ -161,10 +185,13 @@ module ComputerUse =
                 | Drag p ->                     
                     let s = p.path.Head
                     let t = List.last p.path 
-                    let opts = PageDragAndDropOptions()
-                    opts.SourcePosition <- SourcePosition(X = float32 s.x, Y = float32 s.y)
-                    opts.TargetPosition <- TargetPosition(X = float32 t.x, Y = float32 t.y)
-                    do! page.DragAndDropAsync("#source","#target",opts) |> Async.AwaitTask
+                    do! page.Mouse.MoveAsync(float32 s.x,float32 s.y) |> Async.AwaitTask
+                    do! page.Mouse.DownAsync() |> Async.AwaitTask
+                    do! page.Mouse.MoveAsync(float32 t.x, float32 t.y, MouseMoveOptions(Steps=10)) |> Async.AwaitTask
+                    // let opts = PageDragAndDropOptions()
+                    // opts.SourcePosition <- SourcePosition(X = float32 s.x, Y = float32 s.y)
+                    // opts.TargetPosition <- TargetPosition(X = float32 t.x, Y = float32 t.y)
+                    // do! page.DragAndDropAsync("#source","#target",opts) |> Async.AwaitTask
             }
         async{
             match! Async.Catch task with 

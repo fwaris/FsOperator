@@ -32,7 +32,8 @@ module Update =
 
     let initialInstructions = """
 On Amazon, find me an iphone 16 pro max case that has 
-built in screen protector and is less than $40 with good rating
+**built in screen protector** and is less than $50 with good rating.
+*make sure the price is less than $50*
 """
 
     let init _   = 
@@ -90,6 +91,7 @@ built in screen protector and is less than $40 with good rating
             | SetAction txt -> {model with action=txt}, Cmd.none
             | SetWarning txt -> {model with warning = txt},Cmd.none
             | TurnEnd -> {model with warning = "Current turn ended"}, Cmd.ofMsg Stop
+            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else {model with warning = ex.Message}, Cmd.ofMsg Stop
     
             | _ -> model, Cmd.none
         with ex -> 
