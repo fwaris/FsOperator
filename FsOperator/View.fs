@@ -11,37 +11,6 @@ open AvaloniaWebView.Ext
 open Microsoft.Playwright
 
 module Nav = 
-    let drawClickFunction = """
-    function (x, y) {
-        const circle = document.createElement('div');
-        circle.style.position = 'fixed';
-        circle.style.width = '20px';
-        circle.style.height = '20px';
-        circle.style.border = '2px solid red';
-        circle.style.borderRadius = '50%';
-        circle.style.pointerEvents = 'none';
-        circle.style.left = `${x - 10}px`;
-        circle.style.top = `${y - 10}px`;
-        circle.style.zIndex = '9999';
-        document.body.appendChild(circle);
-        setTimeout(() => circle.remove(), 700);
-    };
-"""
-
-    let clickIndicatorScript_global = $"""
-if (!window.__clickIndicatorInjected) {{
-    window.__clickIndicatorInjected = true;
-    window.drawClick = {drawClickFunction}
-    console.log('✅ Click indicator script injected');
-}};
-"""
-
-    let clickIndicatorScript_page = $"""
-() => {{
-    window.drawClick = {drawClickFunction}
-}};
-"""
-
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
 [<AbstractClass; Sealed>]
@@ -56,7 +25,7 @@ type Views =
             Border.horizontalAlignment HorizontalAlignment.Stretch
             Border.child (        
                 Grid.create [
-                    Grid.columnDefinitions "75*,25*"
+                    Grid.columnDefinitions "65*,35*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.verticalAlignment VerticalAlignment.Stretch
                     Grid.children [                    
@@ -112,8 +81,10 @@ type Views =
                                 opts.SlowMo <- 100.f
                                 let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222", opts)                            
                                 let page = browser.Contexts.[0].Pages.[0]
-                                do! page.AddInitScriptAsync(Nav.clickIndicatorScript_global) |> Async.AwaitTask
-                                let! _ = page.EvaluateAsync(Nav.clickIndicatorScript_page) |> Async.AwaitTask
+                                do! page.SetViewportSizeAsync(1280,720) //this seems to be necessary for best results
+                                do! page.AddInitScriptAsync(Scripts.indicatorScript_global) |> Async.AwaitTask
+                                let! _ = page.EvaluateAsync(Scripts.indicatorScript_page) |> Async.AwaitTask
+                                //let! _ = page.EvaluateAsync("()=>drawArrow(100, 100, 50, Math.PI / 2, 2000);")
                                 //let x,y = let s = wv.Bounds.Size in int s.Width/2, int s.Height/2
                                 //let! _ = page.EvaluateAsync($"() => window.drawClick({x},{y})") |> Async.AwaitTask
 

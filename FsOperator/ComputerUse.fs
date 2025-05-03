@@ -125,12 +125,12 @@ module ComputerUse =
         }
 
         
-    let private (==) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
+    let private (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
     let actionToString action = 
         try
             match action with
-            | Click p -> $"click({p.x},{p.y})"
+            | Click p -> $"click({p.x},{p.y},{p.button})"
             | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
             | Double_click p -> $"dbl_click({p.x},{p.y})"
             | Keypress p -> $"keys {p.keys}"
@@ -145,6 +145,39 @@ module ComputerUse =
         with ex -> 
             debug $"Error in actionToString: %s{ex.Message}"
             sprintf "%A" action
+
+
+
+    let previewAction (duration:int) (action:Action) (browser:IBrowser) = 
+        let page = browser.Contexts.[0].Pages.[0]
+        async {
+            match action with
+            | Click p ->
+                let! _ = page.EvaluateAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
+                do! Async.Sleep(duration)
+            | Scroll p -> 
+                let degrees = 
+                    match p.scroll_x,p.scroll_y with
+                    | x,y when x = 0 && y < 0 -> 3. * Math.PI / 2. 
+                    | x,y when x = 0          -> Math.PI / 2.
+                    | x,y when x < 0          -> Math.PI
+                    | _                       -> 0.
+                let! _ = page.EvaluateAsync($"() => window.drawArrow(50,100, 30, {degrees}, {duration});") |> Async.AwaitTask
+                do! Async.Sleep(duration)
+            | _ -> ()
+            (*
+            | Double_click p -> $"dbl_click({p.x},{p.y})"
+            | Keypress p -> $"keys {p.keys}"
+            | Move p -> $"move({p.x},{p.y})"
+            | Screenshot -> "screenshot"
+            | Type p -> $"type {p.text}"
+            | Wait  -> "wait"
+            | Drag p -> 
+                let s = p.path.Head
+                let t = List.last p.path
+                $"drag {s.x},{s.y} -> {t.x},{t.y}"
+            *)
+        }        
 
 
     type RequestAction = 
@@ -169,27 +202,29 @@ module ComputerUse =
                     match mouseButton p.button with
                     | Btn btn -> 
                         let opts = MouseClickOptions(Button = btn)
-                        let! _ = page.EvaluateAsync($"() => window.drawClick({p.x},{p.y})") |> Async.AwaitTask
-                        do! Async.Sleep(1000)
                         do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
                     | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
                     | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
                     | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
                 | Scroll p ->
-                    do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask                                
+                    do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
                     let! _ = page.EvaluateAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
                     ()
                 | Keypress p -> 
                     let mappeKeys = 
                         p.keys 
                         |> List.map (fun k -> 
-                            if k == "Enter" then "Enter"                             //Playwright does not support Enter key
-                            elif k == "space" then " "
-                            elif k = "backspace" then "Backspace"
-                            elif k == "ESC" then "Escape"
-                            elif k == "SHIFT" then "Shift"
-                            elif k == "CTRL" then "Control"
-                            elif k == "TAB" then "Tab"
+                            if k =*= "Enter" then "Enter"                             //Playwright does not support Enter key
+                            elif k =*= "space" then " "
+                            elif k =*= "backspace" then "Backspace"
+                            elif k =*= "ESC" then "Escape"
+                            elif k =*= "SHIFT" then "Shift"
+                            elif k =*= "CTRL" then "Control"
+                            elif k =*= "TAB" then "Tab"
+                            elif k =*= "ArrowLeft" then "ArrowLeft"
+                            elif k =*= "ArrowRight" then "ArrowRight"
+                            elif k =*= "ArrowUp" then "ArrowUp"
+                            elif k =*= "ArrowDown" then "ArrowDown"
                             else k)
                     let compositKey = mappeKeys |> String.concat "+"
                     let opts = KeyboardPressOptions()
@@ -226,7 +261,8 @@ module ComputerUse =
                         | Computer_call cb -> 
                             cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 100 |> postWarning runState
                             cb.action |> actionToString |> postAction runState
-                            do! Async.Sleep 5000
+                            do! Async.Sleep 500
+                            do! previewAction 5000 cb.action runState.browser
                             do! doAction cb.action runState.browser                             
                         | _ -> ()
                     do! Async.Sleep(1000)

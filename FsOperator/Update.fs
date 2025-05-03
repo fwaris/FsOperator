@@ -30,21 +30,18 @@ module Update =
                 [nameof sub2], sub2
         ]
 
-    let initialInstructions = """
-On Amazon, find me an iphone 16 pro max case that has 
-**built in screen protector** and is less than $50 with good rating.
-*make sure the price is less than $50*
-"""
-
     let init _   = 
+        //let url,instructions = StartPrompts.amazon
+        //let url,instructions = StartPrompts.linkedIn
+        let url,instructions = StartPrompts.twitter
         let model = {
             browser = None
-            instructions=initialInstructions
+            instructions=instructions
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
             output = ""
-            url = Uri "https://amazon.com"
+            url = Uri url
             webview = ref None
             action = ""
             warning = ""
