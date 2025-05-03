@@ -188,10 +188,6 @@ module ComputerUse =
                     do! page.Mouse.MoveAsync(float32 s.x,float32 s.y) |> Async.AwaitTask
                     do! page.Mouse.DownAsync() |> Async.AwaitTask
                     do! page.Mouse.MoveAsync(float32 t.x, float32 t.y, MouseMoveOptions(Steps=10)) |> Async.AwaitTask
-                    // let opts = PageDragAndDropOptions()
-                    // opts.SourcePosition <- SourcePosition(X = float32 s.x, Y = float32 s.y)
-                    // opts.TargetPosition <- TargetPosition(X = float32 t.x, Y = float32 t.y)
-                    // do! page.DragAndDropAsync("#source","#target",opts) |> Async.AwaitTask
             }
         async{
             match! Async.Catch task with 
