@@ -11,31 +11,35 @@ open AvaloniaWebView.Ext
 open Microsoft.Playwright
 
 module Nav = 
-    let clickIndicatorScript = """
-if (!window.__clickIndicatorInjected) {
+    let drawClickFunction = """
+    function (x, y) {
+        const circle = document.createElement('div');
+        circle.style.position = 'fixed';
+        circle.style.width = '20px';
+        circle.style.height = '20px';
+        circle.style.border = '2px solid red';
+        circle.style.borderRadius = '50%';
+        circle.style.pointerEvents = 'none';
+        circle.style.left = `${x - 10}px`;
+        circle.style.top = `${y - 10}px`;
+        circle.style.zIndex = '9999';
+        document.body.appendChild(circle);
+        setTimeout(() => circle.remove(), 700);
+    };
+"""
+
+    let clickIndicatorScript_global = $"""
+if (!window.__clickIndicatorInjected) {{
     window.__clickIndicatorInjected = true;
+    window.drawClick = {drawClickFunction}
     console.log('✅ Click indicator script injected');
+}};
+"""
 
-    function addClickIndicator() {
-        document.addEventListener('click', event => {
-            console.log('🖱 Click at', event.pageX, event.pageY);
-            const circle = document.createElement('div');
-            circle.style.position = 'fixed';
-            circle.style.width = '20px';
-            circle.style.height = '20px';
-            circle.style.border = '2px solid red';
-            circle.style.borderRadius = '50%';
-            circle.style.pointerEvents = 'none';
-            circle.style.left = `${event.pageX - 10}px`;
-            circle.style.top = `${event.pageY - 10}px`;
-            circle.style.zIndex = '9999';
-            document.body.appendChild(circle);
-            setTimeout(() => circle.remove(), 700);
-        }, true);
-    }
-
-    addClickIndicator();
-}
+    let clickIndicatorScript_page = $"""
+() => {{
+    window.drawClick = {drawClickFunction}
+}};
 """
 
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
@@ -43,26 +47,52 @@ if (!window.__clickIndicatorInjected) {
 [<AbstractClass; Sealed>]
 type Views =    
     static member navigationBar model dispatch = 
-        TextBox.create [
-            TextBox.init (fun x -> Nav.nav.Value <- x)
+        Border.create [
             Grid.row 0
-            TextBox.text (model.url.ToString())
-            TextBox.borderThickness 1.0
-            TextBox.borderBrush Brushes.LightBlue
-            TextBox.verticalAlignment VerticalAlignment.Top
-            TextBox.horizontalAlignment HorizontalAlignment.Stretch
-            TextBox.onKeyDown (fun e -> 
-                if e.Key = Avalonia.Input.Key.Enter then
-                    if Nav.nav.Value<> Unchecked.defaultof<_> then
-                        let url = Nav.nav.Value.Text
-                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
-                            dispatch (SetUrl url)
-                        else
-                            debug($"Invalid URL: {url}")
-                    else
-                        debug("URL is empty")            
-            )
-            TextBox.margin 2.0
+            Border.borderThickness 1.0
+            Border.margin 2.0
+            Border.borderBrush Brushes.LightBlue
+            Border.verticalAlignment VerticalAlignment.Top
+            Border.horizontalAlignment HorizontalAlignment.Stretch
+            Border.child (        
+                Grid.create [
+                    Grid.columnDefinitions "75*,25*"
+                    Grid.horizontalAlignment HorizontalAlignment.Stretch
+                    Grid.verticalAlignment VerticalAlignment.Stretch
+                    Grid.children [                    
+                        TextBox.create [
+                            Grid.column 0
+                            TextBox.init (fun x -> Nav.nav.Value <- x)
+                            TextBox.text (model.url.ToString())
+                            TextBox.borderThickness 0.
+                            TextBox.margin 5
+                            TextBox.verticalAlignment VerticalAlignment.Center
+                            TextBox.horizontalAlignment HorizontalAlignment.Stretch
+                            TextBox.onKeyDown (fun e -> 
+                                if e.Key = Avalonia.Input.Key.Enter then
+                                    if Nav.nav.Value<> Unchecked.defaultof<_> then
+                                        let url = Nav.nav.Value.Text
+                                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
+                                            dispatch (SetUrl url)
+                                        else
+                                            debug($"Invalid URL: {url}")
+                                    else
+                                        debug("URL is empty")            
+                            )
+                        ]
+                        TextBlock.create [
+                                Grid.column 1
+                                TextBlock.verticalAlignment VerticalAlignment.Center
+                                TextBlock.horizontalAlignment HorizontalAlignment.Stretch
+                                TextBlock.background Brushes.DarkSlateBlue
+                                TextBlock.text model.action
+                                TextBlock.margin (Thickness(1,1,5,1))
+                                TextBlock.padding 3
+                        ]
+                    ]
+
+                ]
+            )    
         ]
 
     static member webview model dispatch = 
@@ -82,7 +112,11 @@ type Views =
                                 opts.SlowMo <- 100.f
                                 let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222", opts)                            
                                 let page = browser.Contexts.[0].Pages.[0]
-                                do! page.AddInitScriptAsync(Nav.clickIndicatorScript) |> Async.AwaitTask
+                                do! page.AddInitScriptAsync(Nav.clickIndicatorScript_global) |> Async.AwaitTask
+                                let! _ = page.EvaluateAsync(Nav.clickIndicatorScript_page) |> Async.AwaitTask
+                                //let x,y = let s = wv.Bounds.Size in int s.Width/2, int s.Height/2
+                                //let! _ = page.EvaluateAsync($"() => window.drawClick({x},{y})") |> Async.AwaitTask
+
                                 dispatch (BrowserConnected browser)
                             with ex ->                                                                         
                                 debug (sprintf "%A" ex)
@@ -109,11 +143,6 @@ type Views =
                 StackPanel.create [
                     StackPanel.orientation Orientation.Horizontal
                     StackPanel.children [
-                        TextBlock.create [
-                            TextBlock.margin (Thickness(5,0,0,0))
-                            TextBlock.verticalAlignment VerticalAlignment.Center
-                            TextBlock.text model.action
-                        ]
                         TextBlock.create [
                             TextBlock.verticalAlignment VerticalAlignment.Center
                             TextBlock.fontStyle FontStyle.Italic
@@ -216,7 +245,7 @@ type Views =
                     )
                 ]
                 Grid.create [
-                    Grid.rowDefinitions "35,*,33"
+                    Grid.rowDefinitions "50,*,33"
                     Grid.columnDefinitions "*,300"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch   
                     Grid.children [

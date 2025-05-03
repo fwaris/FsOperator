@@ -7,6 +7,24 @@ open System.IO
 
 module ComputerUse =
     open Microsoft.Playwright
+
+    let postLog (runState:RunState) msg =  runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog msg) |> ignore
+    let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
+    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
+
+    let rec sendWithRetry count (runState:RunState) (req:Request) =
+        async {
+            try
+                let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
+                return response
+            with ex ->
+                if count < 2 then 
+                    postLog runState $"send error: retry {count + 1}"
+                    return! sendWithRetry (count + 1) runState req
+                else
+                    postLog runState $"Unable to reconnect aborting"
+                    return raise ex
+        }
   
     let startMessaging (runState:RunState) =
         let sendLoop = 
@@ -14,9 +32,9 @@ module ComputerUse =
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
-                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"--> {request}") |> ignore
-                    let! response = Api.create request (Api.defaultClient()) |> Async.AwaitTask
-                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog $"<-- {response}") |> ignore
+                    postLog runState $"--> {request}"
+                    let! response = sendWithRetry 0 runState request                    
+                    postLog runState $"<-- {response}"    
                     do! runState.fromModel.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
                 }
             )
@@ -128,8 +146,6 @@ module ComputerUse =
             debug $"Error in actionToString: %s{ex.Message}"
             sprintf "%A" action
 
-    let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
-    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
 
     type RequestAction = 
         | Btn of MouseButton
@@ -153,6 +169,8 @@ module ComputerUse =
                     match mouseButton p.button with
                     | Btn btn -> 
                         let opts = MouseClickOptions(Button = btn)
+                        let! _ = page.EvaluateAsync($"() => window.drawClick({p.x},{p.y})") |> Async.AwaitTask
+                        do! Async.Sleep(1000)
                         do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
                     | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
                     | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
@@ -208,6 +226,7 @@ module ComputerUse =
                         | Computer_call cb -> 
                             cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 100 |> postWarning runState
                             cb.action |> actionToString |> postAction runState
+                            do! Async.Sleep 5000
                             do! doAction cb.action runState.browser                             
                         | _ -> ()
                     do! Async.Sleep(1000)
