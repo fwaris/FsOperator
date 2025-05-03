@@ -32,8 +32,10 @@ module Update =
 
     let init _   = 
         //let url,instructions = StartPrompts.amazon
+        let url,instructions = StartPrompts.netflix
         //let url,instructions = StartPrompts.linkedIn
-        let url,instructions = StartPrompts.twitter
+        //let url,instructions = StartPrompts.twitter
+        
         let model = {
             browser = None
             instructions=instructions

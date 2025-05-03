@@ -162,7 +162,7 @@ module ComputerUse =
                     | x,y when x = 0          -> Math.PI / 2.
                     | x,y when x < 0          -> Math.PI
                     | _                       -> 0.
-                let! _ = page.EvaluateAsync($"() => window.drawArrow(50,100, 30, {degrees}, {duration});") |> Async.AwaitTask
+                let! _ = page.EvaluateAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration});") |> Async.AwaitTask
                 do! Async.Sleep(duration)
             | _ -> ()
             (*

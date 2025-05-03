@@ -10,6 +10,7 @@ function (x, y, length, angle, duration = 2000) {
     canvas.width = 400;
     canvas.height = 300;
     canvas.style.position = 'fixed';
+    canvas.zIndex = '2147483647';
     canvas.style.left = `${x - canvas.width / 2}px`; // Centering logic
     canvas.style.top = `${y - canvas.height / 2}px`;
 
@@ -48,7 +49,6 @@ function drawFatArrow(ctx, x, y, length, angle, arrowHeadLength = 15, lineWidth 
     ctx.fillStyle = color;
     ctx.fill();
 }
-
 
     // Draw the arrow at the center of the canvas
     drawFatArrow(ctx, canvas.width / 2, canvas.height / 2, length, angle);

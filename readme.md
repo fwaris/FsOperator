@@ -30,12 +30,14 @@ Below is a screenshot demonstrating an Amazon search session to find a specific 
 2. **Hit Enter** to navigate. Log in manually if required.
 3. **Input task instructions** in the instructions box.
 4. **Toggle the switch to "On"** to begin the task.
-5. **Observe computer actions** in the status bar at the bottom, along with any security warnings.
-6. Expand the panel on the right to see the log of request and response messages.
+5. **Observe computer actions** issued by the model on right end of the addres bar. Any warnings, status or error messages are shown at the bottom. A dynamic script is injected into the browser page to preview actions before they are executed. Currently, mouse clicks and scroll requests are rendered on the screen.
+6. **See log messages** by expanding the panel on the right. It shows all API messages tha are sent and received.
 
-> A dynamic script is injected into the browser page to visualize clicks with a flashing red circle. This only works intermittently but may still show occasionally.
+> Note: the screen shakes when Playwright takes a screenshot (not sure if there is fix available)
 
-The model may issue **security warnings** that ideally should be acknowledged by a human. Currently, the app implicitly acknowledges these warnings to allow the process to continue uninterrupted.
+
+
+The model may issue **security warnings** that ideally should be acknowledged by a human. Currently, the app implicitly acknowledges these warnings to allow the process to continue uninterrupted. They are shown in the status bar.
 
 - The process continues until the model returns a **message** (completing its "turn").
 - The resulting message is displayed in the **Output** box.

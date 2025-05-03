@@ -29,3 +29,9 @@ generative AI in the recent past and
 summarize the postings
 """
 
+    let netflix = 
+        "https://www.netflix.com",
+        """
+On netflix.com search for well rate scifi movies 
+and give me a list
+"""
