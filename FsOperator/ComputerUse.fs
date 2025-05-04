@@ -67,7 +67,7 @@ module ComputerUse =
 
     let sendStartMessage (runState:RunState) =
        async {
-                let imgUrl,(w,h) = snapshot runState.browser |> Async.RunSynchronously
+                let! imgUrl,(w,h) = snapshot runState.browser
                 let contImg = Input_image {|image_url = imgUrl|}
                 let input = { Message.Default with content=[contImg]}
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
@@ -191,7 +191,7 @@ return 'done';
     const endX = canvas.width / 2 + length * Math.cos(angle);
     const endY = canvas.height / 2 + length * Math.sin(angle);
     const arrowHeadLength = 15;
-    const lineWidth = 4;
+    const lineWidth = 5;
     const color = 'orange';
 
     ctx.beginPath();
@@ -220,15 +220,13 @@ return 'done';
     setTimeout(function() {
         document.body.removeChild(canvas);
     }, duration);
-})
-
-"""
+})"""
 
     let drawArrow (x:int) (y:int) (length:int) (angle:float) (duration:int) (browser:IBrowser)= 
         async {
-            let script = $"""{arrowBase}({x}, {y}, {length}, {angle}, {duration});"""
+            let script = $"""{arrowBase}({x}, {y}, {length}, {angle}, {duration})"""
             let! page = page browser
-            let! _ = page.EvaluateFunctionAsync<string>(script) |> Async.AwaitTask
+            let! _ = page.EvaluateFunctionAsync(script) |> Async.AwaitTask
             return ()
         }
 
@@ -250,15 +248,15 @@ return 'done';
                         | x,y when x < 0          -> Math.PI
                         | _                       -> 0.
                     //let! _ = page.EvaluateFunctionAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration})") |> Async.AwaitTask
-                    do! drawArrow 50 100 40 degrees duration browser
-                    do! Async.Sleep(duration)
+                    do! drawArrow 100 200 40 degrees duration browser
+                    do! Async.Sleep(10)
                 | Drag p -> 
                     let s = p.path.Head
                     let t = List.last p.path
                     do! drawClick s.x s.y duration browser                    
                     do! Async.Sleep(300)
                     do! drawClick t.x t.y duration browser
-                    do! Async.Sleep(duration)
+                    do! Async.Sleep(10)
                 | _ -> ()
             with ex -> 
                 debug $"Error in previewAction: %s{ex.Message}"

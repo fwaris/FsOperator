@@ -30,6 +30,21 @@ module Update =
                 [nameof sub2], sub2
         ]
 
+    let testSomething (model:Model) =
+        async {
+            try
+                match model.browser with
+                | Some b ->  
+                    let! ua = b.GetUserAgentAsync() |> Async.AwaitTask
+                    //let! imgUrl,(w,h) = ComputerUse.snapshot b 
+                    do! ComputerUse.drawArrow 100 100 50 0. 2000 b
+                | None -> ()
+                debug "Test something"
+            with ex ->
+            debug $"Error in testSomething: {ex.Message}"
+        }
+        |> Async.Start
+
     let init _   = 
         let url,instructions = StartPrompts.amazon
         //let url,instructions = StartPrompts.netflix
@@ -91,7 +106,7 @@ module Update =
             | SetWarning txt -> {model with warning = txt},Cmd.none
             | TurnEnd -> {model with warning = "Current turn ended"}, Cmd.ofMsg Stop
             | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else {model with warning = ex.Message}, Cmd.ofMsg Stop
-    
+            | TestSomething -> testSomething model; model, Cmd.none
             | _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex

@@ -51,7 +51,7 @@ type App() =
                     try
                         conn.Disconnect()
                         conn.CloseAsync().WaitAsync(TimeSpan.FromSeconds 1.0).Wait()      
-                        CefRuntime.Shutdown()                        
+                        Async.RunSynchronously(async {CefRuntime.Shutdown()},1000) 
                     with ex ->
                         debug $"Error closing connection: {ex.Message}"
                 | None -> ())

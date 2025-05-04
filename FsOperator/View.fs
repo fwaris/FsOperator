@@ -127,8 +127,9 @@ type Views =
                                 try
                                     let! browser = Nav.connectToBrowser 9222
                                     let! page = ComputerUse.page browser
-                                    let! r = page.EvaluateFunctionAsync<string>(Scripts.indicatorScript_page) |> Async.AwaitTask
-                                    debug (sprintf "Indicator script result: %s" r)
+                                    let! ua = browser.GetUserAgentAsync() |> Async.AwaitTask //this seems to prime the connection
+                                    //let! r = page.EvaluateFunctionAsync<string>(Scripts.indicatorScript_page) |> Async.AwaitTask
+                                    //debug (sprintf "Indicator script result: %s" r)
 //                                    let! _ = page.EvaluateFunctionOnNewDocumentAsync(Scripts.indicatorScript_page) |> Async.AwaitTask 
                                     //wv.ShowDeveloperTools()
                                     //let! _ = page.ReloadAsync() |> Async.AwaitTask
@@ -155,6 +156,11 @@ type Views =
                 StackPanel.create [
                     StackPanel.orientation Orientation.Horizontal
                     StackPanel.children [
+                        Button.create [
+                            Button.content "Test"
+                            Button.margin (Thickness(2.))
+                            Button.onClick(fun _ -> dispatch TestSomething)
+                        ]                        
                         TextBlock.create [
                             TextBlock.verticalAlignment VerticalAlignment.Center
                             TextBlock.fontStyle FontStyle.Italic
