@@ -24,6 +24,7 @@ module WebView =
 
         static member address(address : string) =
             AttrBuilder<WebView>.CreateProperty<string>(WebView.AddressProperty, address, stringsEqual |> ValueOption<_>.Some)
+ 
 
         // static member devtools(address : string) =
         //     AttrBuilder<WebView>.CreateProperty<string>(WebView., address, stringsEqual |> ValueOption<_>.Some)

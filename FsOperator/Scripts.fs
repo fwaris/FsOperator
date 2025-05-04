@@ -48,7 +48,7 @@ function drawFatArrow(ctx, x, y, length, angle, arrowHeadLength = 15, lineWidth 
     ctx.lineTo(endX, endY);
     ctx.fillStyle = color;
     ctx.fill();
-}
+};
 
     // Draw the arrow at the center of the canvas
     drawFatArrow(ctx, canvas.width / 2, canvas.height / 2, length, angle);
@@ -84,12 +84,13 @@ if (!window.__indicatorInjected) {{
     window.drawClick = {drawClickFunction}
     window.drawArrow = {drawArrowFunction}
     console.log('✅ Click indicator script injected');
-}};
+}}
 """
 
     let indicatorScript_page = $"""
 () => {{
     window.drawClick = {drawClickFunction}
     window.drawArrow = {drawArrowFunction}
+    return "done"
 }}
 """

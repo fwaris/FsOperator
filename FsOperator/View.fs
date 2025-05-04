@@ -10,8 +10,10 @@ open Avalonia
 open WebViewControl
 open WebViewControl.Ext
 open PuppeteerSharp
+open Avalonia.Controls.Shapes
 
 module Nav = 
+    let connection = ref None
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
     let getWebSocketDebuggerUrl (port: int) : Task<string> =
@@ -29,7 +31,12 @@ module Nav =
             let! wsUrl = getWebSocketDebuggerUrl port
 
             let options = ConnectOptions(BrowserWSEndpoint = wsUrl)
-            let! browser = Puppeteer.ConnectAsync(options)
+            options.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
+            options.ProtocolTimeout <- 30000
+            let! temp = Puppeteer.ConnectAsync(options)    
+            let! _  = temp.CloseAsync() |> Async.AwaitTask //clear any hanging sessions
+            let! browser = Puppeteer.ConnectAsync(options) |> Async.AwaitTask
+            connection.Value <- Some browser
             return browser
         }
 
@@ -85,9 +92,30 @@ type Views =
             )    
         ]
 
+    static member overlay model dispatch = 
+        Canvas.create [
+            Canvas.background Brushes.AliceBlue
+            Canvas.isHitTestVisible false
+            Canvas.horizontalAlignment HorizontalAlignment.Stretch
+            Canvas.verticalAlignment VerticalAlignment.Stretch
+            Canvas.zIndex 100
+            Canvas.children [   
+                Ellipse.create [                    
+                    Ellipse.fill Brushes.Green
+                    Ellipse.width 100.
+                    Ellipse.height 100.
+                    Ellipse.horizontalAlignment HorizontalAlignment.Center
+                    Ellipse.verticalAlignment VerticalAlignment.Center
+                    Ellipse.margin (Thickness(0,0,0,0))
+                    Ellipse.stroke Brushes.Red
+                    Ellipse.strokeThickness 2.
+                ]
+            ]
+        ]
+
     static member webview model dispatch = 
-        WebView.create [
-            Grid.row 1 
+        WebView.create [                   
+            Grid.row 1
             WebView.address model.url
             WebView.init (fun wv -> 
                 match model.webview.Value with
@@ -98,10 +126,12 @@ type Views =
                             task {
                                 try
                                     let! browser = Nav.connectToBrowser 9222
-                                    let! page = ComputerUse.page browser                                    
-                                    let vopts = ViewPortOptions(Width=1280,Height=720)
-                                    do! page.SetViewportAsync(vopts) |> Async.AwaitTask
-                                    let! _ = page.EvaluateFunctionAsync(Scripts.indicatorScript_page) |> Async.AwaitTask
+                                    let! page = ComputerUse.page browser
+                                    let! r = page.EvaluateFunctionAsync<string>(Scripts.indicatorScript_page) |> Async.AwaitTask
+                                    debug (sprintf "Indicator script result: %s" r)
+//                                    let! _ = page.EvaluateFunctionOnNewDocumentAsync(Scripts.indicatorScript_page) |> Async.AwaitTask 
+                                    //wv.ShowDeveloperTools()
+                                    //let! _ = page.ReloadAsync() |> Async.AwaitTask
                                     dispatch (BrowserConnected browser)
                                 with ex ->                                                                         
                                     debug (sprintf "%A" ex)

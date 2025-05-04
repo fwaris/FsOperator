@@ -152,37 +152,127 @@ module ComputerUse =
             sprintf "%A" action
 
 
+    let drawClick (x:int) (y:int) (duration:int) (browser:IBrowser)= 
+        async {
+            let script = $"""
+{{
+const circle = document.createElement('div');
+circle.style.position = 'fixed';
+circle.style.width = '50px';
+circle.style.height = '50px';
+circle.style.backgroundColor = 'rgba(254, 153, 0, 0.70)';
+circle.style.borderRadius = '50%%';
+circle.style.pointerEvents = 'none';
+circle.style.left = `${{{x} - 25}}px`; // Center it correctly
+circle.style.top = `${{{y} - 25}}px`;
+circle.style.zIndex = '2147483647'; // Highest possible z-index
+document.body.appendChild(circle);
+setTimeout(() => circle.remove(), {duration});
+return 'done';
+}}
+"""
+            let! page = page browser
+            let! _ = page.EvaluateFunctionAsync<string>($"() => {script}") |> Async.AwaitTask
+            do! Async.Sleep(duration)
+        }
+
+    let arrowBase = """
+(function(x, y, length, angle, duration = 2000) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 300;
+    canvas.style.position = 'fixed';
+    canvas.style.zIndex = '2147483647';
+    canvas.style.left = (x - canvas.width / 2) + 'px';
+    canvas.style.top = (y - canvas.height / 2) + 'px';
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    const endX = canvas.width / 2 + length * Math.cos(angle);
+    const endY = canvas.height / 2 + length * Math.sin(angle);
+    const arrowHeadLength = 15;
+    const lineWidth = 4;
+    const color = 'orange';
+
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, canvas.height / 2);
+    ctx.lineTo(endX, endY);
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    const headAngle1 = angle + Math.PI / 6;
+    const headAngle2 = angle - Math.PI / 6;
+    const arrowPoint1X = endX - arrowHeadLength * Math.cos(headAngle1);
+    const arrowPoint1Y = endY - arrowHeadLength * Math.sin(headAngle1);
+    const arrowPoint2X = endX - arrowHeadLength * Math.cos(headAngle2);
+    const arrowPoint2Y = endY - arrowHeadLength * Math.sin(headAngle2);
+
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(arrowPoint1X, arrowPoint1Y);
+    ctx.lineTo(arrowPoint2X, arrowPoint2Y);
+    ctx.lineTo(endX, endY);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    setTimeout(function() {
+        document.body.removeChild(canvas);
+    }, duration);
+})
+
+"""
+
+    let drawArrow (x:int) (y:int) (length:int) (angle:float) (duration:int) (browser:IBrowser)= 
+        async {
+            let script = $"""{arrowBase}({x}, {y}, {length}, {angle}, {duration});"""
+            let! page = page browser
+            let! _ = page.EvaluateFunctionAsync<string>(script) |> Async.AwaitTask
+            return ()
+        }
 
     let previewAction (duration:int) (action:Action) (browser:IBrowser) =         
+        //async { return ()}
         async {
-            let! page = page browser
-            match action with
-            | Click p ->
-                let! _ = page.EvaluateFunctionAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
-                do! Async.Sleep(duration)
-            | Scroll p -> 
-                let degrees = 
-                    match p.scroll_x,p.scroll_y with
-                    | x,y when x = 0 && y < 0 -> 3. * Math.PI / 2. 
-                    | x,y when x = 0          -> Math.PI / 2.
-                    | x,y when x < 0          -> Math.PI
-                    | _                       -> 0.
-                let! _ = page.EvaluateFunctionAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration});") |> Async.AwaitTask
-                do! Async.Sleep(duration)
-            | _ -> ()
-            (*
-            | Double_click p -> $"dbl_click({p.x},{p.y})"
-            | Keypress p -> $"keys {p.keys}"
-            | Move p -> $"move({p.x},{p.y})"
-            | Screenshot -> "screenshot"
-            | Type p -> $"type {p.text}"
-            | Wait  -> "wait"
-            | Drag p -> 
-                let s = p.path.Head
-                let t = List.last p.path
-                $"drag {s.x},{s.y} -> {t.x},{t.y}"
-            *)
-        }        
+            try
+                let! page = page browser
+                match action with
+                | Click p ->
+                    do! drawClick p.x p.y duration browser
+                    //let! _ = page.EvaluateFunctionAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
+                    do! Async.Sleep(duration)
+                | Scroll p -> 
+                    let degrees = 
+                        match p.scroll_x,p.scroll_y with
+                        | x,y when x = 0 && y < 0 -> 3. * Math.PI / 2. 
+                        | x,y when x = 0          -> Math.PI / 2.
+                        | x,y when x < 0          -> Math.PI
+                        | _                       -> 0.
+                    //let! _ = page.EvaluateFunctionAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration})") |> Async.AwaitTask
+                    do! drawArrow 50 100 40 degrees duration browser
+                    do! Async.Sleep(duration)
+                | Drag p -> 
+                    let s = p.path.Head
+                    let t = List.last p.path
+                    do! drawClick s.x s.y duration browser                    
+                    do! Async.Sleep(300)
+                    do! drawClick t.x t.y duration browser
+                    do! Async.Sleep(duration)
+                | _ -> ()
+            with ex -> 
+                debug $"Error in previewAction: %s{ex.Message}"
+        }
+        (* revisit visualization after making other changes
+                | Double_click p -> $"dbl_click({p.x},{p.y})"
+                | Keypress p -> $"keys {p.keys}"
+                | Move p -> $"move({p.x},{p.y})"
+                | Screenshot -> "screenshot"
+                | Type p -> $"type {p.text}"
+                | Wait  -> "wait"
+
+        
+        *)
 
 
     type RequestAction = 
@@ -244,7 +334,13 @@ module ComputerUse =
                 | Drag p ->                     
                     let s = p.path.Head
                     let t = List.last p.path 
-                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y) |> Async.AwaitTask
+                    do! page.Mouse.MoveAsync(s.x,s.y) |> Async.AwaitTask
+                    do! page.Mouse.DownAsync() |> Async.AwaitTask
+                    do! page.Mouse.MoveAsync(t.x,t.y,MoveOptions(Steps=10)) |> Async.AwaitTask
+                    do! page.Mouse.UpAsync() |> Async.AwaitTask
+                    do! page.Mouse.ClickAsync(s.x,s.y, ClickOptions(Count=1)) |> Async.AwaitTask
+//                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y, delay=500) |> Async.AwaitTask
+                    debug $"done drag"
             }
         async{
             match! Async.Catch task with 
