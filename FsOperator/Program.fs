@@ -65,7 +65,7 @@ module Program =
         WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", "9222")
         WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", "http://localhost:9222")
         WebViewControl.WebView.Settings.AddCommandLineSwitch("no-sandbox", "")
-        System.IO.File.WriteAllText(@"e:\s\pageinject.js", Scripts.indicatorScript_page)
+        //System.IO.File.WriteAllText(@"e:\s\pageinject.js", Scripts.indicatorScript_page)
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
