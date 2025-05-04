@@ -1,8 +1,8 @@
 ﻿namespace rec FsOperator
 open System
 open System.Threading.Channels
-open Microsoft.Playwright
-open AvaloniaWebView
+open PuppeteerSharp
+open WebViewControl
 
 //need these stable for the duration of the run
 type RunState = {
@@ -31,7 +31,7 @@ type Model = {
     mailbox : Channel<ClientMsg>
     log : string list
     output : string
-    url : Uri
+    url : string
     browser : IBrowser option
     webview : Ref<WebView option>
     action : string

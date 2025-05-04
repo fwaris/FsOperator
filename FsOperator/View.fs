@@ -1,17 +1,38 @@
 ﻿namespace FsOperator
 open System
-open Microsoft.Playwright
+open System.Net.Http
+open System.Threading.Tasks
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open AvaloniaWebView
-open AvaloniaWebView.Ext
-open Microsoft.Playwright
+open WebViewControl
+open WebViewControl.Ext
+open PuppeteerSharp
 
 module Nav = 
     let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
+
+    let getWebSocketDebuggerUrl (port: int) : Task<string> =
+        task {
+            use client = new HttpClient()
+            let! response = client.GetStringAsync(sprintf "http://localhost:%d/json/version" port)
+            let json = System.Text.Json.JsonDocument.Parse(response)
+            let wsUrl = json.RootElement.GetProperty("webSocketDebuggerUrl").GetString()
+            return wsUrl
+        }
+
+    let connectToBrowser (port: int) : Task<IBrowser> =
+        task {
+            let port = 9222
+            let! wsUrl = getWebSocketDebuggerUrl port
+
+            let options = ConnectOptions(BrowserWSEndpoint = wsUrl)
+            let! browser = Puppeteer.ConnectAsync(options)
+            return browser
+        }
+
 
 [<AbstractClass; Sealed>]
 type Views =    
@@ -67,37 +88,27 @@ type Views =
     static member webview model dispatch = 
         WebView.create [
             Grid.row 1 
-            WebView.url model.url
+            WebView.address model.url
             WebView.init (fun wv -> 
                 match model.webview.Value with
                 | Some _ -> ()
                 | None -> 
                     model.webview.Value <- Some wv
-                    wv.WebViewCreated.Add(fun args -> 
-                        task {
-                            try
-                                let! pw = Playwright.CreateAsync()
-                                let opts = BrowserTypeConnectOverCDPOptions()
-                                opts.SlowMo <- 100.f
-                                let! browser = pw.Chromium.ConnectOverCDPAsync("http://localhost:9222", opts)                            
-                                let page = browser.Contexts.[0].Pages.[0]
-                                do! page.SetViewportSizeAsync(1280,720) //this seems to be necessary for best results
-                                do! page.AddInitScriptAsync(Scripts.indicatorScript_global) |> Async.AwaitTask
-                                let! _ = page.EvaluateAsync(Scripts.indicatorScript_page) |> Async.AwaitTask
-                                //let! _ = page.EvaluateAsync("()=>drawArrow(100, 100, 50, Math.PI / 2, 2000);")
-                                //let x,y = let s = wv.Bounds.Size in int s.Width/2, int s.Height/2
-                                //let! _ = page.EvaluateAsync($"() => window.drawClick({x},{y})") |> Async.AwaitTask
-
-                                dispatch (BrowserConnected browser)
-                            with ex ->                                                                         
-                                debug (sprintf "%A" ex)
-                        }
-                        |> ignore
-                        ()
-                )
-                wv.WebViewNewWindowRequested.Add(fun args ->
-                    args.UrlLoadingStrategy <- WebViewCore.Enums.UrlRequestStrategy.OpenInWebView
-                ))   
+                    wv.Initialized.Add (fun args ->     
+                            task {
+                                try
+                                    let! browser = Nav.connectToBrowser 9222
+                                    let! page = ComputerUse.page browser                                    
+                                    let vopts = ViewPortOptions(Width=1280,Height=720)
+                                    do! page.SetViewportAsync(vopts) |> Async.AwaitTask
+                                    let! _ = page.EvaluateFunctionAsync(Scripts.indicatorScript_page) |> Async.AwaitTask
+                                    dispatch (BrowserConnected browser)
+                                with ex ->                                                                         
+                                    debug (sprintf "%A" ex)
+                            }
+                            |> ignore                            
+                            ()
+                ))
         ]
 
     static member statusBar model dispatch = 

@@ -7,7 +7,6 @@ open Avalonia.Themes.Fluent
 open Avalonia.FuncUI
 open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Hosts
-open Avalonia.WebView.Desktop
 open System
 
 type MainWindow() as this =
@@ -42,18 +41,19 @@ type App() =
             //win.Closing.Add(fun _ -> Connection.disconnect())
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
-            System.Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-port=9222")
         | _ -> ()
 
 module Program =
-
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
+        System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", "9222")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", "http://localhost:9222")
+        System.IO.File.WriteAllText(@"e:\s\pageinject.js", Scripts.indicatorScript_page)
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
-            //.UseSkia()
-            .UseDesktopWebView()
+            //.UseSkia()            
 #if DEBUG
             //.LogToTrace(LogEventLevel.Debug)            
 #endif

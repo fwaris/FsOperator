@@ -43,7 +43,7 @@ module Update =
             mailbox = Channel.CreateBounded(10)
             log = []
             output = ""
-            url = Uri url
+            url = url
             webview = ref None
             action = ""
             warning = ""
@@ -85,7 +85,7 @@ module Update =
                 let output = if output.Length > 10000 then output.Substring(0,10000) else output
                 {model with output=output}, Cmd.none
             | ClearOutput -> {model with output = ""}, Cmd.none
-            | SetUrl txt -> {model with url=Uri txt}, Cmd.none
+            | SetUrl txt -> {model with url=txt}, Cmd.none
 
             | SetAction txt -> {model with action=txt}, Cmd.none
             | SetWarning txt -> {model with warning = txt},Cmd.none

@@ -91,5 +91,5 @@ if (!window.__indicatorInjected) {{
 () => {{
     window.drawClick = {drawClickFunction}
     window.drawArrow = {drawArrowFunction}
-}};
+}}
 """

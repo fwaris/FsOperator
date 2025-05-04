@@ -1,16 +1,22 @@
 ﻿namespace FsOperator
 open System
 open FSharp.Control
-open Microsoft.Playwright
+open PuppeteerSharp
 open FsResponses
 open System.IO
+open PuppeteerSharp.Input
 
-module ComputerUse =
-    open Microsoft.Playwright
+module ComputerUse =    
 
     let postLog (runState:RunState) msg =  runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog msg) |> ignore
     let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
     let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
+
+    let page (browser:IBrowser) = 
+        async {
+            let! pages = browser.PagesAsync() |> Async.AwaitTask
+            return pages.[0]
+        }
 
     let rec sendWithRetry count (runState:RunState) (req:Request) =
         async {
@@ -49,12 +55,10 @@ module ComputerUse =
         Async.Start(comp, runState.tokenSource.Token)
 
     let snapshot (browser:IBrowser) = 
-        async {
-            let wctx = browser.Contexts.[0]
-            let page = wctx.Pages.[0]
-            let opts = PageScreenshotOptions()
-            opts.Type <- ScreenshotType.Png
-            let! image = page.ScreenshotAsync() |> Async.AwaitTask
+        async {        
+            let! page = page browser
+            let opts = ScreenshotOptions()
+            let! image = page.ScreenshotDataAsync() |> Async.AwaitTask
             use ms = new MemoryStream(image)
             use bmp = System.Drawing.Image.FromStream(ms)
             let imgUrl = image |> RUtils.toImageUri
@@ -96,7 +100,8 @@ module ComputerUse =
         )
 
     let sendNext (runState:RunState) =
-        async {
+        async {            
+            let! page = page runState.browser
             match getResponseIdsAndChecks runState with
             | None -> 
                 runState.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
@@ -111,7 +116,7 @@ module ComputerUse =
                     call_id = lastCallId
                     acknowledged_safety_checks = safetyChecks                                 //these should come from human acknowlegedgement
                     output = Computer_creenshot {|image_url = imgUrl |}
-                    current_url = Some runState.browser.Contexts.[0].Pages.[0].Url
+                    current_url = Some page.Url
                 }
                 let req = {Request.Default with 
                                 input = [Computer_call_output cc_out]; tools=[tool]
@@ -148,12 +153,12 @@ module ComputerUse =
 
 
 
-    let previewAction (duration:int) (action:Action) (browser:IBrowser) = 
-        let page = browser.Contexts.[0].Pages.[0]
+    let previewAction (duration:int) (action:Action) (browser:IBrowser) =         
         async {
+            let! page = page browser
             match action with
             | Click p ->
-                let! _ = page.EvaluateAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
+                let! _ = page.EvaluateFunctionAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
                 do! Async.Sleep(duration)
             | Scroll p -> 
                 let degrees = 
@@ -162,7 +167,7 @@ module ComputerUse =
                     | x,y when x = 0          -> Math.PI / 2.
                     | x,y when x < 0          -> Math.PI
                     | _                       -> 0.
-                let! _ = page.EvaluateAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration});") |> Async.AwaitTask
+                let! _ = page.EvaluateFunctionAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration});") |> Async.AwaitTask
                 do! Async.Sleep(duration)
             | _ -> ()
             (*
@@ -196,19 +201,20 @@ module ComputerUse =
     let doAction (action:Action) (browser:IBrowser)  =
         let task = 
             async {
-                let page = browser.Contexts.[0].Pages.[0]
+                let! pages = browser.PagesAsync() |> Async.AwaitTask
+                let page = pages.[0]
                 match action with 
                 | Click p -> 
                     match mouseButton p.button with
                     | Btn btn -> 
-                        let opts = MouseClickOptions(Button = btn)
-                        do! page.Mouse.ClickAsync(float32 p.x,float32 p.y, opts) |> Async.AwaitTask
+                        let opts = ClickOptions(Button = btn)
+                        do! page.Mouse.ClickAsync(p.x,p.y, opts) |> Async.AwaitTask
                     | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
                     | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
                     | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
                 | Scroll p ->
-                    do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
-                    let! _ = page.EvaluateAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
+                    do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask                    
+                    let! _ = page.EvaluateFunctionAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
                     ()
                 | Keypress p -> 
                     let mappeKeys = 
@@ -227,20 +233,18 @@ module ComputerUse =
                             elif k =*= "ArrowDown" then "ArrowDown"
                             else k)
                     let compositKey = mappeKeys |> String.concat "+"
-                    let opts = KeyboardPressOptions()
+                    let opts = PressOptions()
                     do! page.Keyboard.PressAsync(compositKey, opts) |> Async.AwaitTask                            
                 | Type p ->
                     do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
                 | Wait  ->  do! Async.Sleep(2000)
                 | Screenshot -> ()
-                | Move p -> do! page.Mouse.MoveAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
-                | Double_click p -> do! page.Mouse.DblClickAsync(float32 p.x,float32 p.y) |> Async.AwaitTask
+                | Move p -> do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask
+                | Double_click p -> do! page.Mouse.ClickAsync(p.x,p.y, ClickOptions(Count=2)) |> Async.AwaitTask
                 | Drag p ->                     
                     let s = p.path.Head
                     let t = List.last p.path 
-                    do! page.Mouse.MoveAsync(float32 s.x,float32 s.y) |> Async.AwaitTask
-                    do! page.Mouse.DownAsync() |> Async.AwaitTask
-                    do! page.Mouse.MoveAsync(float32 t.x, float32 t.y, MouseMoveOptions(Steps=10)) |> Async.AwaitTask
+                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y) |> Async.AwaitTask
             }
         async{
             match! Async.Catch task with 
