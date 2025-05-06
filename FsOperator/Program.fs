@@ -11,6 +11,8 @@ open System
 open Microsoft.Extensions.DependencyInjection
 open Avalonia.Input
 open Xilium.CefGlue
+open Avalonia.Markup.Xaml.Styling
+open Avalonia.Logging
 
 
 type MainWindow() as this =
@@ -35,6 +37,10 @@ type App() =
         this.Styles.Add (FluentTheme())
         this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
         this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"    
+        //this.Resources.MergedDictionaries.Add (
+        //    ResourceInclude(baseUri = null, Source = Uri("avares://FsOperator/Resources.axaml"))
+        //)
+
         this.AttachDevTools(Diagnostics.DevToolsOptions(Gesture=KeyGesture(Key.F12)))
 
     override this.OnFrameworkInitializationCompleted() =

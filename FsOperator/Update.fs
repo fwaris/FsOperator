@@ -49,8 +49,9 @@ module Update =
                 Assistant {id = "1"; content = model.instructions}
                 User "The quick brown fox jumped over the lazy dog"
                 Assistant {id = "2"; content = "How can I help you?"}
-                //Question "What is your name?"
+                Question "What is your name?"
             ]
+
         let runState = RunState.Create model.mailbox model.instructions
         let runState = {runState with chatHistory = testChat |> Chat.fixPlaceholder; chatState = ChatState.CS_Prompt}
         {model with runState =  Some runState}, Cmd.none

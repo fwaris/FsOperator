@@ -3,21 +3,17 @@
 		<OutputType>WinExe</OutputType>
 		<TargetFrameworks>net9.0</TargetFrameworks>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-	</PropertyGroup>
-	
-	<PropertyGroup>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
+	
 
 	<ItemGroup>
-		<AvaloniaResource Include="**\*.xaml" />
 		<AvaloniaResource Include="Assets\**" />
+		<None Include="Assets\typing dot.json" />
+		<None Include="app.manifest" />
 	</ItemGroup>
 
-
 	<ItemGroup>
-		<Content Include="Assets\typing dot.json" />
-		<None Include="app.manifest" />
 		<Compile Include="WebView.fs" />
 		<Compile Include="Lottie.fs" />
 		<Compile Include="Constants.fs" />
@@ -64,5 +60,5 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	</ItemGroup>
-
+	
 </Project>
