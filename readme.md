@@ -29,21 +29,18 @@ Below is a screenshot demonstrating an Amazon search session to find a specific 
 1. **Enter a URL** in the top address bar (must include `https://`; e.g., `https://amazon.com`).
 2. **Hit Enter** to navigate. Log in manually if required.
 3. **Input task instructions** in the instructions box.
-4. **Toggle the switch to "On"** to begin the task.
-5. **Observe computer actions** issued by the model on right end of the addres bar. Any warnings, status or error messages are shown at the bottom. A dynamic script is injected into the browser page to preview actions before they are executed. Currently, mouse clicks and scroll requests are rendered on the screen.
+4. **Click 'Start Task'** to begin the task.
+5. **Observe computer actions** issued by the model on right end of the addres bar. Any warnings, status or error messages are shown at the bottom. 
 6. **See log messages** by expanding the panel on the right. It shows all API messages tha are sent and received.
 
-> Note: the screen shakes when Puppeteer takes a screenshot (not sure if there is fix available)
-
-
+> Note: the screen shakes when Puppeteer takes a screenshot. It seems to be coming from Chromium itself - not sure if there is a fix available.
 
 The model may issue **security warnings** that ideally should be acknowledged by a human. Currently, the app implicitly acknowledges these warnings to allow the process to continue uninterrupted. They are shown in the status bar.
 
-- The process continues until the model returns a **message** (completing its "turn").
-- The resulting message is displayed in the **Output** box.
-- You can **manually stop** the process by switching the toggle to "Off".
-- **Turn-by-turn conversations** are *not yet implemented*.
-
+- The process continues until the model returns an **assistant message** (completing its "turn").
+- The resulting message is displayed in the **Chat** box.
+- You may respond to the message and continue the task further
+- Or cancel the task by clicking **Cancel Task**
 
 > ⚠️ *This is beta code. It has not been fully battle-tested.*
 

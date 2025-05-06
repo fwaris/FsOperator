@@ -130,7 +130,7 @@ module ComputerUse =
 
                         
     let loop (runState:RunState) = 
-        let rec loop() = 
+        let rec loop retryCount = 
             async {  
                 try 
                     let! response = runState.fromModel.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
@@ -155,15 +155,19 @@ module ComputerUse =
                             | _  -> ()
                         if runState.tokenSource.IsCancellationRequested |> not then 
                             if hasComputerCall then 
-                                return! loop()
+                                return! loop 0
                             else
                                 runState.mailbox.Writer.TryWrite(ClientMsg.TurnEnd) |> ignore
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
-                    runState.mailbox.Writer.TryWrite(ClientMsg.StopWithError ex) |> ignore
                     do! Async.Sleep 1000
+                    if retryCount < 10 then 
+                        return! loop(retryCount + 1)                   
+                    else
+                        runState.mailbox.Writer.TryWrite(ClientMsg.StopWithError ex) |> ignore
+
             }
-        Async.Start(loop(),runState.tokenSource.Token)
+        Async.Start(loop 0,runState.tokenSource.Token)
         
         
 
