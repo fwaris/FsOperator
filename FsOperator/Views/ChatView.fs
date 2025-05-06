@@ -46,45 +46,6 @@ type ChatView =
                 TextBlock.padding 1
                 TextBlock.margin margin
             ]
-        | Question content ->
-            Panel.create [
-                Panel.margin 2
-                Panel.children [
-                    TextBox.create [
-                        TextBox.text content
-                        //TextBox.isEnabled (model.runState |> Option.map (fun cs -> cs.chatState.IsCS_Prompt ) |> Option.defaultValue false)
-                        TextBox.textWrapping TextWrapping.Wrap
-                        TextBox.horizontalAlignment HorizontalAlignment.Stretch
-                        TextBox.verticalAlignment VerticalAlignment.Stretch
-                        TextBox.multiline true
-                        TextBox.minHeight 50.
-                        TextBox.acceptsReturn true
-                        TextBox.textAlignment TextAlignment.Left
-                        TextBox.margin 1  
-                        TextBox.fontSize 14.
-                        TextBox.borderThickness 1.
-                        TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
-                        TextBox.margin (Thickness(2.,2.,35.,2.))
-                    ]
-                    Button.create [
-                        Button.margin (Thickness(0.,0.,1.,2.))
-                        Button.content "\u27a1"
-                        Button.onClick (fun _ -> dispatch Chat_Submit) 
-                        Button.horizontalAlignment HorizontalAlignment.Right
-                        Button.verticalAlignment VerticalAlignment.Bottom
-                    ]
-                ]
-                
-            ]
-
-        | Placeholder -> 
-            Lottie.create [
-                Lottie.width 10.
-                Lottie.height 10.
-                Lottie.repeatCount -1
-                Lottie.path Lottie.defaultPath.Value
-            ]                        
-
 
     static member chatHistory leftMargin model dispatch = 
         ListBox.create [
@@ -94,8 +55,6 @@ type ChatView =
             ListBox.itemTemplate (
                 DataTemplateView<ChatMsg>.create (fun (msg: ChatMsg) -> 
                     Panel.create [
-                        //Panel.background (match msg with Assistant _ -> Brushes.DarkSeaGreen | _ -> Brushes.Transparent)
-
                         Panel.children [
                             ChatView.messageView model dispatch msg (Thickness(1,12,1,1))
                             TextBlock.create [
@@ -109,53 +68,67 @@ type ChatView =
                         ]
                     ]
                 )                        
-            )
+            )   
         ]
 
 
     static member chat model dispatch =
         let leftMargin = 10.
+        let csState = model.runState |> Option.map (fun rs -> rs.chatState) |> Option.defaultValue ChatState.CS_Init
         Grid.create [
             Grid.column 1
             Grid.rowSpan 2
-            Grid.rowDefinitions "30,30,1*,1*"
+            Grid.rowDefinitions "30,1*,2*"
             Grid.children [
-                ToggleSwitch.create [
-                    Grid.row 0 
-                    ToggleSwitch.isEnabled model.initialized
-                    ToggleSwitch.onChecked (fun _ -> dispatch Start)
-                    ToggleSwitch.onUnchecked (fun _ -> dispatch Stop)
-                    ToggleSwitch.isChecked model.runState.IsSome
-                    ToggleSwitch.horizontalAlignment HorizontalAlignment.Left
-                    ToggleSwitch.verticalAlignment VerticalAlignment.Center
-                    ToggleSwitch.margin (Thickness(leftMargin,2.,2.,2.))
+                Panel.create [
+                    Grid.row 0
+                    Panel.children [
+                        TextBlock.create  [                            
+                            TextBlock.text "Instructions"
+                            TextBlock.horizontalAlignment HorizontalAlignment.Left
+                            TextBlock.verticalAlignment VerticalAlignment.Top
+                            TextBlock.fontSize 14.
+                            TextBlock.fontWeight FontWeight.Bold
+                            TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
+                        ]
+                        if csState.IsCS_Prompt || csState.IsCS_Loop then 
+                            Lottie.create [
+                                Lottie.verticalAlignment VerticalAlignment.Top
+                                Lottie.horizontalAlignment HorizontalAlignment.Right
+                                Lottie.path Lottie.defaultPath.Value
+                                Lottie.height 50.
+                            ]
+                    ]
                 ]
-                TextBlock.create  [
+                Panel.create [
                     Grid.row 1
-                    TextBlock.text "Instructions"
-                    TextBlock.horizontalAlignment HorizontalAlignment.Left
-                    TextBlock.verticalAlignment VerticalAlignment.Top
-                    TextBlock.fontSize 14.
-                    TextBlock.fontWeight FontWeight.Bold
-                    TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
-                ]
-                TextBox.create [
-                    Grid.row 2
-                    TextBox.text model.instructions
-                    TextBox.textWrapping TextWrapping.Wrap
-                    TextBox.horizontalAlignment HorizontalAlignment.Stretch
-                    TextBox.verticalAlignment VerticalAlignment.Stretch
-                    TextBox.multiline true
-                    TextBox.acceptsReturn true
-                    TextBox.textAlignment TextAlignment.Left
-                    TextBox.background Brushes.Transparent
-                    TextBox.borderThickness 2.
-                    TextBox.margin (Thickness(leftMargin,2.,2.,2.))
-                    TextBox.fontSize 14.
-                    TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
+                    Panel.children [
+                        TextBox.create [
+                            TextBox.text model.instructions
+                            TextBox.textWrapping TextWrapping.Wrap
+                            TextBox.horizontalAlignment HorizontalAlignment.Stretch
+                            TextBox.verticalAlignment VerticalAlignment.Stretch
+                            TextBox.multiline true
+                            TextBox.acceptsReturn true
+                            TextBox.textAlignment TextAlignment.Left
+                            TextBox.background Brushes.Transparent
+                            TextBox.borderThickness 2.
+                            TextBox.margin (Thickness(leftMargin,2.,2.,37.))
+                            TextBox.fontSize 14.
+                            TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
+                        ]
+                        Button.create [
+                            Button.isEnabled model.initialized
+                            Button.margin (Thickness(0.,0.,1.,2.))
+                            Button.content (if csState.IsCS_Init then "Start Task" else "Cancel Task" )
+                            Button.onClick (fun _ -> dispatch StartStopTask) 
+                            Button.horizontalAlignment HorizontalAlignment.Right
+                            Button.verticalAlignment VerticalAlignment.Bottom
+                        ]
+                    ]
                 ]
                 DockPanel.create [
-                    Grid.row 3
+                    Grid.row 2
                     DockPanel.children [
                         TextBlock.create  [
                             DockPanel.dock Dock.Top
@@ -166,15 +139,45 @@ type ChatView =
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
+                        match model.runState with 
+                        | Some rs when rs.chatState.IsCS_Prompt -> 
+                            Panel.create [
+                                DockPanel.dock Dock.Bottom
+                                Panel.margin 2
+                                Panel.children [
+                                    TextBox.create [
+                                        TextBox.text rs.question
+                                        TextBox.textWrapping TextWrapping.Wrap
+                                        TextBox.horizontalAlignment HorizontalAlignment.Stretch
+                                        TextBox.verticalAlignment VerticalAlignment.Stretch
+                                        TextBox.multiline true
+                                        TextBox.minHeight 50.
+                                        TextBox.acceptsReturn true
+                                        TextBox.textAlignment TextAlignment.Left
+                                        TextBox.margin 1  
+                                        TextBox.fontSize 14.
+                                        TextBox.borderThickness 1.
+                                        TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
+                                        TextBox.margin (Thickness(2.,2.,35.,2.))
+                                    ]
+                                    Button.create [
+                                        Button.margin (Thickness(0.,0.,1.,2.))
+                                        Button.content "\u27a1"
+                                        Button.onClick (fun _ -> dispatch Chat_Submit) 
+                                        Button.horizontalAlignment HorizontalAlignment.Right
+                                        Button.verticalAlignment VerticalAlignment.Bottom
+                                    ]
+                                ]
+                            ]
+                        | _ -> ()                        
                         ScrollViewer.create [
                             ScrollViewer.verticalScrollBarVisibility Primitives.ScrollBarVisibility.Auto
-                            ScrollViewer.content (ChatView.chatHistory leftMargin model dispatch)
-                            
+                            ScrollViewer.content (ChatView.chatHistory leftMargin model dispatch)                            
                         ]
                     ]
                 ]
                 GridSplitter.create [
-                    Grid.row 3
+                    Grid.row 2
                     Grid.columnSpan 1
                     GridSplitter.verticalAlignment VerticalAlignment.Top
                     GridSplitter.width 50.

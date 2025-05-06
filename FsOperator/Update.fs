@@ -30,7 +30,7 @@ module Update =
                 [nameof sub2], sub2
         ]
 
-    let testSomething_ (model:Model) =
+    let testSomething (model:Model) =
         async {
             try
                 //do! Preview.drawArrow 100 500 50 0. 2000
@@ -43,17 +43,16 @@ module Update =
         |> Async.Start
         model,Cmd.none
 
-    let testSomething (model:Model) =
+    let testSomething_ (model:Model) =
         let testChat = 
             [
                 Assistant {id = "1"; content = model.instructions}
                 User "The quick brown fox jumped over the lazy dog"
                 Assistant {id = "2"; content = "How can I help you?"}
-                Question "What is your name?"
             ]
-
         let runState = RunState.Create model.mailbox model.instructions
-        let runState = {runState with chatHistory = testChat |> Chat.fixPlaceholder; chatState = ChatState.CS_Prompt}
+        //let runState = {runState with chatHistory = testChat; chatState = ChatState.CS_Loop}
+        let runState = {runState with chatHistory = testChat; chatState = ChatState.CS_Prompt}
         {model with runState =  Some runState}, Cmd.none
 
 
@@ -62,7 +61,7 @@ module Update =
         //let url,instructions = StartPrompts.netflix
         //let url,instructions = StartPrompts.linkedIn
         //let url,instructions = StartPrompts.twitter
-        
+        FsResponses.debug_logging <- true
         let model = {
             instructions=instructions
             runState = None
@@ -88,7 +87,7 @@ module Update =
         async {
             do! Async.Sleep 10000
             return Some time
-        }
+        }    
 
     let token() = new System.Threading.CancellationTokenSource()
 
@@ -97,33 +96,43 @@ module Update =
             match msg with
             | Initialize -> model, Cmd.none
             | BrowserConnected -> {model with initialized=true},Cmd.none
-            | Start ->
+            | StartStopTask ->
                 match model.runState with 
                 | None when model.initialized -> 
                     let runState = RunState.Create model.mailbox model.instructions
-                    let runState = {runState with chatHistory = [Placeholder]}
+                    let runState = {runState with chatHistory = []; chatState = CS_Loop}
                     ComputerUse.startMessaging runState
                     ComputerUse.sendStartMessage runState |> Async.Start
                     ComputerUse.loop runState 
                     {model with runState =  Some runState}, Cmd.none
-                | _  -> debug "Already started or no browser set"; model, Cmd.none
-            | Stop -> 
-                match model.runState with
-                | Some runState -> 
+                | None -> model, Cmd.none
+                | Some runState-> 
                     runState.tokenSource.Cancel()
                     runState.fromModel.Writer.TryComplete() |> ignore
                     runState.toModel.Writer.TryComplete()   |> ignore                    
-                    {model with runState=None}, Cmd.none 
-                | None -> 
-                    model, Cmd.none
+                    {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none 
+            | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg StartStopTask else Cmd.none)
+
             | SetInstructions txt -> {model with instructions=txt}, Cmd.none
 
             | Chat_Clear -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = []})}, Cmd.none
-            | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.updateQustion txt rs.chatHistory})}, Cmd.none
+            | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with question = txt})}, Cmd.none
             | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
-            | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append (Question "") rs.chatHistory})}, Cmd.none
-            | Chat_Submit -> model, Cmd.none
-
+            | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatState = CS_Prompt})}, Cmd.none
+            | Chat_Submit -> 
+                match model.runState with
+                | Some runState when runState.chatState.IsCS_Prompt -> 
+                    let prevId = runState.lastResponse.Value |> Option.map (fun r -> r.id)
+                    let question = runState.question
+                    let runState = {runState with 
+                                        chatState = CS_Loop
+                                        chatHistory = runState.chatHistory |> Chat.append (User runState.question)
+                                        question = ""
+                                   }
+                    ComputerUse.loop runState
+                    ComputerUse.sendTextResponse runState (prevId,question) |> Async.Start
+                    {model with runState = Some runState}, Cmd.none
+                | _ -> model, Cmd.none
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> {model with url=txt}, Cmd.none
@@ -133,7 +142,7 @@ module Update =
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 
             | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_Respond]
-            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg Stop]
+            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg StopIfRunning]
             | TestSomething -> testSomething model
 
             //| _ -> model, Cmd.none

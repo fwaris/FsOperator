@@ -9,7 +9,7 @@ open PuppeteerSharp.Input
 module Preview = 
     let drawClick (x:int) (y:int) (duration:int) = 
         async {            
-            let script = Scripts.drawCircle x y 20 0.5 duration
+            let script = Scripts.drawCircle x y 20 0.7 duration
             let! page = Browser.page()
             let ts1 = DateTime.Now
             let! _  =  page.EvaluateFunctionAsync($"()=> {script}") |> Async.AwaitTask
@@ -57,6 +57,7 @@ module Preview =
                 | Click p ->
                     do! drawClick p.x p.y duration
                     do! Async.Sleep(duration)
+                (*
                 | Scroll p -> 
                     let degrees = 
                         match p.scroll_x,p.scroll_y with
@@ -71,6 +72,7 @@ module Preview =
                     let t = List.last p.path
                     do! drawDragArrow (s.x,s.y) (t.x,t.y) duration
                     do! Async.Sleep(duration)
+                *)
                 | _ -> ()
             with ex -> 
                 do! Connection.closeConnection()

@@ -4,7 +4,6 @@ open System.Threading.Channels
 open PuppeteerSharp
 open WebViewControl
 
-
 type ChatState = CS_Init | CS_Loop | CS_Prompt
 
 //need these stable for the duration of the run
@@ -12,6 +11,7 @@ type RunState = {
     toModel : Channel<FsResponses.Request>
     fromModel : Channel<FsResponses.Response>
     lastResponse : Ref<FsResponses.Response option>
+    question : string
     tokenSource : System.Threading.CancellationTokenSource
     mailbox : Channel<ClientMsg>
     instructions : string
@@ -24,10 +24,11 @@ with static member Create mailbox instructions =
                 toModel = Channel.CreateBounded(10)
                 fromModel = Channel.CreateBounded(10)
                 lastResponse = ref None
+                question = ""
                 tokenSource = new System.Threading.CancellationTokenSource()
                 mailbox = mailbox
                 instructions = instructions
-                chatHistory = [Placeholder]
+                chatHistory = []
                 chatState = CS_Init
             }
 
@@ -46,8 +47,8 @@ type Model = {
 
 type ClientMsg =
     | Initialize
-    | Start
-    | Stop
+    | StartStopTask
+    | StopIfRunning
     | BrowserConnected
     | SetInstructions of string
     | AppendLog of string

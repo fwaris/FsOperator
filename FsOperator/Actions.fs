@@ -33,6 +33,7 @@ module Actions =
         | Btn of MouseButton
         | Back 
         | Forward
+        | Wheel
         | Unknown
     let mouseButton = function 
         | Buttons.Left          -> Btn MouseButton.Left
@@ -40,6 +41,7 @@ module Actions =
         | Buttons.Right         -> Btn MouseButton.Right
         | "back" | "Back"       -> Back
         | "forward" | "Forward" -> Forward
+        | "wheel"   | "Wheel"   -> Wheel
         | x -> debug $"cannot use '{x}' button"; Unknown
 
     let pressKeys (page:IPage) (keys:string list) = 
@@ -56,14 +58,16 @@ module Actions =
     let perform (action:Action)  =
         async {
             let! page = Browser.page()
+            
             match action with 
             | Click p -> 
                 match mouseButton p.button with
                 | Btn btn -> 
                     let opts = ClickOptions(Button = btn)
                     do! page.Mouse.ClickAsync(p.x,p.y, opts) |> Async.AwaitTask
-                | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
-                | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
+                | Back -> do! page.GoBackAsync() |> Async.AwaitTask |> Async.Ignore
+                | Forward -> do! page.GoForwardAsync() |> Async.AwaitTask |> Async.Ignore
+                | Wheel -> do! page.Mouse.WheelAsync(p.x,p.y) |> Async.AwaitTask
                 | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
             | Scroll p ->
                 do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask                    

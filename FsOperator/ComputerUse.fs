@@ -54,20 +54,36 @@ module ComputerUse =
                 let contImg = Input_image {|image_url = imgUrl|}
                 let input = { Message.Default with content=[contImg]}
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
-                let instructions,prev_id = 
-                    match runState.lastResponse.Value with 
-                    | None   -> Some runState.instructions, None  //no previous response, i.e. first msg,send the instructions
-                    | Some r -> None, Some r.id                   //otherwise send the previous response id
                 let req = {Request.Default with 
                                 input = [Message input]; tools=[tool]
-                                instructions = instructions
-                                previous_response_id = prev_id                               
+                                instructions = Some runState.instructions
+                                previous_response_id = None                    
                                 store = true
                                 model=Models.computer_use_preview
                                 truncation = Some Truncation.auto
                           }
                 do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
+
+
+    let sendTextResponse (runState:RunState) (previousId:string option,message:string) =
+       async {
+                try
+                    let! imgUrl,(w,h) = Browser.snapshot()                    
+                    let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
+                    let contMsg = Message {id = None; role="user"; content = [Input_text {|text = message|}] ; status = None}
+                    let req = {Request.Default with 
+                                    input = [contMsg]; tools=[tool]
+                                    previous_response_id = previousId
+                                    store = true
+                                    model=Models.computer_use_preview
+                                    truncation = Some Truncation.auto
+                              }
+                    do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                with ex ->
+                    debug $"Error in sendTextResponse: %s{ex.Message}"
+        }
+
 
     let getResponseIdsAndChecks (runState:RunState) = 
         runState.lastResponse.Value
@@ -128,7 +144,7 @@ module ComputerUse =
                                 cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> postWarning runState
                                 cb.action |> Actions.actionToString |> postAction runState
                                 do! Async.Sleep 500
-                                //do! Preview.previewAction 5000 cb.action
+                                //do! Preview.previewAction 2000 cb.action
                                 do! Actions.doAction 2 cb.action 
                                 do! Async.Sleep 1000
                                 do! computerCallResponse runState
