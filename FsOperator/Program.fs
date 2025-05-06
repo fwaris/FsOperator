@@ -46,15 +46,8 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) -> 
-                match Nav.connection.Value with 
-                | Some conn -> 
-                    try
-                        conn.Disconnect()
-                        conn.CloseAsync().WaitAsync(TimeSpan.FromSeconds 1.0).Wait()      
-                        Async.RunSynchronously(async {CefRuntime.Shutdown()},1000) 
-                    with ex ->
-                        debug $"Error closing connection: {ex.Message}"
-                | None -> ())
+                Async.RunSynchronously(Connection.shutdown(),1000) 
+                Async.RunSynchronously(async {CefRuntime.Shutdown()},1000))
         | _ -> ()
 
 module Program =
@@ -62,15 +55,13 @@ module Program =
     let main(args: string[]) =
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         //WebViewControl.WebView.Settings.LogFile <- @"e:\\s\\log.txt"
-        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", "9222")
-        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", "http://localhost:9222")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", string C.DEBUG_PORT)
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", $"http://localhost:{C.DEBUG_PORT}")
+        //WebViewControl.WebView.Settings.AddCommandLineSwitch("auto-open-devtools-for-tabs","")
         WebViewControl.WebView.Settings.AddCommandLineSwitch("no-sandbox", "")
-        //System.IO.File.WriteAllText(@"e:\s\pageinject.js", Scripts.indicatorScript_page)
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
-            
-            .UseSkia()            
 #if DEBUG
             //.LogToTrace(LogEventLevel.Debug)            
 #endif

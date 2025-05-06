@@ -10,14 +10,27 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<AvaloniaResource Include="Assets\**" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+		<Content Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
 		<Compile Include="WebView.fs" />
+		<Compile Include="Lottie.fs" />
+		<Compile Include="Constants.fs" />
 		<Compile Include="Utils.fs" />
+		<Compile Include="Chat.fs" />
 		<Compile Include="Model.fs" />
+		<Compile Include="Connection.fs" />
 		<Compile Include="StartPrompts.fs" />
+		<Compile Include="Browser.fs" />
+		<Compile Include="Scripts.fs" />
+		<Compile Include="Preview.fs" />
+		<Compile Include="Actions.fs" />
 		<Compile Include="ComputerUse.fs" />
 		<Compile Include="Update.fs" />
-		<Compile Include="Scripts.fs" />
 		<Compile Include="View.fs" />
 		<Compile Include="Program.fs" />
 	</ItemGroup>
@@ -36,10 +49,13 @@
 		<!--<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />-->
 		<PackageReference Include="PuppeteerSharp" Version="20.1.3" />
 		<PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
+		<PackageReference Include="System.Text.Json" Version="9.0.4" />
 		<!--<PackageReference Include="WebView.Avalonia.Cross" Version="11.2.4" />
 		<PackageReference Include="WebView.Avalonia.Desktop.Cross" Version="11.2.4" />-->
 		<PackageReference Include="WebViewControl-Avalonia" Version="3.120.9" />
 		<PackageReference Include="WebViewControl-Avalonia-RemoteDebugSupport" Version="3.120.9" />
+		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.2.0" />
 	</ItemGroup>
 	
 	<ItemGroup>

@@ -33,15 +33,12 @@ module Update =
     let testSomething (model:Model) =
         async {
             try
-                match model.browser with
-                | Some b ->  
-                    let! ua = b.GetUserAgentAsync() |> Async.AwaitTask
-                    //let! imgUrl,(w,h) = ComputerUse.snapshot b 
-                    do! ComputerUse.drawArrow 100 100 50 0. 2000 b
-                | None -> ()
+                //do! Preview.drawArrow 100 500 50 0. 2000
+                do! Preview.drawClick 100 500 2000
+                //do! Preview.drawDragArrow (100,500) (300,600) 2000
                 debug "Test something"
             with ex ->
-            debug $"Error in testSomething: {ex.Message}"
+                debug $"Error in testSomething: {ex.Message}"
         }
         |> Async.Start
 
@@ -52,12 +49,12 @@ module Update =
         //let url,instructions = StartPrompts.twitter
         
         let model = {
-            browser = None
             instructions=instructions
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
             output = ""
+            initialized = false
             url = url
             webview = ref None
             action = ""
@@ -71,11 +68,12 @@ module Update =
         try
             match msg with
             | Initialize -> model, Cmd.none
-            | BrowserConnected pw -> {model with browser=Some pw},Cmd.none
+            | BrowserConnected -> {model with initialized=true},Cmd.none
             | Start ->
                 match model.runState with 
-                | None when model.browser.IsSome -> 
-                    let runState = RunState.Create model.browser.Value model.mailbox model.instructions
+                | None when model.initialized -> 
+                    let runState = RunState.Create model.mailbox model.instructions
+                    let runState = {runState with chatHistory = [Placeholder]}
                     ComputerUse.startMessaging runState
                     ComputerUse.sendStartMessage runState |> Async.Start
                     ComputerUse.loop runState 
@@ -91,15 +89,14 @@ module Update =
                 | None -> 
                     model, Cmd.none
             | SetInstructions txt -> {model with instructions=txt}, Cmd.none
-            | AppendLog txt -> 
-                let log = txt :: model.log |> List.truncate 100
-                {model with log=log}, Cmd.none
+
+            | Chat_Clear -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = []})}, Cmd.none
+            | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.updateQustion txt rs.chatHistory})}, Cmd.none
+            | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
+            | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append (Question "") rs.chatHistory})}, Cmd.none
+
+            | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
-            | AppendOutput txt -> 
-                let output = txt + Environment.NewLine + model.output
-                let output = if output.Length > 10000 then output.Substring(0,10000) else output
-                {model with output=output}, Cmd.none
-            | ClearOutput -> {model with output = ""}, Cmd.none
             | SetUrl txt -> {model with url=txt}, Cmd.none
 
             | SetAction txt -> {model with action=txt}, Cmd.none
@@ -107,7 +104,8 @@ module Update =
             | TurnEnd -> {model with warning = "Current turn ended"}, Cmd.ofMsg Stop
             | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else {model with warning = ex.Message}, Cmd.ofMsg Stop
             | TestSomething -> testSomething model; model, Cmd.none
-            | _ -> model, Cmd.none
+
+            //| _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex
             model, Cmd.none

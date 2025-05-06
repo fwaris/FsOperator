@@ -1,7 +1,5 @@
 ﻿namespace FsOperator
 open System
-open System.Net.Http
-open System.Threading.Tasks
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
@@ -9,37 +7,14 @@ open Avalonia.Media
 open Avalonia
 open WebViewControl
 open WebViewControl.Ext
-open PuppeteerSharp
 open Avalonia.Controls.Shapes
+open Avalonia.FuncUI
+open Avalonia.Labs.Lottie
+open Avalonia.Labs.Lottie.Ext
 
-module Nav = 
-    let connection = ref None
-    let  nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
-    let getWebSocketDebuggerUrl (port: int) : Task<string> =
-        task {
-            use client = new HttpClient()
-            let! response = client.GetStringAsync(sprintf "http://localhost:%d/json/version" port)
-            let json = System.Text.Json.JsonDocument.Parse(response)
-            let wsUrl = json.RootElement.GetProperty("webSocketDebuggerUrl").GetString()
-            return wsUrl
-        }
-
-    let connectToBrowser (port: int) : Task<IBrowser> =
-        task {
-            let port = 9222
-            let! wsUrl = getWebSocketDebuggerUrl port
-
-            let options = ConnectOptions(BrowserWSEndpoint = wsUrl)
-            options.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
-            options.ProtocolTimeout <- 30000
-            let! temp = Puppeteer.ConnectAsync(options)    
-            let! _  = temp.CloseAsync() |> Async.AwaitTask //clear any hanging sessions
-            let! browser = Puppeteer.ConnectAsync(options) |> Async.AwaitTask
-            connection.Value <- Some browser
-            return browser
-        }
-
+module Cache =
+    let nav : Ref<TextBox> = ref Unchecked.defaultof<_>
 
 [<AbstractClass; Sealed>]
 type Views =    
@@ -59,7 +34,7 @@ type Views =
                     Grid.children [                    
                         TextBox.create [
                             Grid.column 0
-                            TextBox.init (fun x -> Nav.nav.Value <- x)
+                            TextBox.init (fun x -> Cache.nav.Value <- x)
                             TextBox.text (model.url.ToString())
                             TextBox.borderThickness 0.
                             TextBox.margin 5
@@ -67,8 +42,8 @@ type Views =
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                             TextBox.onKeyDown (fun e -> 
                                 if e.Key = Avalonia.Input.Key.Enter then
-                                    if Nav.nav.Value<> Unchecked.defaultof<_> then
-                                        let url = Nav.nav.Value.Text
+                                    if Cache.nav.Value<> Unchecked.defaultof<_> then
+                                        let url = Cache.nav.Value.Text
                                         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
                                             dispatch (SetUrl url)
                                         else
@@ -125,15 +100,9 @@ type Views =
                     wv.Initialized.Add (fun args ->     
                             task {
                                 try
-                                    let! browser = Nav.connectToBrowser 9222
-                                    let! page = ComputerUse.page browser
-                                    let! ua = browser.GetUserAgentAsync() |> Async.AwaitTask //this seems to prime the connection
-                                    //let! r = page.EvaluateFunctionAsync<string>(Scripts.indicatorScript_page) |> Async.AwaitTask
-                                    //debug (sprintf "Indicator script result: %s" r)
-//                                    let! _ = page.EvaluateFunctionOnNewDocumentAsync(Scripts.indicatorScript_page) |> Async.AwaitTask 
-                                    //wv.ShowDeveloperTools()
-                                    //let! _ = page.ReloadAsync() |> Async.AwaitTask
-                                    dispatch (BrowserConnected browser)
+                                    let! browser = Connection.connection()
+                                    let _ = Browser.snapshot()
+                                    dispatch BrowserConnected
                                 with ex ->                                                                         
                                     debug (sprintf "%A" ex)
                             }
@@ -172,16 +141,18 @@ type Views =
             )
         ]                            
 
-    static member instructions model dispatch =
+
+
+    static member chat model dispatch =
         let leftMargin = 10.
         Grid.create [
             Grid.column 1
             Grid.rowSpan 2
-            Grid.rowDefinitions "30,30,*,40,*"
+            Grid.rowDefinitions "30,30,1*,1*"
             Grid.children [
                 ToggleSwitch.create [
                     Grid.row 0 
-                    ToggleSwitch.isEnabled model.browser.IsSome
+                    ToggleSwitch.isEnabled model.initialized
                     ToggleSwitch.onChecked (fun _ -> dispatch Start)
                     ToggleSwitch.onUnchecked (fun _ -> dispatch Stop)
                     ToggleSwitch.isChecked model.runState.IsSome
@@ -213,34 +184,87 @@ type Views =
                     TextBox.fontSize 14.
                     TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
                 ]
-                TextBlock.create  [
+                StackPanel.create [
                     Grid.row 3
-                    TextBlock.text "Output"
-                    TextBlock.horizontalAlignment HorizontalAlignment.Left
-                    TextBlock.verticalAlignment VerticalAlignment.Top
-                    TextBlock.fontSize 14.
-                    TextBlock.fontWeight FontWeight.Bold
-                    TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
+                    StackPanel.orientation Orientation.Vertical
+                    StackPanel.horizontalAlignment HorizontalAlignment.Stretch
+                    StackPanel.verticalAlignment VerticalAlignment.Top
+                    StackPanel.children [
+                        TextBlock.create  [
+                            TextBlock.text "Chat"
+                            TextBlock.horizontalAlignment HorizontalAlignment.Left
+                            TextBlock.verticalAlignment VerticalAlignment.Top
+                            TextBlock.fontSize 14.
+                            TextBlock.fontWeight FontWeight.Bold
+                            TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
+                        ]
+                        ListBox.create [
+                            ListBox.margin (Thickness(leftMargin,2.,2.,2.))
+                            ListBox.dataItems (model.runState |> Option.map _.chatHistory |> Option.defaultValue [])
+                            ListBox.itemTemplate (
+                                DataTemplateView<ChatMsg>.create (fun (msg: ChatMsg) -> 
+                                    match msg with 
+                                    | User content -> 
+                                        TextBlock.create [
+                                            TextBlock.text content
+                                            TextBlock.background Brushes.DarkSlateBlue
+                                            TextBlock.textWrapping TextWrapping.Wrap
+                                            TextBlock.margin (Thickness(5.,0.,0.,0.))
+                                        ]
+                                        :> Types.IView
+                                    | Assistant msg -> 
+                                        TextBlock.create [
+                                            TextBlock.text msg.content
+                                            TextBlock.background Brushes.DarkSlateBlue
+                                            
+                                            TextBlock.margin (Thickness(5.,0.,0.,0.))
+                                        ]
+                                    | Question content ->
+                                        StackPanel.create [
+                                            StackPanel.orientation Orientation.Horizontal
+                                            StackPanel.children [
+                                                TextBox.create [
+                                                    TextBox.text content
+                                                    TextBox.isEnabled (model.runState |> Option.map (fun cs -> cs.chatState.IsCS_Prompt ) |> Option.defaultValue false)
+                                                    TextBox.textWrapping TextWrapping.Wrap
+                                                    TextBox.horizontalAlignment HorizontalAlignment.Stretch
+                                                    TextBox.verticalAlignment VerticalAlignment.Stretch
+                                                    TextBox.multiline true
+                                                    TextBox.acceptsReturn true
+                                                    TextBox.textAlignment TextAlignment.Left
+                                                    TextBox.borderThickness 2.
+                                                    TextBox.margin (Thickness(leftMargin,2.,2.,2.))
+                                                    TextBox.fontSize 14.
+                                                    TextBox.background Brushes.DarkSlateBlue
+                                                    TextBox.borderThickness 1.
+                                                    TextBox.margin (Thickness(5.,0.,0.,0.))
+                                                    TextBox.onTextInput (fun t -> dispatch (Chat_UpdateQuestion t.Text))
+                                                ]
+                                                Button.create [
+                                                    Button.content "Send"
+                                                    Button.onClick (fun _ -> dispatch Chat_Respond) 
+                                                ]
+                                            ]
+                                        ]
+                                    | Placeholder -> 
+                                        Lottie.create [
+                                            Lottie.width 70.
+                                            Lottie.height 70.
+                                            Lottie.repeatCount -1
+                                            Lottie.path Lottie.defaultPath.Value
+                                        ]
+                                )                        
+                            )
+                        ]
+                    ]
                 ]
-                Button.create [
+                GridSplitter.create [
                     Grid.row 3
-                    Button.content "\u232b"
-                    Button.tip "Clear output"
-                    Button.onClick (fun _ -> dispatch ClearOutput)
-                    Button.margin (Thickness(5.))
-                    Button.horizontalAlignment HorizontalAlignment.Right
-                    Button.verticalAlignment VerticalAlignment.Top                    
-                    Button.fontSize 10.
-                ]
-                TextBlock.create  [
-                    Grid.row 4
-                    TextBlock.text model.output
-                    TextBlock.horizontalAlignment HorizontalAlignment.Stretch
-                    TextBlock.verticalAlignment VerticalAlignment.Stretch
-                    TextBlock.fontSize 14.                    
-                    TextBlock.background Brushes.DarkSlateBlue
-                    TextBlock.textWrapping TextWrapping.Wrap
-                    TextBlock.margin (Thickness(leftMargin,0.,2.,6.))
+                    Grid.columnSpan 1
+                    GridSplitter.verticalAlignment VerticalAlignment.Top
+                    GridSplitter.width 50.
+                    GridSplitter.horizontalAlignment HorizontalAlignment.Stretch
+                    GridSplitter.background Brushes.DarkGray                                
                 ]
             ]
         ]
@@ -269,7 +293,7 @@ type Views =
                     Grid.children [
                         Views.navigationBar model dispatch
                         Views.webview model dispatch
-                        Views.instructions model dispatch
+                        Views.chat model dispatch
                         Views.statusBar model dispatch
                         GridSplitter.create [
                             Grid.column 1
@@ -280,8 +304,7 @@ type Views =
                             GridSplitter.background Brushes.DarkGray                                
                         ]
                     ]
-                ]
-               
+                ]               
             ]
         ]
     

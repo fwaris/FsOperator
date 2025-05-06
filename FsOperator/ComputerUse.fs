@@ -12,11 +12,6 @@ module ComputerUse =
     let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
     let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
 
-    let page (browser:IBrowser) = 
-        async {
-            let! pages = browser.PagesAsync() |> Async.AwaitTask
-            return pages.[0]
-        }
 
     let rec sendWithRetry count (runState:RunState) (req:Request) =
         async {
@@ -54,20 +49,9 @@ module ComputerUse =
             }
         Async.Start(comp, runState.tokenSource.Token)
 
-    let snapshot (browser:IBrowser) = 
-        async {        
-            let! page = page browser
-            let opts = ScreenshotOptions()
-            let! image = page.ScreenshotDataAsync() |> Async.AwaitTask
-            use ms = new MemoryStream(image)
-            use bmp = System.Drawing.Image.FromStream(ms)
-            let imgUrl = image |> RUtils.toImageUri
-            return imgUrl,(int bmp.PhysicalDimension.Width, int bmp.PhysicalDimension.Height)
-        }
-
     let sendStartMessage (runState:RunState) =
        async {
-                let! imgUrl,(w,h) = snapshot runState.browser
+                let! imgUrl,(w,h) = Browser.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|}
                 let input = { Message.Default with content=[contImg]}
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
@@ -99,16 +83,16 @@ module ComputerUse =
             |> Option.map (fun cbId -> r.id, cbId, safetyChecks) //return the response id and the computer call id)
         )
 
-    let sendNext (runState:RunState) =
+    let computerCallResponse (runState:RunState) =
         async {            
-            let! page = page runState.browser
+            let! page = Browser.page()
             match getResponseIdsAndChecks runState with
             | None -> 
                 runState.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
                 runState.mailbox.Writer.TryWrite(TurnEnd) |> ignore
                 return ()
             | Some (prevId, lastCallId, safetyChecks) -> 
-                let imgUrl,(w,h) = snapshot runState.browser |> Async.RunSynchronously
+                let! imgUrl,(w,h) = Browser.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|} //use the same image url as before
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 debug $"snapshot dims : {w}, {h}"
@@ -129,251 +113,38 @@ module ComputerUse =
                 do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
-        
-    let private (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
-
-    let actionToString action = 
-        try
-            match action with
-            | Click p -> $"click({p.x},{p.y},{p.button})"
-            | Scroll p -> $"scroll({p.scroll_x},{p.scroll_y},{p.x},{p.y})"
-            | Double_click p -> $"dbl_click({p.x},{p.y})"
-            | Keypress p -> $"keys {p.keys}"
-            | Move p -> $"move({p.x},{p.y})"
-            | Screenshot -> "screenshot"
-            | Type p -> $"type {p.text}"
-            | Wait  -> "wait"
-            | Drag p -> 
-                let s = p.path.Head
-                let t = List.last p.path
-                $"drag {s.x},{s.y} -> {t.x},{t.y}"
-        with ex -> 
-            debug $"Error in actionToString: %s{ex.Message}"
-            sprintf "%A" action
-
-
-    let drawClick (x:int) (y:int) (duration:int) (browser:IBrowser)= 
-        async {
-            let script = $"""
-{{
-const circle = document.createElement('div');
-circle.style.position = 'fixed';
-circle.style.width = '50px';
-circle.style.height = '50px';
-circle.style.backgroundColor = 'rgba(254, 153, 0, 0.70)';
-circle.style.borderRadius = '50%%';
-circle.style.pointerEvents = 'none';
-circle.style.left = `${{{x} - 25}}px`; // Center it correctly
-circle.style.top = `${{{y} - 25}}px`;
-circle.style.zIndex = '2147483647'; // Highest possible z-index
-document.body.appendChild(circle);
-setTimeout(() => circle.remove(), {duration});
-return 'done';
-}}
-"""
-            let! page = page browser
-            let! _ = page.EvaluateFunctionAsync<string>($"() => {script}") |> Async.AwaitTask
-            do! Async.Sleep(duration)
-        }
-
-    let arrowBase = """
-(function(x, y, length, angle, duration = 2000) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 300;
-    canvas.style.position = 'fixed';
-    canvas.style.zIndex = '2147483647';
-    canvas.style.left = (x - canvas.width / 2) + 'px';
-    canvas.style.top = (y - canvas.height / 2) + 'px';
-    document.body.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-
-    const endX = canvas.width / 2 + length * Math.cos(angle);
-    const endY = canvas.height / 2 + length * Math.sin(angle);
-    const arrowHeadLength = 15;
-    const lineWidth = 5;
-    const color = 'orange';
-
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2, canvas.height / 2);
-    ctx.lineTo(endX, endY);
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = color;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    const headAngle1 = angle + Math.PI / 6;
-    const headAngle2 = angle - Math.PI / 6;
-    const arrowPoint1X = endX - arrowHeadLength * Math.cos(headAngle1);
-    const arrowPoint1Y = endY - arrowHeadLength * Math.sin(headAngle1);
-    const arrowPoint2X = endX - arrowHeadLength * Math.cos(headAngle2);
-    const arrowPoint2Y = endY - arrowHeadLength * Math.sin(headAngle2);
-
-    ctx.beginPath();
-    ctx.moveTo(endX, endY);
-    ctx.lineTo(arrowPoint1X, arrowPoint1Y);
-    ctx.lineTo(arrowPoint2X, arrowPoint2Y);
-    ctx.lineTo(endX, endY);
-    ctx.fillStyle = color;
-    ctx.fill();
-
-    setTimeout(function() {
-        document.body.removeChild(canvas);
-    }, duration);
-})"""
-
-    let drawArrow (x:int) (y:int) (length:int) (angle:float) (duration:int) (browser:IBrowser)= 
-        async {
-            let script = $"""{arrowBase}({x}, {y}, {length}, {angle}, {duration})"""
-            let! page = page browser
-            let! _ = page.EvaluateFunctionAsync(script) |> Async.AwaitTask
-            return ()
-        }
-
-    let previewAction (duration:int) (action:Action) (browser:IBrowser) =         
-        //async { return ()}
-        async {
-            try
-                let! page = page browser
-                match action with
-                | Click p ->
-                    do! drawClick p.x p.y duration browser
-                    //let! _ = page.EvaluateFunctionAsync($"() => window.drawClick({p.x},{p.y},{duration})") |> Async.AwaitTask
-                    do! Async.Sleep(duration)
-                | Scroll p -> 
-                    let degrees = 
-                        match p.scroll_x,p.scroll_y with
-                        | x,y when x = 0 && y < 0 -> 3. * Math.PI / 2. 
-                        | x,y when x = 0          -> Math.PI / 2.
-                        | x,y when x < 0          -> Math.PI
-                        | _                       -> 0.
-                    //let! _ = page.EvaluateFunctionAsync($"() => window.drawArrow(50,100, 40, {degrees}, {duration})") |> Async.AwaitTask
-                    do! drawArrow 100 200 40 degrees duration browser
-                    do! Async.Sleep(10)
-                | Drag p -> 
-                    let s = p.path.Head
-                    let t = List.last p.path
-                    do! drawClick s.x s.y duration browser                    
-                    do! Async.Sleep(300)
-                    do! drawClick t.x t.y duration browser
-                    do! Async.Sleep(10)
-                | _ -> ()
-            with ex -> 
-                debug $"Error in previewAction: %s{ex.Message}"
-        }
-        (* revisit visualization after making other changes
-                | Double_click p -> $"dbl_click({p.x},{p.y})"
-                | Keypress p -> $"keys {p.keys}"
-                | Move p -> $"move({p.x},{p.y})"
-                | Screenshot -> "screenshot"
-                | Type p -> $"type {p.text}"
-                | Wait  -> "wait"
-
-        
-        *)
-
-
-    type RequestAction = 
-        | Btn of MouseButton
-        | Back 
-        | Forward
-        | Unknown
-    let mouseButton = function 
-        | Buttons.Left          -> Btn MouseButton.Left
-        | Buttons.Middle        -> Btn MouseButton.Middle
-        | Buttons.Right         -> Btn MouseButton.Right
-        | "back" | "Back"       -> Back
-        | "forward" | "Forward" -> Forward
-        | x -> debug $"cannot use '{x}' button"; Unknown
-
-    let doAction (action:Action) (browser:IBrowser)  =
-        let task = 
-            async {
-                let! pages = browser.PagesAsync() |> Async.AwaitTask
-                let page = pages.[0]
-                match action with 
-                | Click p -> 
-                    match mouseButton p.button with
-                    | Btn btn -> 
-                        let opts = ClickOptions(Button = btn)
-                        do! page.Mouse.ClickAsync(p.x,p.y, opts) |> Async.AwaitTask
-                    | Back -> page.GoBackAsync() |> Async.AwaitTask |> ignore
-                    | Forward -> page.GoForwardAsync() |> Async.AwaitTask |> ignore
-                    | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
-                | Scroll p ->
-                    do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask                    
-                    let! _ = page.EvaluateFunctionAsync($"window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
-                    ()
-                | Keypress p -> 
-                    let mappeKeys = 
-                        p.keys 
-                        |> List.map (fun k -> 
-                            if k =*= "Enter" then "Enter"                             //Playwright does not support Enter key
-                            elif k =*= "space" then " "
-                            elif k =*= "backspace" then "Backspace"
-                            elif k =*= "ESC" then "Escape"
-                            elif k =*= "SHIFT" then "Shift"
-                            elif k =*= "CTRL" then "Control"
-                            elif k =*= "TAB" then "Tab"
-                            elif k =*= "ArrowLeft" then "ArrowLeft"
-                            elif k =*= "ArrowRight" then "ArrowRight"
-                            elif k =*= "ArrowUp" then "ArrowUp"
-                            elif k =*= "ArrowDown" then "ArrowDown"
-                            else k)
-                    let compositKey = mappeKeys |> String.concat "+"
-                    let opts = PressOptions()
-                    do! page.Keyboard.PressAsync(compositKey, opts) |> Async.AwaitTask                            
-                | Type p ->
-                    do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
-                | Wait  ->  do! Async.Sleep(2000)
-                | Screenshot -> ()
-                | Move p -> do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask
-                | Double_click p -> do! page.Mouse.ClickAsync(p.x,p.y, ClickOptions(Count=2)) |> Async.AwaitTask
-                | Drag p ->                     
-                    let s = p.path.Head
-                    let t = List.last p.path 
-                    do! page.Mouse.MoveAsync(s.x,s.y) |> Async.AwaitTask
-                    do! page.Mouse.DownAsync() |> Async.AwaitTask
-                    do! page.Mouse.MoveAsync(t.x,t.y,MoveOptions(Steps=10)) |> Async.AwaitTask
-                    do! page.Mouse.UpAsync() |> Async.AwaitTask
-                    do! page.Mouse.ClickAsync(s.x,s.y, ClickOptions(Count=1)) |> Async.AwaitTask
-//                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y, delay=500) |> Async.AwaitTask
-                    debug $"done drag"
-            }
-        async{
-            match! Async.Catch task with 
-            | Choice1Of2 _ -> ()
-            | Choice2Of2 ex -> debug $"Error in doAction: %s{ex.Message}"
-        }
-                
+                        
     let loop (runState:RunState) = 
         let rec loop() = 
-            async {                      
-                let! response = runState.fromModel.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
-                if runState.tokenSource.IsCancellationRequested |> not then 
-                    runState.lastResponse.Value <- Some response
-                    let outputText = RUtils.outputText response                       
-                    runState.mailbox.Writer.TryWrite(ClientMsg.AppendOutput outputText) |> ignore
-                    for o in response.output do
-                        match o with
-                        | Computer_call cb -> 
-                            cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 100 |> postWarning runState
-                            cb.action |> actionToString |> postAction runState
-                            do! Async.Sleep 500
-                            do! previewAction 5000 cb.action runState.browser
-                            do! doAction cb.action runState.browser                             
-                        | _ -> ()
-                    do! Async.Sleep(1000)
-                if runState.tokenSource.IsCancellationRequested |> not then
-                    do! sendNext runState
-                    return! loop()      //done recursively to handle resumability better for human-in-the-loop in future
-        }
-        let comp = async {
-            match! Async.Catch (loop()) with 
-            | Choice1Of2 _ -> debug "dispose loop"
-            | Choice2Of2 ex -> debug $"Error in loop: %s{ex.Message}"
-        }
-        Async.Start(comp,runState.tokenSource.Token)
+            async {  
+                try 
+                    let! response = runState.fromModel.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
+                    if runState.tokenSource.IsCancellationRequested |> not then 
+                        runState.lastResponse.Value <- Some response
+                        let mutable hasComputerCall = false
+                        for o in response.output do
+                            match o with
+                            | Computer_call cb -> 
+                                hasComputerCall <- true
+                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> postWarning runState
+                                cb.action |> Actions.actionToString |> postAction runState
+                                do! Async.Sleep 500
+                                //do! Preview.previewAction 5000 cb.action
+                                do! Actions.doAction 2 cb.action 
+                                do! Async.Sleep 1000
+                                do! computerCallResponse runState
+                            | Message m -> 
+                                let outputText = RUtils.outputText response
+                                let msg = Assistant {id = response.id; prev_id = response.previous_response_id; content = outputText}
+                                runState.mailbox.Writer.TryWrite(ClientMsg.Chat_Append msg) |> ignore
+                            | _  -> ()
+                        if hasComputerCall && runState.tokenSource.IsCancellationRequested |> not then
+                            return! loop() //continue the loop
+                with ex -> 
+                    debug $"Error in loop: %s{ex.Message}"
+                    do! Async.Sleep 1000
+            }
+        Async.Start(loop(),runState.tokenSource.Token)
         
         
 
