@@ -21,7 +21,7 @@ type MainWindow() as this =
         base.Width <- 800.0
         base.Height <- 500.0
 
-        Program.mkProgram Update.init (Update.update this) Views.main
+        Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
         |> Program.withSubscription Update.subscriptions        
         //|> Program.withConsoleTrace        

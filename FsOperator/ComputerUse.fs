@@ -10,8 +10,7 @@ module ComputerUse =
 
     let postLog (runState:RunState) msg =  runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog msg) |> ignore
     let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
-    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(SetWarning warning) |> ignore
-
+    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(StatusMsg_Set warning) |> ignore
 
     let rec sendWithRetry count (runState:RunState) (req:Request) =
         async {
@@ -135,13 +134,17 @@ module ComputerUse =
                                 do! computerCallResponse runState
                             | Message m -> 
                                 let outputText = RUtils.outputText response
-                                let msg = Assistant {id = response.id; prev_id = response.previous_response_id; content = outputText}
+                                let msg = Assistant {id = response.id; content = outputText}
                                 runState.mailbox.Writer.TryWrite(ClientMsg.Chat_Append msg) |> ignore
                             | _  -> ()
-                        if hasComputerCall && runState.tokenSource.IsCancellationRequested |> not then
-                            return! loop() //continue the loop
+                        if runState.tokenSource.IsCancellationRequested |> not then 
+                            if hasComputerCall then 
+                                return! loop()
+                            else
+                                runState.mailbox.Writer.TryWrite(ClientMsg.TurnEnd) |> ignore
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
+                    runState.mailbox.Writer.TryWrite(ClientMsg.StopWithError ex) |> ignore
                     do! Async.Sleep 1000
             }
         Async.Start(loop(),runState.tokenSource.Token)

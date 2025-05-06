@@ -30,7 +30,7 @@ module Update =
                 [nameof sub2], sub2
         ]
 
-    let testSomething (model:Model) =
+    let testSomething_ (model:Model) =
         async {
             try
                 //do! Preview.drawArrow 100 500 50 0. 2000
@@ -41,6 +41,20 @@ module Update =
                 debug $"Error in testSomething: {ex.Message}"
         }
         |> Async.Start
+        model,Cmd.none
+
+    let testSomething (model:Model) =
+        let testChat = 
+            [
+                Assistant {id = "1"; content = model.instructions}
+                User "The quick brown fox jumped over the lazy dog"
+                Assistant {id = "2"; content = "How can I help you?"}
+                //Question "What is your name?"
+            ]
+        let runState = RunState.Create model.mailbox model.instructions
+        let runState = {runState with chatHistory = testChat |> Chat.fixPlaceholder; chatState = ChatState.CS_Prompt}
+        {model with runState =  Some runState}, Cmd.none
+
 
     let init _   = 
         let url,instructions = StartPrompts.amazon
@@ -58,9 +72,22 @@ module Update =
             url = url
             webview = ref None
             action = ""
-            warning = ""
+            statusMsg = None,""
         }        
         model,Cmd.ofMsg Initialize
+
+    let shouldClearStatus (inComingDT:DateTime option) messageDT = 
+        match inComingDT,messageDT with
+        | None, None -> true
+        | Some inComingDT, None -> true
+        | Some inComingDT, Some messageDT -> messageDT = inComingDT
+        | None, Some messageDT -> false
+
+    let delayClearStatus (time:DateTime) =
+        async {
+            do! Async.Sleep 10000
+            return Some time
+        }
 
     let token() = new System.Threading.CancellationTokenSource()
 
@@ -94,16 +121,19 @@ module Update =
             | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.updateQustion txt rs.chatHistory})}, Cmd.none
             | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
             | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append (Question "") rs.chatHistory})}, Cmd.none
+            | Chat_Submit -> model, Cmd.none
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> {model with url=txt}, Cmd.none
 
             | SetAction txt -> {model with action=txt}, Cmd.none
-            | SetWarning txt -> {model with warning = txt},Cmd.none
-            | TurnEnd -> {model with warning = "Current turn ended"}, Cmd.ofMsg Stop
-            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else {model with warning = ex.Message}, Cmd.ofMsg Stop
-            | TestSomething -> testSomething model; model, Cmd.none
+            | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
+            | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
+
+            | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_Respond]
+            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg Stop]
+            | TestSomething -> testSomething model
 
             //| _ -> model, Cmd.none
         with ex -> 

@@ -2,7 +2,6 @@
 
 type AsstMsg = {
     id      : string    
-    prev_id : string option
     content : string
 }
 

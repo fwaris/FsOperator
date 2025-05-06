@@ -41,7 +41,7 @@ type Model = {
     url : string
     webview : Ref<WebView option>
     action : string
-    warning : string
+    statusMsg : (DateTime option*string)
 }
 
 type ClientMsg =
@@ -54,7 +54,8 @@ type ClientMsg =
     | ClearLog
     | SetUrl of string
     | SetAction of string
-    | SetWarning of string
+    | StatusMsg_Set of string
+    | StatusMsg_Clear of DateTime option
     | TurnEnd
     | StopWithError of exn
     | TestSomething
@@ -62,5 +63,6 @@ type ClientMsg =
     | Chat_UpdateQuestion of string
     | Chat_Clear
     | Chat_Respond
+    | Chat_Submit
 
 

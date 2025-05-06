@@ -10,6 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<AvaloniaResource Include="**\*.xaml" />
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
 
@@ -31,7 +32,9 @@
 		<Compile Include="Actions.fs" />
 		<Compile Include="ComputerUse.fs" />
 		<Compile Include="Update.fs" />
-		<Compile Include="View.fs" />
+		<Compile Include="Views\BrowserView.fs" />
+		<Compile Include="Views\ChatView.fs" />
+		<Compile Include="Views\MainView.fs" />
 		<Compile Include="Program.fs" />
 	</ItemGroup>
 	
