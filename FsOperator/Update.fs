@@ -61,7 +61,7 @@ module Update =
         //let url,instructions = StartPrompts.netflix
         //let url,instructions = StartPrompts.linkedIn
         //let url,instructions = StartPrompts.twitter
-        FsResponses.debug_logging <- true
+        //sResponses.debug_logging <- true
         let model = {
             instructions=instructions
             runState = None
