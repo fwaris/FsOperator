@@ -160,6 +160,7 @@ module ComputerUse =
                                 runState.mailbox.Writer.TryWrite(ClientMsg.TurnEnd) |> ignore
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
+                    do! Connection.closeConnection()
                     do! Async.Sleep 1000
                     if retryCount < 10 then 
                         return! loop(retryCount + 1)                   
