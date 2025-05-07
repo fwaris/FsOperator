@@ -9,6 +9,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponses", "FsResponses\
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RTOpenAI.Api", "RTOpenAI.Api\RTOpenAI.Api.fsproj", "{80FEB1A1-AB57-AF4C-640A-BBAFD328F5A4}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RTTest", "RTTest\RTTest.fsproj", "{CC260714-5D16-4D3A-848D-2660AB853B2D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{80FEB1A1-AB57-AF4C-640A-BBAFD328F5A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{80FEB1A1-AB57-AF4C-640A-BBAFD328F5A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{80FEB1A1-AB57-AF4C-640A-BBAFD328F5A4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
