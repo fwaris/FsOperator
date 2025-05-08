@@ -2,6 +2,7 @@
 
 open PuppeteerSharp
 open System.IO
+open SkiaSharp
 
 module Browser = 
 
@@ -23,12 +24,14 @@ module Browser =
     let snapshot() = 
         async {                   
             let! page = page()
+  
             let opts = ScreenshotOptions()
+            opts.BurstMode <- true
             let! image = page.ScreenshotDataAsync() |> Async.AwaitTask
-            use ms = new MemoryStream(image)
-            use bmp = System.Drawing.Image.FromStream(ms)
+            do! page.SetBurstModeOffAsync() |> Async.AwaitTask
+            let bmp = SKBitmap.Decode(image)
             let imgUrl = FsResponses.RUtils.toImageUri image
-            //File.WriteAllBytes(@"e:\s\cua\screenshot.png", image)
-            return imgUrl,(int bmp.PhysicalDimension.Width, int bmp.PhysicalDimension.Height)
+            File.WriteAllBytes(Path.Combine(homePath.Value, @"screenshot.png"), image)
+            return imgUrl,(int bmp.Width, int bmp.Height)
         }
 

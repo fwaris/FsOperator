@@ -32,9 +32,9 @@ module ComputerUse =
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
-                    postLog runState $"--> {request}"
+                    postLog runState $"--> {RUtils.trimRequest request}"
                     let! response = sendWithRetry 0 runState request                    
-                    postLog runState $"<-- {response}"    
+                    postLog runState $"<-- {RUtils.trimResponse response}"    
                     do! runState.fromModel.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
                 }
             )

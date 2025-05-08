@@ -58,7 +58,7 @@ module Actions =
     let perform (action:Action)  =
         async {
             let! page = Browser.page()
-            
+            if page.MainFrame = null then failwith "no main frame"
             match action with 
             | Click p -> 
                 match mouseButton p.button with

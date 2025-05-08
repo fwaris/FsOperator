@@ -20,8 +20,8 @@ type MainWindow() as this =
 
     do
         base.Title <- "Computer Use Agent"
-        base.Width <- 800.0
-        base.Height <- 500.0
+        base.Width <- 1400.0
+        base.Height <- 800.0
 
         Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
@@ -59,6 +59,7 @@ type App() =
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
+        //WebViewControl.WebView.Settings.OsrEnabled <- true
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         //WebViewControl.WebView.Settings.LogFile <- @"e:\\s\\log.txt"
         WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", string C.DEBUG_PORT)

@@ -2,7 +2,13 @@
 open System
 
 [<AutoOpen>]
-module Utility = 
+module Utility =
+    
+    let homePath = lazy(
+        match Environment.OSVersion.Platform with 
+        | PlatformID.Unix 
+        | PlatformID.MacOSX -> Environment.GetEnvironmentVariable("HOME") 
+        | _                 -> Environment.GetEnvironmentVariable("USERPROFILE"))
 
     let debug (msg:string) = 
         System.Diagnostics.Debug.WriteLine(msg)

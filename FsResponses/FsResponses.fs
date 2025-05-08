@@ -235,7 +235,21 @@ let runT (t:Task<'t>) = t.Result
 
 exception ApiError of ResponseErrorObj
 
-module RUtils = 
+module RUtils =
+    let private shorten (s:string) = if s.Length < 100 then s else s.Substring(0,100)
+    
+    let trimImage = function
+        | Image i ->  Image {|image = shorten i.image; annotations=i.annotations|}
+        | x -> x
+        
+    ///trim the large image base64 encoded string (to reduce log sizes)
+    let trimResponse (resp:Response) =
+        {resp with output = resp.output |> List.map trimImage}
+        
+    ///trim the large image base64 encoded string (to reduce log sizes)
+    let trimRequest (req:Request) =
+        {req with input = req.input |> List.map trimImage}
+        
     let outputText (resp:Response) = 
         [
             for r in resp.output do
