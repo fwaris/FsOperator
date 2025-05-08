@@ -8,9 +8,6 @@ open PuppeteerSharp.Input
 
 module ComputerUse =    
 
-    let postLog (runState:RunState) msg =  runState.mailbox.Writer.TryWrite(ClientMsg.AppendLog msg) |> ignore
-    let postAction (runState:RunState) action = runState.mailbox.Writer.TryWrite(SetAction action) |> ignore
-    let postWarning (runState:RunState) warning = runState.mailbox.Writer.TryWrite(StatusMsg_Set warning) |> ignore
 
     let rec sendWithRetry count (runState:RunState) (req:Request) =
         async {
@@ -19,10 +16,10 @@ module ComputerUse =
                 return response
             with ex ->
                 if count < 2 then 
-                    postLog runState $"send error: retry {count + 1}"
+                    AppUtils.postLog runState $"send error: retry {count + 1}"
                     return! sendWithRetry (count + 1) runState req
                 else
-                    postLog runState $"Unable to reconnect aborting"
+                    AppUtils.postLog runState $"Unable to reconnect aborting"
                     return raise ex
         }
   
@@ -32,9 +29,9 @@ module ComputerUse =
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
-                    postLog runState $"--> {RUtils.trimRequest request}"
+                    AppUtils.postLog runState $"--> {RUtils.trimRequest request}"
                     let! response = sendWithRetry 0 runState request                    
-                    postLog runState $"<-- {RUtils.trimResponse response}"    
+                    AppUtils.postLog runState $"<-- {RUtils.trimResponse response}"    
                     do! runState.fromModel.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
                 }
             )
@@ -48,7 +45,7 @@ module ComputerUse =
             }
         Async.Start(comp, runState.tokenSource.Token)
 
-    let sendStartMessage (runState:RunState) =
+    let sendStartMessage (runState:RunState) (overrideInstructions:string option) =
        async {
                 let! imgUrl,(w,h) = Browser.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|}
@@ -56,7 +53,7 @@ module ComputerUse =
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 let req = {Request.Default with 
                                 input = [Message input]; tools=[tool]
-                                instructions = Some runState.instructions
+                                instructions = overrideInstructions |> Option.defaultValue runState.instructions |> Some
                                 previous_response_id = None                    
                                 store = true
                                 model=Models.computer_use_preview
@@ -141,8 +138,8 @@ module ComputerUse =
                             match o with
                             | Computer_call cb -> 
                                 hasComputerCall <- true
-                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> postWarning runState
-                                cb.action |> Actions.actionToString |> postAction runState
+                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> AppUtils.postWarning runState
+                                cb.action |> Actions.actionToString |> AppUtils.postAction runState
                                 do! Async.Sleep 500
                                 //do! Preview.previewAction 2000 cb.action
                                 do! Actions.doAction 2 cb.action 

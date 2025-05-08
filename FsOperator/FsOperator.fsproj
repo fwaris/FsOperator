@@ -1,11 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<OutputType>WinExe</OutputType>
+		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
+		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
+		<OutputType>Exe</OutputType>
 		<TargetFrameworks>net9.0</TargetFrameworks>
+		<TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
-	
+
+	<PropertyGroup Condition="$(IsWindows)">
+		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>		
+	</PropertyGroup>		
 
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\**" />
@@ -20,6 +26,7 @@
 		<Compile Include="Utils.fs" />
 		<Compile Include="Chat.fs" />
 		<Compile Include="Model.fs" />
+		<Compile Include="AppUtils.fs" />
 		<Compile Include="Connection.fs" />
 		<Compile Include="StartPrompts.fs" />
 		<Compile Include="Browser.fs" />
@@ -27,6 +34,7 @@
 		<Compile Include="Preview.fs" />
 		<Compile Include="Actions.fs" />
 		<Compile Include="ComputerUse.fs" />
+		<Compile Include="VoiceMachine.fs" />
 		<Compile Include="Update.fs" />
 		<Compile Include="Views\BrowserView.fs" />
 		<Compile Include="Views\ChatView.fs" />
@@ -64,6 +72,7 @@
 	
 	<ItemGroup>
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
+	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
 	</ItemGroup>
 	
 </Project>

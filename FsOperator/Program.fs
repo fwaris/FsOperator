@@ -20,13 +20,13 @@ type MainWindow() as this =
 
     do
         base.Title <- "Computer Use Agent"
-        base.Width <- 1400.0
-        base.Height <- 800.0
+        base.Width <- 800.0
+        base.Height <- 400.0
 
         Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
         |> Program.withSubscription Update.subscriptions        
-        //|> Program.withConsoleTrace        
+        |> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
 

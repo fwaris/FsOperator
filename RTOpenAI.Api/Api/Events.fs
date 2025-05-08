@@ -459,7 +459,7 @@ type ResponseOutputItemDoneEvent =
         ``type``: string  // "response.output_item.done"
         response_id: string
         output_index: int
-        item: ResponseOutputItemItem
+        item: ResponseOutputItemItem option
     }
 
 ///Returned when a new content part is added to an assistant message item during response generation.

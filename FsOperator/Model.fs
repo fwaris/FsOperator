@@ -3,6 +3,7 @@ open System
 open System.Threading.Channels
 open PuppeteerSharp
 open WebViewControl
+open RTOpenAI.Api
 
 type ChatState = CS_Init | CS_Loop | CS_Prompt
 
@@ -17,6 +18,8 @@ type RunState = {
     instructions : string
     chatHistory : ChatMsg list
     chatState : ChatState
+    chatMode : ChatMode
+    lastFunctionCallId : Ref<string option> 
 }
 
 with static member Create mailbox instructions =
@@ -30,7 +33,11 @@ with static member Create mailbox instructions =
                 instructions = instructions
                 chatHistory = []
                 chatState = CS_Init
+                chatMode = CM_Text
+                lastFunctionCallId = ref None
             }
+
+type ChatMode = CM_Text | CM_Voice of RTOpenAI.Api.Connection  | CM_Init
 
 type Model = {
     runState : RunState option
@@ -45,9 +52,22 @@ type Model = {
     statusMsg : (DateTime option*string)
 }
 
+//request to get the ephemeral key    
+type KeyReq = {
+    model : string
+    modalities : string list
+    instructions : string
+}
+with static member Default = {
+        model = ""
+        modalities = ["audio"; "text"]
+        instructions = "You are a friendly assistant"
+    }        
+
+
 type ClientMsg =
     | Initialize
-    | StartStopTask
+    | TextChat_StartStopTask
     | StopIfRunning
     | BrowserConnected
     | SetInstructions of string
@@ -65,5 +85,6 @@ type ClientMsg =
     | Chat_Clear
     | Chat_Respond
     | Chat_Submit
-
+    | VoicChat_StartStop
+    | VoiceChat_RunInstructions of (string*string)
 

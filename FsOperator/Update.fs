@@ -96,29 +96,38 @@ module Update =
             match msg with
             | Initialize -> model, Cmd.none
             | BrowserConnected -> {model with initialized=true},Cmd.none
-            | StartStopTask ->
+            | TextChat_StartStopTask ->
                 match model.runState with 
                 | None when model.initialized -> 
                     let runState = RunState.Create model.mailbox model.instructions
                     let runState = {runState with chatHistory = []; chatState = CS_Loop}
                     ComputerUse.startMessaging runState
-                    ComputerUse.sendStartMessage runState |> Async.Start
+                    ComputerUse.sendStartMessage runState None |> Async.Start
                     ComputerUse.loop runState 
                     {model with runState =  Some runState}, Cmd.none
                 | None -> model, Cmd.none
-                | Some runState-> 
+                | Some runState when runState.chatMode.IsCM_Text -> 
                     runState.tokenSource.Cancel()
                     runState.fromModel.Writer.TryComplete() |> ignore
                     runState.toModel.Writer.TryComplete()   |> ignore                    
                     {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none 
-            | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg StartStopTask else Cmd.none)
+                | _ -> model, Cmd.none //ignore voice mode
+            | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg TextChat_StartStopTask else Cmd.none)
 
             | SetInstructions txt -> {model with instructions=txt}, Cmd.none
 
             | Chat_Clear -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = []})}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with question = txt})}, Cmd.none
             | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
-            | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatState = CS_Prompt})}, Cmd.none
+            | Chat_Respond -> 
+                let model = {model with runState = model.runState |> Option.map (fun rs -> {rs with chatState = CS_Prompt})}
+                match model.runState with 
+                | Some rs ->                 
+                    match rs.chatMode, rs.lastFunctionCallId.Value, List.tryLast rs.chatHistory with
+                    | CM_Voice cnn, Some funcReq, Some (Assistant m) -> Functions.sendFunctionResponse cnn funcReq m
+                    | x -> debug $"invalid state to respond to voice function call"
+                | _ -> ()
+                model,Cmd.none                
             | Chat_Submit -> 
                 match model.runState with
                 | Some runState when runState.chatState.IsCS_Prompt -> 
@@ -145,7 +154,35 @@ module Update =
             | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg StopIfRunning]
             | TestSomething -> testSomething model
 
+            | VoicChat_StartStop -> 
+                match model.runState with 
+                | None when model.initialized -> 
+                    let runState = RunState.Create model.mailbox ""
+                    let conn = RTOpenAI.Api.Connection.create()
+                    let runState = {runState with chatHistory = []; chatState = CS_Loop; chatMode = CM_Voice conn}
+                    ComputerUse.startMessaging runState
+                    ComputerUse.loop runState 
+                    VoiceMachine.startVoiceMachine runState |> Async.Start
+                    {model with runState =  Some runState}, Cmd.none
+                | None -> model, Cmd.none
+                | Some runState when runState.chatMode.IsCM_Voice -> 
+                    runState.tokenSource.Cancel()
+                    runState.fromModel.Writer.TryComplete() |> ignore
+                    runState.toModel.Writer.TryComplete()   |> ignore                    
+                    VoiceMachine.stopVoiceMachine runState |> Async.Start
+                    {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none 
+                | _ -> model, Cmd.none //ignore voice mode
+
+            | VoiceChat_RunInstructions (instructions,ev) ->
+                match model.runState with 
+                | Some rs when rs.chatMode.IsCM_Voice -> 
+                    rs.lastFunctionCallId.Value <- Some ev
+                    Functions.sendVoiceInstructions rs instructions |> Async.Start
+                | _ -> ()
+                model, Cmd.none
+
             //| _ -> model, Cmd.none
         with ex -> 
-            printfn "%A" ex
+            printfn "%A" ex 
             model, Cmd.none
+

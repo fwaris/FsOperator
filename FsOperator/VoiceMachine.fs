@@ -1,0 +1,220 @@
+﻿namespace FsOperator
+open System.Text.Json
+open FSharp.Control
+open RTOpenAI
+open RTOpenAI.Api.Events
+open System.Text.Json.Nodes
+
+module VoicePrompts =
+    let rtInstructions = $"""
+You are to collaborate with a user to help complete a task.
+The task is performed by a separate 'assistant'. 
+You job is to converse with the human generate instructions for the assistant.
+The assistant will carry out the task and return with a response - which may br question or clarification.
+
+To send the instructions to the assitant use function call 'assistantInstructions' with the instructions as the argument.
+
+Note the assistant may take a while to get back to you so be patient.
+
+You can use the same 'assistantantInstructions' function to respond to the results of the previous assistant's reponse.
+
+"""
+
+module Functions =
+
+    let sendInitResp conn = 
+        (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
+                                        event_id = Api.Utils.newId()
+                                        response.instructions = Some "briefly introduce yourself"
+                                        //response.modalities = Some [M_AUDIO; M_TEXT]
+                                        })
+        |> Api.Connection.sendClientEvent conn
+
+    //sends 'response.create' to prompt the LLM to generate audio (otherwise it seems to wait).
+    let sendResponseCreate conn=
+        (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
+                                        event_id = Api.Utils.newId()
+                                        //response.modalities = Some [M_AUDIO; M_TEXT]
+                                        })
+        |> Api.Connection.sendClientEvent conn
+    
+        
+    let inline sendFunctionResponse conn (callId:string) result =
+        let outEv =
+            { ConversationItemCreateEvent.Default with
+                item =
+                      { ConversationItem.Default with
+                          ``type`` = ConversationItemType.Function_call_output
+                          call_id = Some callId
+                          output = Some (JsonSerializer.Serialize(result))                                      
+                      }
+            }
+            |> ConversationItemCreate
+        Api.Connection.sendClientEvent conn outEv  //send prolog query results (or error)
+        sendResponseCreate conn                    //prompt the LLM to respond now
+    
+    let MAX_RETRY = 2
+
+    let getArg (argName:string) (jsonStr:string) =    
+        let jargs = JsonSerializer.Deserialize<JsonObject>(jsonStr)
+        jargs.[argName].ToString()
+    
+
+    let rec sendInstructions (runState:RunState) (ev:ResponseOutputItemDoneEvent) =
+        async {
+            try                                                 
+                let instructions = ev.item |> Option.bind _.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")
+                let callId = ev.item |> Option.map _.call_id |> Option.defaultWith (fun _ -> failwith "function call id not found")
+                AppUtils.postMessage runState (ClientMsg.VoiceChat_RunInstructions (instructions,callId))
+                AppUtils.postLog runState $"<-- voice instr. {instructions}"
+            with ex ->
+                AppUtils.postWarning runState ex.Message
+                RTOpenAI.Api.Log.error $"Error in runInstructions: {ex.Message}"
+        }        
+
+    let sendVoiceInstructions (runState:RunState) (instructions:string) =
+        async {
+            match runState.lastResponse.Value with 
+            | None -> do! ComputerUse.sendStartMessage runState (Some instructions) 
+            | Some _ -> do! ComputerUse.sendTextResponse runState (runState.lastResponse.Value|> Option.map(_.id), instructions)
+        }
+
+module VoiceMachine =    
+    let ASST_INSTRUCTIONS_FUNCTION = "assistantInstructions"
+    let M_AUDIO = "audio"
+    let M_TEXT = "text"
+    let FUNCTION_CALL = "function_call"
+    let FUNCTION_CALL_OUTPUT = "function_call_output"
+    
+    type State = {
+        initialized : bool
+        responses : Set<string>
+        currentSession : Session  }      
+    with static member Default = {
+             initialized=false
+             currentSession = Session.Default
+             responses = Set.empty}
+                            
+    let ssInit = State.Default          //initial state for server event handling
+        
+    //take an existing session and 'update' it to new settings       
+    let reconfigure (s:Session) =
+        { s with
+            id = None                               //*** set 'id' and 'object' to None when updating an existing session
+            object = None   
+                                                    // set, unset, or override other fields as needed 
+            instructions = Some VoicePrompts.rtInstructions
+            tool_choice = Some "auto"
+            tools = [
+                {
+                    ``type`` = "function"
+                    name = ASST_INSTRUCTIONS_FUNCTION
+                    description = "Accepts a set of English instructions that be conveyed to an assistant to complete or continue a task"
+                    parameters =
+                        {
+                            ``type`` = "object"
+                            properties = Map.ofList ["instructions", {``type``= "string"; description= Some "detailed steps in English"}] 
+                            required = []                            
+                        }
+                }
+            ]                
+        }
+        
+    let toUpdateEvent (s:Session) =
+        { SessionUpdateEvent.Default with
+            event_id = Api.Utils.newId()
+            session = s}
+        |> SessionUpdate
+            
+    let sendUpdateSession conn session =
+        session
+        |> reconfigure
+        |> toUpdateEvent
+        |> Api.Connection.sendClientEvent conn
+            
+    let  isInstructionsCall (ev:ResponseOutputItemDoneEvent) =
+        ev.item 
+        |> Option.map (fun x -> x.``type`` = FUNCTION_CALL && x.name = Some ASST_INSTRUCTIONS_FUNCTION) 
+        |> Option.defaultValue false
+        
+    let  getInstructions (ev:ResponseOutputItemDoneEvent) =
+        ev.item 
+        |> Option.bind (fun x ->
+            if x.``type`` = FUNCTION_CALL && x.name = Some ASST_INSTRUCTIONS_FUNCTION then 
+                x.arguments 
+            else 
+                None
+        ) 
+        |> Option.defaultValue "no instructions found"
+      
+        //if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then
+        //     ev.item.arguments |> Option.defaultValue "no instructions found"
+        //else
+        //    "no instructions: incorrect response type"
+             
+    let  isInstructionsResult (ev:ResponseOutputItemDoneEvent) =
+        ev.item 
+        |> Option.map (fun x -> x.``type`` = FUNCTION_CALL_OUTPUT && x.name = Some ASST_INSTRUCTIONS_FUNCTION) 
+        |> Option.defaultValue false        
+                
+       
+    // accepts old state and next event - returns new state
+    let update (runState:RunState) conn (st:State) ev =
+        async {
+            match ev with
+            | SessionCreated s when not st.initialized ->  sendUpdateSession conn s.session; return {st with initialized = true} 
+            | SessionCreated s -> return {st with currentSession = s.session }
+            | SessionUpdated s -> Functions.sendInitResp conn; return {st with currentSession = s.session }
+            | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
+                if runState.lastFunctionCallId.Value.IsSome then 
+                    debug $"Ignoring function call {ev.item |> Option.map _.name} as we are already processing a function call"
+                else
+                    Functions.sendInstructions runState ev |> Async.Start
+                return st
+            | ResponseOutputItemDone ev when isInstructionsResult ev  -> return  st            
+            | ResponseTextDelta ev -> AppUtils.postLog runState $"text delta {ev}"; return st
+            | ResponseAudioDelta _
+            | ResponseAudioTranscriptDelta _
+            | ResponseFunctionCallArgumentsDelta _ -> return st // suppress logging 'delta' events 
+            | other -> (* Log.info $"unhandled event: {other}"; *) return st //log other events
+        }
+        
+
+    let private startReader (runState:RunState) (conn:RTOpenAI.Api.Connection) = 
+        let task =
+            async {
+                let comp = 
+                    conn.WebRtcClient.OutputChannel.Reader.ReadAllAsync(runState.tokenSource.Token)
+                        |> AsyncSeq.ofAsyncEnum
+                        |> AsyncSeq.map Api.Exts.toEvent
+                        |> AsyncSeq.scanAsync (update runState conn) ssInit   //handle actual event
+                        |> AsyncSeq.iter (fun s -> ())
+                match! Async.Catch comp with
+                | Choice1Of2 _ -> RTOpenAI.Api.Log.info "server events completed"
+                | Choice2Of2 exn -> RTOpenAI.Api. Log.exn(exn,"Error: Machine.run")
+            }
+        Async.Start(task, runState.tokenSource.Token)
+
+        
+    let startVoiceMachine (runState:RunState) =
+        async {
+            match runState.chatMode with
+            | CM_Voice connection  -> 
+                let! key = AppUtils.getOpenAIEphemKey (getApiKey())
+                let! ephemeralKey = AppUtils.getOpenAIEphemKey (getApiKey())
+                do! RTOpenAI.Api.Connection.connect ephemeralKey connection |> Async.AwaitTask
+                startReader runState connection
+                return ()
+            | x -> AppUtils.postLog runState $"Chat mode not supported {x}"
+            return ()
+        }
+
+    let stopVoiceMachine (runState:RunState) =
+        async {
+            match runState.chatMode with
+            | CM_Voice connection  -> 
+                RTOpenAI.Api.Connection.close connection
+                return ()
+            | x -> AppUtils.postLog runState $"Chat mode not supported {x}"
+            return ()
+        }

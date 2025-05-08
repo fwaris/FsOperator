@@ -3,7 +3,11 @@ open System
 
 [<AutoOpen>]
 module Utility =
+
     
+    let getApiKey() = Environment.GetEnvironmentVariable("OPENAI_API_KEY") 
+  
+
     let homePath = lazy(
         match Environment.OSVersion.Platform with 
         | PlatformID.Unix 

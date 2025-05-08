@@ -12,35 +12,6 @@ open SIPSorceryMedia.Abstractions
 open Concentus
 open Concentus.Enums
 
-type AudioEncoderOpus(format:AudioFormat) = 
-    let opusEncoder = lazy(OpusCodecFactory.CreateEncoder(format.ClockRate, format.ChannelCount, OpusApplication.OPUS_APPLICATION_VOIP))
-    let opusDecoder = lazy(OpusCodecFactory.CreateDecoder(format.ClockRate, format.ChannelCount))
-    let OPUS_MAXIMUM_DECODE_BUFFER_LENGTH = 5760
-
-    interface IAudioEncoder with
-    
-        member this.EncodeAudio(pcm, format) = 
-            let pcmFloat = pcm |> Array.map (fun pcm -> Math.Clamp(float32 pcm / 32768.0f, -1.0f, 1.0f))
-            let encodedSample = Span(Array.zeroCreate pcm.Length)            
-            let encodedLength = opusEncoder.Value.Encode(pcmFloat, pcmFloat.Length / format.ChannelCount, encodedSample, encodedSample.Length)
-            encodedSample.Slice(0, encodedLength).ToArray()
-
-        member this.DecodeAudio(encodedSample, format) = 
-            let decodedPcmFloat = Span(Array.zeroCreate<float32> OPUS_MAXIMUM_DECODE_BUFFER_LENGTH)
-            let decodedLength = opusDecoder.Value.Decode(encodedSample, decodedPcmFloat, decodedPcmFloat.Length, false)
-            let decodedPcm = Array.zeroCreate<int16> decodedLength
-            for i in 0 .. decodedLength - 1 do
-                decodedPcm[i] <- Math.Clamp(int16 (decodedPcmFloat[i] * 32767.0f), Int16.MinValue, Int16.MaxValue)
-            decodedPcm
-
-        member this.SupportedFormats = [format] |> ResizeArray
-
-    interface IDisposable with
-        member this.Dispose() =             
-            if opusEncoder.IsValueCreated then opusEncoder.Value.Dispose()
-            if opusDecoder.IsValueCreated then opusDecoder.Value.Dispose()
-
-
 type WebRtcClientWin() = 
         
     let mutable peerConnection: RTCPeerConnection = null   
@@ -62,7 +33,7 @@ type WebRtcClientWin() =
 
     let addAudio(pc:RTCPeerConnection) = 
         let winAudioEP = new WindowsAudioEndPoint(new AudioEncoder(includeOpus=true),-1,-1,false,false)
-        winAudioEP.RestrictFormats(fun x -> x.FormatName = "OPUS") 
+        winAudioEP.RestrictFormats(fun x -> x.FormatName = "OPUS")         
         winAudioEP.add_OnAudioSinkError(SourceErrorDelegate(fun err -> Log.info $"Audio sink error {err}"))
         let audioDlg = audioDelegate pc
         winAudioEP.add_OnAudioSourceEncodedSample(audioDlg)
@@ -83,6 +54,7 @@ type WebRtcClientWin() =
                 Log.info $"Peer connection state changed to {state}"
                 if state = RTCPeerConnectionState.connected then 
                     do! winAudioEP.StartAudio()
+                    do! winAudioEP.StartAudioSink()
                 }
                 |> ignore)
 

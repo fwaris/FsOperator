@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FsOperator": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

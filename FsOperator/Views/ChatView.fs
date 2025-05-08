@@ -75,60 +75,121 @@ type ChatView =
     static member chat model dispatch =
         let leftMargin = 10.
         let csState = model.runState |> Option.map (fun rs -> rs.chatState) |> Option.defaultValue ChatState.CS_Init
+        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+       
         Grid.create [
             Grid.column 1
             Grid.rowSpan 2
-            Grid.rowDefinitions "30,1*,2*"
+            Grid.rowDefinitions "1*,2*"
             Grid.children [
-                Panel.create [
+                TabControl.create [
                     Grid.row 0
-                    Panel.children [
-                        TextBlock.create  [                            
-                            TextBlock.text "Instructions"
-                            TextBlock.horizontalAlignment HorizontalAlignment.Left
-                            TextBlock.verticalAlignment VerticalAlignment.Top
-                            TextBlock.fontSize 14.
-                            TextBlock.fontWeight FontWeight.Bold
-                            TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
+                    TabControl.viewItems [
+                        //text mode
+                        TabItem.create [
+                            TabItem.header (
+                                Panel.create [
+                                    Panel.children [
+                                        TextBlock.create [
+                                            TextBlock.verticalAlignment VerticalAlignment.Center
+                                            TextBlock.text "Text"
+                                            TextBlock.fontSize 14.
+                                            TextBlock.fontWeight FontWeight.Bold
+                                            TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
+                                        ]
+                                        if ((csState.IsCS_Prompt || csState.IsCS_Loop) && csMode.IsCM_Text) then 
+                                            Lottie.create [
+                                                Grid.row 0
+                                                Lottie.margin (Thickness(10.,0.,0.,0.))
+                                                Lottie.verticalAlignment VerticalAlignment.Center
+                                                Lottie.horizontalAlignment HorizontalAlignment.Right
+                                                Lottie.path Lottie.defaultPath.Value
+                                                Lottie.height 50.
+                                            ]
+                                    ]
+                                ]
+                            )
+                            TabItem.content (
+                                Panel.create [
+                                    Grid.row 1
+                                    Panel.children [
+                                        TextBlock.create  [                            
+                                            TextBlock.text "Instructions"
+                                            TextBlock.horizontalAlignment HorizontalAlignment.Stretch
+                                            TextBlock.verticalAlignment VerticalAlignment.Top
+                                            TextBlock.fontSize 14.
+                                            TextBlock.fontWeight FontWeight.Bold
+                                            TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
+                                        ]
+                                        TextBox.create [
+                                            TextBox.text model.instructions
+                                            TextBox.textWrapping TextWrapping.Wrap
+                                            TextBox.horizontalAlignment HorizontalAlignment.Stretch
+                                            TextBox.verticalAlignment VerticalAlignment.Stretch
+                                            TextBox.multiline true
+                                            TextBox.acceptsReturn true
+                                            TextBox.textAlignment TextAlignment.Left
+                                            TextBox.background Brushes.Transparent
+                                            TextBox.borderThickness 2.
+                                            TextBox.margin (Thickness(leftMargin,30.,2.,37.))
+                                            TextBox.fontSize 14.
+                                            TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
+                                        ]
+                                        Button.create [
+                                            Button.isEnabled (model.initialized  && (csMode.IsCM_Init || csMode.IsCM_Text))
+                                            Button.margin (Thickness(0.,0.,1.,2.))
+                                            Button.content (if csState.IsCS_Init then "Start Task" else "Cancel Task" )
+                                            Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
+                                            Button.horizontalAlignment HorizontalAlignment.Right
+                                            Button.verticalAlignment VerticalAlignment.Bottom
+                                        ]
+                                    ]
+                                ]
+                            )
                         ]
-                        if csState.IsCS_Prompt || csState.IsCS_Loop then 
-                            Lottie.create [
-                                Lottie.verticalAlignment VerticalAlignment.Top
-                                Lottie.horizontalAlignment HorizontalAlignment.Right
-                                Lottie.path Lottie.defaultPath.Value
-                                Lottie.height 50.
-                            ]
-                    ]
-                ]
-                Panel.create [
-                    Grid.row 1
-                    Panel.children [
-                        TextBox.create [
-                            TextBox.text model.instructions
-                            TextBox.textWrapping TextWrapping.Wrap
-                            TextBox.horizontalAlignment HorizontalAlignment.Stretch
-                            TextBox.verticalAlignment VerticalAlignment.Stretch
-                            TextBox.multiline true
-                            TextBox.acceptsReturn true
-                            TextBox.textAlignment TextAlignment.Left
-                            TextBox.background Brushes.Transparent
-                            TextBox.borderThickness 2.
-                            TextBox.margin (Thickness(leftMargin,2.,2.,37.))
-                            TextBox.fontSize 14.
-                            TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
-                        ]
-                        Button.create [
-                            Button.isEnabled model.initialized
-                            Button.margin (Thickness(0.,0.,1.,2.))
-                            Button.content (if csState.IsCS_Init then "Start Task" else "Cancel Task" )
-                            Button.onClick (fun _ -> dispatch StartStopTask) 
-                            Button.horizontalAlignment HorizontalAlignment.Right
-                            Button.verticalAlignment VerticalAlignment.Bottom
+                        
+                        //voice mode
+                        TabItem.create [
+                            TabItem.header (
+                                Panel.create [
+                                    Panel.children [
+                                        TextBlock.create [
+                                            TextBlock.verticalAlignment VerticalAlignment.Center
+                                            TextBlock.text "Voice"
+                                            TextBlock.fontSize 14.
+                                            TextBlock.fontWeight FontWeight.Bold
+                                            TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
+                                        ]
+                                        if ((csState.IsCS_Prompt || csState.IsCS_Loop) && csMode.IsCM_Voice) then
+                                            Lottie.create [
+                                                Grid.row 0
+                                                Lottie.margin (Thickness(10.,0.,0.,0.))
+                                                Lottie.verticalAlignment VerticalAlignment.Center
+                                                Lottie.horizontalAlignment HorizontalAlignment.Right
+                                                Lottie.path Lottie.defaultPath.Value
+                                                Lottie.height 50.
+                                        ]
+                                    ]
+                                ]
+                            )
+                            TabItem.content(
+                                Panel.create [
+                                    Panel.children [
+                                        Button.create [
+                                            Button.margin 2
+                                            Button.verticalAlignment VerticalAlignment.Top
+                                            Button.content (if csState.IsCS_Init then "Start Task" else "StopTask")
+                                            Button.isEnabled (model.initialized && (csMode.IsCM_Init || csMode.IsCM_Voice))
+                                            Button.onClick (fun _ -> dispatch VoicChat_StartStop)
+                                        ]
+                                    ]
+                                ]
+                            )
                         ]
                     ]
                 ]
                 DockPanel.create [
-                    Grid.row 2
+                    Grid.row 1
                     DockPanel.children [
                         TextBlock.create  [
                             DockPanel.dock Dock.Top
@@ -177,7 +238,7 @@ type ChatView =
                     ]
                 ]
                 GridSplitter.create [
-                    Grid.row 2
+                    Grid.row 1
                     Grid.columnSpan 1
                     GridSplitter.verticalAlignment VerticalAlignment.Top
                     GridSplitter.width 50.

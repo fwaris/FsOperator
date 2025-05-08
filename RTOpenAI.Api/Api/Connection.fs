@@ -20,11 +20,14 @@ module Connection =
         }
        
     let sendClientEvent connection ev =
-        ev
-        |> Exts.toJson
-        |> fun j -> Log.info $">>> {j.ToString()}"; j
-        |> connection.WebRtcClient.Send
-        |> ignore
+        try
+            ev
+            |> Exts.toJson
+            |> fun j -> Log.info $">>> {j.ToString()}"; j
+            |> connection.WebRtcClient.Send
+            |> ignore
+        with ex -> 
+            Log.exn (ex,$"Error sending event {ex.Message}")
         
     let defaultHandleServerEvent (connection:Connection) (ev:ServerEvent) =
         match ev with
