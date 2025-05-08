@@ -1,6 +1,7 @@
 ﻿namespace FsOperator
 open System
 open Avalonia.Controls
+open Avalonia.Controls.Primitives
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
@@ -67,12 +68,19 @@ type BrowserView =
                 ]
             )    
         ]
-
-    static member webview model dispatch = 
-        WebView.create [                   
+        
+    static member internalWebView model dispatch = 
+         WebView.create [
+            Visual.zIndex -21
             Grid.row 1
+            (*
+            WebView.height 725
+            WebView.width 1285
+            *)
+            WebView.maxHeight 725
+            WebView.maxWidth 1285
             WebView.address model.url
-            WebView.init (fun wv -> 
+            WebView.init (fun wv ->
                 match model.webview.Value with
                 | Some _ -> ()
                 | None -> 
@@ -88,4 +96,17 @@ type BrowserView =
                             |> ignore                            
                             ()
                 ))
+        ]                                
+
+    static member webview model dispatch =
+        BrowserView.internalWebView model dispatch
+        (*
+        Grid.create [
+            Grid.row 1
+            Visual.zIndex -1
+            Grid.clipToBounds true
+            Grid.verticalAlignment VerticalAlignment.Stretch
+            Grid.horizontalAlignment HorizontalAlignment.Stretch
+            Grid.children [BrowserView.internalWebView model dispatch]
         ]
+        *)

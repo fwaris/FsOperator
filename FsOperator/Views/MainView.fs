@@ -20,6 +20,7 @@ type MainView =
         Border.create [
             Grid.row 2
             Grid.columnSpan 2
+            Border.clipToBounds true
             Border.horizontalAlignment HorizontalAlignment.Stretch
             Border.verticalAlignment VerticalAlignment.Bottom
             Border.margin 3
@@ -67,7 +68,8 @@ type MainView =
                 Grid.create [
                     Grid.rowDefinitions "50,*,33"
                     Grid.columnDefinitions "*,300"
-                    Grid.horizontalAlignment HorizontalAlignment.Stretch   
+                    Grid.horizontalAlignment HorizontalAlignment.Stretch
+                    Grid.clipToBounds true
                     Grid.children [
                         BrowserView.navigationBar model dispatch
                         BrowserView.webview model dispatch
