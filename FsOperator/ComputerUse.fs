@@ -25,14 +25,14 @@ module ComputerUse =
   
     let startMessaging (runState:RunState) =
         let sendLoop = 
-            runState.toModel.Reader.ReadAllAsync(runState.tokenSource.Token)
+            runState.toCua.Reader.ReadAllAsync(runState.tokenSource.Token)
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
                     AppUtils.postLog runState $"--> {RUtils.trimRequest request}"
                     let! response = sendWithRetry 0 runState request                    
                     AppUtils.postLog runState $"<-- {RUtils.trimResponse response}"    
-                    do! runState.fromModel.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
+                    do! runState.fromCua.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
                 }
             )
         let comp = 
@@ -59,7 +59,7 @@ module ComputerUse =
                                 model=Models.computer_use_preview
                                 truncation = Some Truncation.auto
                           }
-                do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                do! runState.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
 
@@ -76,7 +76,7 @@ module ComputerUse =
                                     model=Models.computer_use_preview
                                     truncation = Some Truncation.auto
                               }
-                    do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                    do! runState.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
                 with ex ->
                     debug $"Error in sendTextResponse: %s{ex.Message}"
         }
@@ -130,7 +130,7 @@ module ComputerUse =
         let rec loop retryCount = 
             async {  
                 try 
-                    let! response = runState.fromModel.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
+                    let! response = runState.fromCua.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
                     if runState.tokenSource.IsCancellationRequested |> not then 
                         runState.lastCuaResponse.Value <- Some response
                         let mutable hasComputerCall = false

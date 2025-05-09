@@ -27,7 +27,7 @@ module Update =
 
         let sub2 = subscribeBackground model
         [
-                [nameof sub2], sub2
+            [nameof sub2], sub2
         ]
 
     let testSomething (model:Model) =
@@ -52,7 +52,7 @@ module Update =
             ]
         let runState = RunState.Create model.mailbox model.instructions
         //let runState = {runState with chatHistory = testChat; chatState = ChatState.CS_Loop}
-        let runState = {runState with chatMode = CM_Text testChat; chatState = ChatState.CS_Prompt}
+        let runState = {runState with chatMode = CM_Text testChat; cuaState = CUAState.CUA_Pause}
         {model with runState =  Some runState}, Cmd.none
 
 
@@ -89,54 +89,95 @@ module Update =
             return Some time
         }    
 
-    let token() = new System.Threading.CancellationTokenSource()
+    ///start or stop text mode task
+    let startStopForTextChat model =
+        match model.runState with 
+        | None when model.initialized -> 
+            let runState = {RunState.initForText model.mailbox model.instructions with cuaState = CUA_Loop}
+            ComputerUse.startMessaging runState
+            ComputerUse.sendStartMessage runState (Instructions.getTextChat model.instructions) |> Async.Start
+            ComputerUse.loop runState 
+            {model with runState =  Some runState}, Cmd.none
+        | None -> model, Cmd.none
+        | Some runState when runState.chatMode.IsCM_Text -> 
+            runState.tokenSource.Cancel()
+            runState.fromCua.Writer.TryComplete() |> ignore
+            runState.toCua.Writer.TryComplete()   |> ignore                    
+            {model with runState=Some {runState with cuaState = CUA_Init}}, Cmd.none 
+        | _ -> model, Cmd.none //ignore any other state
+
+    ///cua assistant loop has stopped and we need to respond to the assistant's last message (and chatHistory)
+    ///For voice mode we send the cua assistant's last message to the voice assistant
+    ///For text, no action required (for now until reasoning is enabled) the user can see the message and respond 
+    let handleTurnEnd model =
+        match model.runState with 
+        | Some r when r.chatMode.IsCM_Voice ->                 
+            let rs = RunState.setState CUA_Pause model.runState
+            let callId = RunState.lastFunctionCallId rs
+            let asstMsg = RunState.lastAssistantMessage rs
+            let conn = RunState.voiceConnection rs
+            match conn,asstMsg,callId with
+            | Some cnn, Some m, Some callId -> Functions.sendFunctionResponse cnn m.content callId
+            | None,_,_ ->  failwith "no voice connection"
+            | _,None,_ -> failwith  "no assistant message as the last message of chat"
+            | _,_,None -> failwith "no function call id found to respond to voice assistant"
+            {model with runState=rs}, Cmd.none
+        | _ -> model,Cmd.none                 
+        
+    ///Either the voice assistant, the reasoning model or the user has submitted a question (i.e. a response)
+    ///Send that to the CUA assitant to continue the task
+    let resumeChat model = 
+        let question = model.question
+        let model = 
+            {model with 
+                runState = 
+                    model.runState 
+                    |> RunState.appendChatMsg model.question
+                    |> RunState.setQuestion ""
+                    |> RunState.setState CS_Loop}
+
+                
+
+                        |> 
+                    log = ("Chat submitted"::model.log) |> List.truncate 100
+                }, Cmd.none}
+                let rs = 
+                    model.runState
+                    |> RunState.appendChatMsg model.question
+
+                let rs = 
+                    model.runState
+                    |> Option.bind (RunState.setState CS_Prompt)
+
+
+                match model.runState with
+                | Some runState when runState.chatState.IsCS_Prompt -> 
+                    let prevId = runState.lastCuaResponse.Value |> Option.map (fun r -> r.id)
+                    let question = runState.question
+                    let runState = RunState.appendChatMsg runState {runState with 
+                                        chatState = CUA_Loop
+                                        chatMode = match chatMode with 
+                                                  | CM_Text -> chatHistory = runState.chatHistory |> Chat.append (User runState.question)
+                                        question = ""
+                                   }
+                    ComputerUse.loop runState
+                    ComputerUse.sendTextResponse runState (prevId,question) |> Async.Start
+                    {model with runState = Some runState}, Cmd.none
+                | _ -> model, Cmd.none
+
+        
 
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
             | Initialize -> model, Cmd.none
             | BrowserConnected -> {model with initialized=true},Cmd.none
-            | TextChat_StartStopTask ->
-                match model.runState with 
-                | None when model.initialized -> 
-                    let runState = RunState.Create model.mailbox model.instructions
-                    let runState = {runState with chatMode = CM_Text []; chatState = CS_Loop}
-                    ComputerUse.startMessaging runState
-                    ComputerUse.sendStartMessage runState (Instructions.getTextChat model.instructions) |> Async.Start
-                    ComputerUse.loop runState 
-                    {model with runState =  Some runState}, Cmd.none
-                | None -> model, Cmd.none
-                | Some runState when runState.chatMode.IsCM_Text -> 
-                    runState.tokenSource.Cancel()
-                    runState.fromModel.Writer.TryComplete() |> ignore
-                    runState.toModel.Writer.TryComplete()   |> ignore                    
-                    {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none 
-                | _ -> model, Cmd.none //ignore voice mode
-            | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg TextChat_StartStopTask else Cmd.none)
-
+            | TextChat_StartStopTask -> startStopForTextChat model
             | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
-
-            | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none
-            
+            | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
-
-            | Chat_HandleTurnEnd -> 
-                let rs = RunState.setState CS_Prompt model.runState
-                let cmd = 
-                    match rs with 
-                    | Some r when r.chatMode.IsCM_Voice ->                 
-                        let callId = RunState.lastFunctionCallId rs
-                        let asstMsg = RunState.lastAssistantMessage rs
-                        let conn = RunState.voiceConnection rs
-                        match conn,asstMsg,callId with
-                        | Some cnn, Some m, Some callId -> Functions.sendFunctionResponse cnn m.content callId; Cmd.none
-                        | None,_,_ ->  Cmd.ofMsg (TerminateWithMessage "no voice connection")
-                        | _,None,_ -> Cmd.ofMsg (TerminateWithMessage  "no assistant message as the last message of chat")
-                        | _,_,None -> Cmd.ofMsg (TerminateWithMessage "no function call id found to respond to voice assistant")
-                    | _ -> Cmd.none
-                {model with runState=rs}, cmd
-
-            | Chat_Submit ->               
+            | Chat_HandleTurnEnd -> handleTurnEnd model
+            | Chat_Submit ->  resumeChat model             
                 {model with 
                     runState = 
                         model.runState 

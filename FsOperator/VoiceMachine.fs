@@ -192,11 +192,11 @@ module VoiceMachine =
     let startVoiceMachine (runState:RunState) =
         async {
             match runState.chatMode with
-            | CM_Voice connection  -> 
+            | CM_Voice v  -> 
                 let! key = AppUtils.getOpenAIEphemKey (getApiKey())
                 let! ephemeralKey = AppUtils.getOpenAIEphemKey (getApiKey())
-                do! RTOpenAI.Api.Connection.connect ephemeralKey connection |> Async.AwaitTask
-                startReader runState connection
+                do! RTOpenAI.Api.Connection.connect ephemeralKey v.connection |> Async.AwaitTask
+                startReader runState v.connection
                 return ()
             | x -> AppUtils.postLog runState $"Chat mode not supported {x}"
             return ()

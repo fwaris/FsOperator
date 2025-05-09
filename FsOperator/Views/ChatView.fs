@@ -71,7 +71,7 @@ type ChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = model.runState |> Option.map (fun rs -> rs.chatState) |> Option.defaultValue ChatState.CS_Init
+        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
         let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         Grid.create [
@@ -198,7 +198,7 @@ type ChatView =
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
                         match model.runState with 
-                        | Some rs when rs.chatState.IsCS_Prompt -> 
+                        | Some rs when rs.cuaState.IsCS_Prompt -> 
                             Panel.create [
                                 DockPanel.dock Dock.Bottom
                                 Panel.margin 2

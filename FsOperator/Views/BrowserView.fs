@@ -21,7 +21,7 @@ module Cache =
 type BrowserView =
 
     static member navigationBar model dispatch = 
-        let csState = model.runState |> Option.map (fun rs -> rs.chatState) |> Option.defaultValue ChatState.CS_Init
+        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
         Border.create [
             Grid.row 0
             Border.borderThickness 1.0

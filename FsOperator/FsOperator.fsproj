@@ -23,6 +23,7 @@
 		<Compile Include="WebView.fs" />
 		<Compile Include="Lottie.fs" />
 		<Compile Include="Constants.fs" />
+		<Compile Include="Log.fs" />
 		<Compile Include="Utils.fs" />
 		<Compile Include="Chat.fs" />
 		<Compile Include="Instructions.fs" />
