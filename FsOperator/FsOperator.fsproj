@@ -25,6 +25,7 @@
 		<Compile Include="Constants.fs" />
 		<Compile Include="Utils.fs" />
 		<Compile Include="Chat.fs" />
+		<Compile Include="Instructions.fs" />
 		<Compile Include="Model.fs" />
 		<Compile Include="AppUtils.fs" />
 		<Compile Include="Connection.fs" />

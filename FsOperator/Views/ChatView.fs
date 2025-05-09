@@ -5,9 +5,6 @@ open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open WebViewControl
-open WebViewControl.Ext
-open Avalonia.Controls.Shapes
 open Avalonia.FuncUI
 open Avalonia.Labs.Lottie
 open Avalonia.Labs.Lottie.Ext
@@ -122,7 +119,7 @@ type ChatView =
                                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                                         ]
                                         TextBox.create [
-                                            TextBox.text model.instructions
+                                            TextBox.text (Instructions.getTextChat model.instructions)
                                             TextBox.textWrapping TextWrapping.Wrap
                                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                                             TextBox.verticalAlignment VerticalAlignment.Stretch

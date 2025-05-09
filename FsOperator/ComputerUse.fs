@@ -41,11 +41,11 @@ module ComputerUse =
                 | Choice1Of2 _ -> debug "dispose sendLoop"
                 | Choice2Of2 ex -> 
                     debug $"Error in sendLoop: %s{ex.Message}"                    
-                    runState.mailbox.Writer.TryWrite(StopWithError ex) |> ignore
+                    runState.mailbox.Writer.TryWrite(TerminateWithException ex) |> ignore
             }
         Async.Start(comp, runState.tokenSource.Token)
 
-    let sendStartMessage (runState:RunState) (overrideInstructions:string option) =
+    let sendStartMessage (runState:RunState) instructions  =
        async {
                 let! imgUrl,(w,h) = Browser.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|}
@@ -53,7 +53,7 @@ module ComputerUse =
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 let req = {Request.Default with 
                                 input = [Message input]; tools=[tool]
-                                instructions = overrideInstructions |> Option.defaultValue runState.instructions |> Some
+                                instructions = Some instructions
                                 previous_response_id = None                    
                                 store = true
                                 model=Models.computer_use_preview
@@ -83,7 +83,7 @@ module ComputerUse =
 
 
     let getResponseIdsAndChecks (runState:RunState) = 
-        runState.lastResponse.Value
+        runState.lastCuaResponse.Value
         |> Option.bind (fun r -> 
             let safetyChecks = r.output |> List.choose (function Computer_call cb -> Some cb.pending_safety_checks | _ -> None) |> List.concat
             r.output
@@ -132,7 +132,7 @@ module ComputerUse =
                 try 
                     let! response = runState.fromModel.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
                     if runState.tokenSource.IsCancellationRequested |> not then 
-                        runState.lastResponse.Value <- Some response
+                        runState.lastCuaResponse.Value <- Some response
                         let mutable hasComputerCall = false
                         for o in response.output do
                             match o with
@@ -162,7 +162,7 @@ module ComputerUse =
                     if retryCount < 10 then 
                         return! loop(retryCount + 1)                   
                     else
-                        runState.mailbox.Writer.TryWrite(ClientMsg.StopWithError ex) |> ignore
+                        runState.mailbox.Writer.TryWrite(ClientMsg.TerminateWithException ex) |> ignore
 
             }
         Async.Start(loop 0,runState.tokenSource.Token)

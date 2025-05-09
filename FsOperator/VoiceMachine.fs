@@ -9,8 +9,10 @@ module VoicePrompts =
     let rtInstructions = $"""
 You are to collaborate with a user to help complete a task.
 The task is performed by a separate 'assistant'. 
-You job is to converse with the human generate instructions for the assistant.
-The assistant will carry out the task and return with a response - which may br question or clarification.
+You job is to converse with the human user to generate and sumbit the instructions to the assistant.
+The assistant will carry out the task and return with a response - which may be a question or a clarification.
+Again, converse with the user before generating the next instruction for the assistant.
+Always confirm with the user first before sending the instructions to the assistant.
 
 To send the instructions to the assitant use function call 'assistantInstructions' with the instructions as the argument.
 
@@ -63,9 +65,8 @@ module Functions =
     let rec sendInstructions (runState:RunState) (ev:ResponseOutputItemDoneEvent) =
         async {
             try                                                 
-                let instructions = ev.item |> Option.bind _.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")
-                let callId = ev.item |> Option.map _.call_id |> Option.defaultWith (fun _ -> failwith "function call id not found")
-                AppUtils.postMessage runState (ClientMsg.VoiceChat_RunInstructions (instructions,callId))
+                let instructions = ev.item.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
+                AppUtils.postMessage runState (ClientMsg.VoiceChat_RunInstructions (instructions,ev.item.call_id))
                 AppUtils.postLog runState $"<-- voice instr. {instructions}"
             with ex ->
                 AppUtils.postWarning runState ex.Message
@@ -74,9 +75,9 @@ module Functions =
 
     let sendVoiceInstructions (runState:RunState) (instructions:string) =
         async {
-            match runState.lastResponse.Value with 
-            | None -> do! ComputerUse.sendStartMessage runState (Some instructions) 
-            | Some _ -> do! ComputerUse.sendTextResponse runState (runState.lastResponse.Value|> Option.map(_.id), instructions)
+            match runState.lastCuaResponse.Value with 
+            | None -> do! ComputerUse.sendStartMessage runState instructions
+            | Some _ -> do! ComputerUse.sendTextResponse runState (runState.lastCuaResponse.Value|> Option.map(_.id), instructions)
         }
 
 module VoiceMachine =    
@@ -133,19 +134,13 @@ module VoiceMachine =
         |> Api.Connection.sendClientEvent conn
             
     let  isInstructionsCall (ev:ResponseOutputItemDoneEvent) =
-        ev.item 
-        |> Option.map (fun x -> x.``type`` = FUNCTION_CALL && x.name = Some ASST_INSTRUCTIONS_FUNCTION) 
-        |> Option.defaultValue false
+        ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
         
     let  getInstructions (ev:ResponseOutputItemDoneEvent) =
-        ev.item 
-        |> Option.bind (fun x ->
-            if x.``type`` = FUNCTION_CALL && x.name = Some ASST_INSTRUCTIONS_FUNCTION then 
-                x.arguments 
-            else 
-                None
-        ) 
-        |> Option.defaultValue "no instructions found"
+        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then  
+            ev.item.arguments
+        else
+            Some "no instructions found"
       
         //if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then
         //     ev.item.arguments |> Option.defaultValue "no instructions found"
@@ -153,9 +148,7 @@ module VoiceMachine =
         //    "no instructions: incorrect response type"
              
     let  isInstructionsResult (ev:ResponseOutputItemDoneEvent) =
-        ev.item 
-        |> Option.map (fun x -> x.``type`` = FUNCTION_CALL_OUTPUT && x.name = Some ASST_INSTRUCTIONS_FUNCTION) 
-        |> Option.defaultValue false        
+        ev.item.``type`` = FUNCTION_CALL_OUTPUT && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
                 
        
     // accepts old state and next event - returns new state
@@ -167,7 +160,7 @@ module VoiceMachine =
             | SessionUpdated s -> Functions.sendInitResp conn; return {st with currentSession = s.session }
             | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
                 if runState.lastFunctionCallId.Value.IsSome then 
-                    debug $"Ignoring function call {ev.item |> Option.map _.name} as we are already processing a function call"
+                    debug $"Ignoring function call {ev.item.name} as we are already processing a function call"
                 else
                     Functions.sendInstructions runState ev |> Async.Start
                 return st

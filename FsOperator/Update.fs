@@ -46,13 +46,13 @@ module Update =
     let testSomething_ (model:Model) =
         let testChat = 
             [
-                Assistant {id = "1"; content = model.instructions}
+                Assistant {id = "1"; content = Instructions.getTextChat model.instructions}
                 User "The quick brown fox jumped over the lazy dog"
                 Assistant {id = "2"; content = "How can I help you?"}
             ]
         let runState = RunState.Create model.mailbox model.instructions
         //let runState = {runState with chatHistory = testChat; chatState = ChatState.CS_Loop}
-        let runState = {runState with chatHistory = testChat; chatState = ChatState.CS_Prompt}
+        let runState = {runState with chatMode = CM_Text testChat; chatState = ChatState.CS_Prompt}
         {model with runState =  Some runState}, Cmd.none
 
 
@@ -63,7 +63,7 @@ module Update =
         //let url,instructions = StartPrompts.twitter
         //sResponses.debug_logging <- true
         let model = {
-            instructions=instructions
+            instructions = Instructions.sample
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
@@ -100,9 +100,9 @@ module Update =
                 match model.runState with 
                 | None when model.initialized -> 
                     let runState = RunState.Create model.mailbox model.instructions
-                    let runState = {runState with chatHistory = []; chatState = CS_Loop}
+                    let runState = {runState with chatMode = CM_Text []; chatState = CS_Loop}
                     ComputerUse.startMessaging runState
-                    ComputerUse.sendStartMessage runState None |> Async.Start
+                    ComputerUse.sendStartMessage runState (Instructions.getTextChat model.instructions) |> Async.Start
                     ComputerUse.loop runState 
                     {model with runState =  Some runState}, Cmd.none
                 | None -> model, Cmd.none
@@ -114,28 +114,56 @@ module Update =
                 | _ -> model, Cmd.none //ignore voice mode
             | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg TextChat_StartStopTask else Cmd.none)
 
-            | SetInstructions txt -> {model with instructions=txt}, Cmd.none
+            | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
 
-            | Chat_Clear -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = []})}, Cmd.none
-            | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with question = txt})}, Cmd.none
-            | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
-            | Chat_Respond -> 
-                let model = {model with runState = model.runState |> Option.map (fun rs -> {rs with chatState = CS_Prompt})}
-                match model.runState with 
-                | Some rs ->                 
-                    match rs.chatMode, rs.lastFunctionCallId.Value, List.tryLast rs.chatHistory with
-                    | CM_Voice cnn, Some funcReq, Some (Assistant m) -> Functions.sendFunctionResponse cnn funcReq m
-                    | x -> debug $"invalid state to respond to voice function call"
-                | _ -> ()
-                model,Cmd.none                
-            | Chat_Submit -> 
+            | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none
+            
+            | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
+
+            | Chat_HandleTurnEnd -> 
+                let rs = RunState.setState CS_Prompt model.runState
+                let cmd = 
+                    match rs with 
+                    | Some r when r.chatMode.IsCM_Voice ->                 
+                        let callId = RunState.lastFunctionCallId rs
+                        let asstMsg = RunState.lastAssistantMessage rs
+                        let conn = RunState.voiceConnection rs
+                        match conn,asstMsg,callId with
+                        | Some cnn, Some m, Some callId -> Functions.sendFunctionResponse cnn m.content callId; Cmd.none
+                        | None,_,_ ->  Cmd.ofMsg (TerminateWithMessage "no voice connection")
+                        | _,None,_ -> Cmd.ofMsg (TerminateWithMessage  "no assistant message as the last message of chat")
+                        | _,_,None -> Cmd.ofMsg (TerminateWithMessage "no function call id found to respond to voice assistant")
+                    | _ -> Cmd.none
+                {model with runState=rs}, cmd
+
+            | Chat_Submit ->               
+                {model with 
+                    runState = 
+                        model.runState 
+                        |> RunState.appendChatMsg model.question
+                        |> RunState.setQuestion ""
+                        |> RunState.setState CS_Loop
+
+                        |> 
+                    log = ("Chat submitted"::model.log) |> List.truncate 100
+                }, Cmd.none}
+                let rs = 
+                    model.runState
+                    |> RunState.appendChatMsg model.question
+
+                let rs = 
+                    model.runState
+                    |> Option.bind (RunState.setState CS_Prompt)
+
+
                 match model.runState with
                 | Some runState when runState.chatState.IsCS_Prompt -> 
-                    let prevId = runState.lastResponse.Value |> Option.map (fun r -> r.id)
+                    let prevId = runState.lastCuaResponse.Value |> Option.map (fun r -> r.id)
                     let question = runState.question
-                    let runState = {runState with 
+                    let runState = RunState.appendChatMsg runState {runState with 
                                         chatState = CS_Loop
-                                        chatHistory = runState.chatHistory |> Chat.append (User runState.question)
+                                        chatMode = match chatMode with 
+                                                  | CM_Text -> chatHistory = runState.chatHistory |> Chat.append (User runState.question)
                                         question = ""
                                    }
                     ComputerUse.loop runState
@@ -150,16 +178,16 @@ module Update =
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 
-            | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_Respond]
-            | StopWithError ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg StopIfRunning]
+            | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
+            | TerminateWithException ex -> if model.runState.IsNone then model,Cmd.none else model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set ex.Message);  Cmd.ofMsg StopIfRunning]
             | TestSomething -> testSomething model
 
             | VoicChat_StartStop -> 
                 match model.runState with 
                 | None when model.initialized -> 
-                    let runState = RunState.Create model.mailbox ""
+                    let runState = RunState.Create model.mailbox model.instructions
                     let conn = RTOpenAI.Api.Connection.create()
-                    let runState = {runState with chatHistory = []; chatState = CS_Loop; chatMode = CM_Voice conn}
+                    let runState = let rs = runState |> RunState.appendChatMsg runState.question in {rs with chatState = CS_Loop; chatMode = CM_Voice conn}
                     ComputerUse.startMessaging runState
                     ComputerUse.loop runState 
                     VoiceMachine.startVoiceMachine runState |> Async.Start
@@ -184,5 +212,5 @@ module Update =
             //| _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex 
-            model, Cmd.none
+            model, Cmd.ofMsg (TerminateWithException ex)
 
