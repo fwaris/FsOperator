@@ -99,6 +99,19 @@ with static member Default = {
         instructions = "You are a friendly assistant"
     }        
 
+type Model = {
+    runState : RunState option
+    initialized : bool
+    instructions: string
+    mailbox : Channel<ClientMsg>
+    log : string list
+    output : string
+    url : string
+    webview : Ref<WebView option>
+    action : string
+    statusMsg : (DateTime option*string)
+}
+
 type ClientMsg =
     | Initialize
     | TextChat_StartStopTask
