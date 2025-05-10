@@ -17,26 +17,26 @@
 		<AvaloniaResource Include="Assets\**" />
 		<None Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
+		<Compile Include="Controls\WebView.fs" />
+		<Compile Include="Controls\Lottie.fs" />
+		<Compile Include="Misc\Constants.fs" />
+		<Compile Include="Misc\Log.fs" />
+		<Compile Include="Misc\Utils.fs" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Compile Include="WebView.fs" />
-		<Compile Include="Lottie.fs" />
-		<Compile Include="Constants.fs" />
-		<Compile Include="Log.fs" />
-		<Compile Include="Utils.fs" />
-		<Compile Include="Chat.fs" />
-		<Compile Include="Instructions.fs" />
-		<Compile Include="Model.fs" />
-		<Compile Include="AppUtils.fs" />
-		<Compile Include="Connection.fs" />
-		<Compile Include="StartPrompts.fs" />
-		<Compile Include="Browser.fs" />
-		<Compile Include="Scripts.fs" />
-		<Compile Include="Preview.fs" />
-		<Compile Include="Actions.fs" />
-		<Compile Include="ComputerUse.fs" />
-		<Compile Include="VoiceMachine.fs" />
+		<Compile Include="Model\Chat.fs" />
+		<Compile Include="Model\Instructions.fs" />
+		<Compile Include="Model\Model.fs" />
+		<Compile Include="Model\AppUtils.fs" />
+		<Compile Include="CUA\Connection.fs" />
+		<Compile Include="CUA\StartPrompts.fs" />
+		<Compile Include="CUA\Browser.fs" />
+		<Compile Include="CUA\Scripts.fs" />
+		<Compile Include="CUA\Preview.fs" />
+		<Compile Include="CUA\Actions.fs" />
+		<Compile Include="CUA\ComputerUse.fs" />
+		<Compile Include="VoiceAsst.fs" />
 		<Compile Include="Update.fs" />
 		<Compile Include="Views\BrowserView.fs" />
 		<Compile Include="Views\ChatView.fs" />

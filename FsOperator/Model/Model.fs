@@ -22,7 +22,6 @@ with static member Create mailbox =
                     mailbox = mailbox
                 }
 
-
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
     let postLog bus msg =  postMessage bus (ClientMsg.AppendLog msg) 

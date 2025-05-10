@@ -134,7 +134,7 @@ module Update =
             let asstMsg = RunState.lastAssistantMessage rs
             let conn = RunState.voiceConnection rs
             match conn,asstMsg,callId with
-            | Some cnn, Some m, Some callId -> Functions.sendFunctionResponse cnn m.content callId
+            | Some cnn, Some m, Some callId -> VoiceAsst.sendFunctionResponse cnn m.content callId
             | None,_,_ ->  failwith "no voice connection"
             | _,None,_ -> failwith  "no assistant message as the last message of chat"
             | _,_,None -> failwith "no function call id found to respond to voice assistant"
@@ -155,7 +155,7 @@ module Update =
                     |> RunState.setState CUA_Loop}
         match model.runState with
         | Some rs when rs.chatMode.IsCM_Text -> ComputerUse.sendTextResponse rs.bus (prevCuaId,question) |> Async.Start
-        | Some rs when rs.chatMode.IsCM_Voice -> Functions.sendVoiceInstructions rs.bus (prevCuaId,question) |> Async.Start
+        | Some rs when rs.chatMode.IsCM_Voice -> VoiceAsst.sendVoiceInstructions rs.bus (prevCuaId,question) |> Async.Start
         | _ -> ()
         model,Cmd.none              
    
@@ -188,7 +188,7 @@ module Update =
                 match model.runState with 
                 | Some rs when rs.chatMode.IsCM_Voice -> 
                     rs.lastFunctionCallId.Value <- Some ev
-                    Functions.sendVoiceInstructions rs.bus (None,instructions) |> Async.Start
+                    VoiceAsst.sendVoiceInstructions rs.bus (None,instructions) |> Async.Start
                 | _ -> ()
                 model, Cmd.none
 

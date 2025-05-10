@@ -22,7 +22,7 @@ You can use the same 'assistantantInstructions' function to respond to the resul
 
 """
 
-module Functions =
+module VoiceAsst =
 
     let sendInitResp conn = 
         (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
@@ -88,12 +88,11 @@ module VoiceMachine =
     
     type State = {
         initialized : bool
-        responses : Set<string>
         currentSession : Session  }      
     with static member Default = {
              initialized=false
              currentSession = Session.Default
-             responses = Set.empty}
+             }
                             
     let ssInit = State.Default          //initial state for server event handling
         
@@ -156,12 +155,12 @@ module VoiceMachine =
             match ev with
             | SessionCreated s when not st.initialized ->  sendUpdateSession conn s.session; return {st with initialized = true} 
             | SessionCreated s -> return {st with currentSession = s.session }
-            | SessionUpdated s -> Functions.sendInitResp conn; return {st with currentSession = s.session }
+            | SessionUpdated s -> VoiceAsst.sendInitResp conn; return {st with currentSession = s.session }
             | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
                 if runState.lastFunctionCallId.Value.IsSome then 
                     debug $"Ignoring function call {ev.item.name} as we are already processing a function call"
                 else
-                    Functions.sendInstructions runState ev |> Async.Start
+                    VoiceAsst.sendInstructions runState ev |> Async.Start
                 return st
             | ResponseOutputItemDone ev when isInstructionsResult ev  -> return  st            
             | ResponseTextDelta ev -> Bus.postLog runState.bus $"text delta {ev}"; return st
