@@ -20,75 +20,70 @@ type ChatView =
         let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
         let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
-        Grid.create [
+        TabControl.create [
+            TabControl.horizontalAlignment HorizontalAlignment.Stretch
+            TabControl.verticalAlignment VerticalAlignment.Stretch
+            Grid.row 0
             Grid.column 1
             Grid.rowSpan 2
-            Grid.rowDefinitions "1*,2*"
-            Grid.children [
-                TabControl.create [
-                    TabControl.horizontalAlignment HorizontalAlignment.Stretch
-                    TabControl.verticalAlignment VerticalAlignment.Stretch
-                    Grid.row 0
-                    TabControl.viewItems [
-                        //text mode
-                        TabItem.create [
-                            TabItem.horizontalAlignment HorizontalAlignment.Stretch
-                            TabItem.verticalAlignment VerticalAlignment.Stretch
-                            TabItem.header (
-                                Panel.create [
-                                    Panel.children [
-                                        TextBlock.create [
-                                            TextBlock.verticalAlignment VerticalAlignment.Center
-                                            TextBlock.text "Text"
-                                            TextBlock.fontSize 14.
-                                            TextBlock.fontWeight FontWeight.Bold
-                                            TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
-                                        ]
-                                        if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Text) then 
-                                            Lottie.create [
-                                                Grid.row 0
-                                                Lottie.margin (Thickness(10.,0.,0.,0.))
-                                                Lottie.verticalAlignment VerticalAlignment.Center
-                                                Lottie.horizontalAlignment HorizontalAlignment.Right
-                                                Lottie.path Lottie.defaultPath.Value
-                                                Lottie.height 50.
-                                            ]
-                                    ]
+            TabControl.viewItems [
+                //text mode
+                TabItem.create [
+                    TabItem.horizontalAlignment HorizontalAlignment.Stretch
+                    TabItem.verticalAlignment VerticalAlignment.Stretch
+                    TabItem.header (
+                        Panel.create [
+                            Panel.children [
+                                TextBlock.create [
+                                    TextBlock.verticalAlignment VerticalAlignment.Center
+                                    TextBlock.text "Text"
+                                    TextBlock.fontSize 14.
+                                    TextBlock.fontWeight FontWeight.Bold
+                                    TextBlock.margin (Thickness(leftMargin,1.,30.,0.))
                                 ]
-                            )
-                            TabItem.content (TextChatView.chat model dispatch)
+                                if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Text) then 
+                                    Lottie.create [
+                                        Grid.row 0
+                                        Lottie.margin (Thickness(10.,0.,0.,0.))
+                                        Lottie.verticalAlignment VerticalAlignment.Center
+                                        Lottie.horizontalAlignment HorizontalAlignment.Right
+                                        Lottie.path Lottie.defaultPath.Value
+                                        Lottie.height 50.
+                                    ]
+                            ]
                         ]
+                    )
+                    TabItem.content (TextChatView.chat model dispatch)
+                ]
                         
                         
-                        //voice mode
-                        TabItem.create [
-                            TabItem.horizontalAlignment HorizontalAlignment.Stretch
-                            TabItem.verticalAlignment VerticalAlignment.Stretch
-                            TabItem.header (
-                                Panel.create [
-                                    Panel.children [
-                                        TextBlock.create [
-                                            TextBlock.verticalAlignment VerticalAlignment.Center
-                                            TextBlock.text "Voice"
-                                            TextBlock.fontSize 14.
-                                            TextBlock.fontWeight FontWeight.Bold
-                                            TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
-                                        ]
-                                        if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Voice) then
-                                            Lottie.create [
-                                                Grid.row 0
-                                                Lottie.margin (Thickness(10.,0.,0.,0.))
-                                                Lottie.verticalAlignment VerticalAlignment.Center
-                                                Lottie.horizontalAlignment HorizontalAlignment.Right
-                                                Lottie.path Lottie.defaultPath.Value
-                                                Lottie.height 50.
-                                        ]
-                                    ]
+                //voice mode
+                TabItem.create [
+                    TabItem.horizontalAlignment HorizontalAlignment.Stretch
+                    TabItem.verticalAlignment VerticalAlignment.Stretch
+                    TabItem.header (
+                        Panel.create [
+                            Panel.children [
+                                TextBlock.create [
+                                    TextBlock.verticalAlignment VerticalAlignment.Center
+                                    TextBlock.text "Voice"
+                                    TextBlock.fontSize 14.
+                                    TextBlock.fontWeight FontWeight.Bold
+                                    TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
                                 ]
-                            )
-                            TabItem.content(VoiceChatView.chat model dispatch)
+                                if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Voice) then
+                                    Lottie.create [
+                                        Grid.row 0
+                                        Lottie.margin (Thickness(10.,0.,0.,0.))
+                                        Lottie.verticalAlignment VerticalAlignment.Center
+                                        Lottie.horizontalAlignment HorizontalAlignment.Right
+                                        Lottie.path Lottie.defaultPath.Value
+                                        Lottie.height 50.
+                                ]
+                            ]
                         ]
-                    ]
+                    )
+                    TabItem.content(VoiceChatView.chat model dispatch)
                 ]
             ]
         ]

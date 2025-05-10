@@ -26,7 +26,7 @@ type MainWindow() as this =
         Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
         |> Program.withSubscription Update.subscriptions        
-        |> Program.withConsoleTrace        
+        //|> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
 

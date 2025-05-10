@@ -32,8 +32,8 @@ type TextChatView =
                             TextBlock.text "Instructions"
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Top
-                            TextBlock.fontSize 10.
-                            TextBlock.fontWeight FontWeight.Bold
+                            TextBlock.fontSize 11.
+                            TextBlock.fontWeight FontWeight.Bold                            
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         TextBox.create [
@@ -46,17 +46,18 @@ type TextChatView =
                             TextBox.textAlignment TextAlignment.Left
                             TextBox.background Brushes.Transparent
                             TextBox.borderThickness 2.
-                            TextBox.margin (Thickness(leftMargin,30.,2.,37.))
+                            TextBox.margin (Thickness(leftMargin,20.,2.,37.))
                             TextBox.fontSize 14.
                             TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
                         ]
                         Button.create [
                             Button.isEnabled (model.initialized  && (csMode.IsCM_Init || csMode.IsCM_Text))
                             Button.margin (Thickness(0.,0.,1.,2.))
+                            Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
                             Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
                             Button.horizontalAlignment HorizontalAlignment.Right
-                            Button.verticalAlignment VerticalAlignment.Bottom
+                            Button.verticalAlignment VerticalAlignment.Top
                         ]
                     ]
                 ]
