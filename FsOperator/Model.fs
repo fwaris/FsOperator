@@ -7,7 +7,7 @@ type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
 type ChatMode = 
     | CM_Text of Chat
-    | CM_Voice of {| connection : RTOpenAI.Api.Connection; chat : Chat |}
+    | CM_Voice of {| connection: RTOpenAI.Api.Connection option; chat : Chat |}
     | CM_Init
 
 type Bus = {
@@ -21,6 +21,15 @@ with static member Create mailbox =
                     fromCua = Channel.CreateBounded(10)
                     mailbox = mailbox
                 }
+
+
+module Bus =
+    let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
+    let postLog bus msg =  postMessage bus (ClientMsg.AppendLog msg) 
+    let postAction bus action = postMessage bus (SetAction action) 
+    let postWarning bus warning = postMessage bus (StatusMsg_Set warning)
+    let postToCua bus req = bus.toCua.Writer.TryWrite(req) |> ignore
+
 
 //State needed for the duration of a task
 type RunState = {
@@ -69,28 +78,36 @@ module RunState =
     let setMode mode (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with chatMode=mode})
     let setState state (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with cuaState=state})
     let lastFunctionCallId (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastFunctionCallId.Value)
-    let setQuestion question = function | Some rs -> Some {rs with question=question} | _ -> None
+    let setQuestion question = function | Some (rs:RunState) -> Some {rs with question=question} | _ -> None
+    let question (runState:RunState option)  = runState |> Option.map _.question |> Option.defaultValue ""
     let lastCuaResponse (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastCuaResponse.Value)
 
-    let lastAssistantMessage (runState:RunState option)  = 
+    let messages (runState:RunState option)  = 
         runState 
-        |> Option.bind (fun rs -> 
+        |> Option.map (fun rs -> 
             match rs.chatMode with
-            | CM_Text msgs -> msgs |> List.tryLast
-            | CM_Voice v -> v.chat |> List.tryLast
-            | CM_Init -> None)
+            | CM_Text c -> c.messages
+            | CM_Voice v -> v.chat.messages 
+            | CM_Init -> [])
+        |> Option.defaultValue []
+        
+    let lastAssistantMessage (runState:RunState option)  = 
+        runState
+        |> messages
+        |> List.tryLast
         |> Option.bind (function | Assistant m -> Some m | _ -> None)
         
     let voiceConnection (runState:RunState option)  = 
         runState 
         |> Option.map (fun rs -> 
             match rs.chatMode with
-            | CM_Voice v -> v.connection
+            | CM_Voice v when v.connection.IsSome -> v.connection.Value
+            | CM_Voice v -> failwith "no voice connection set"
             | _ -> failwith "not a voice connection")
 
     let initForText mailbox instructions = 
         {RunState.Create mailbox instructions with 
-            chatMode = CM_Text []
+            chatMode = CM_Text Chat.Default
             cuaState = CUA_Init
         }
 
@@ -98,7 +115,7 @@ module RunState =
         {RunState.Create mailbox instructions with             
             chatMode = CM_Voice 
                         {|
-                         connection = RTOpenAI.Api.Connection.create()
+                         connection = RTOpenAI.Api.Connection.create() |> Some
                          chat = Chat.Default                         
                         |}
         }
@@ -131,7 +148,6 @@ type Model = {
 type ClientMsg =
     | Initialize
     | TextChat_StartStopTask
-    | StopIfRunning
     | BrowserConnected
     | SetInstructions of string
     | AppendLog of string
@@ -141,11 +157,10 @@ type ClientMsg =
     | StatusMsg_Set of string
     | StatusMsg_Clear of DateTime option
     | TurnEnd
-    | TerminateWithException of exn
+    | Abort of (exn option*string)
     | TestSomething
     | Chat_Append of ChatMsg
     | Chat_UpdateQuestion of string
-    | Chat_Clear
     | Chat_HandleTurnEnd
     | Chat_Submit
     | VoicChat_StartStop

@@ -8,31 +8,30 @@ open PuppeteerSharp.Input
 
 module ComputerUse =    
 
-
-    let rec sendWithRetry count (runState:RunState) (req:Request) =
+    let rec sendWithRetry count bus (req:Request) =
         async {
             try
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
                 return response
             with ex ->
                 if count < 2 then 
-                    AppUtils.postLog runState $"send error: retry {count + 1}"
-                    return! sendWithRetry (count + 1) runState req
+                    Bus.postLog bus $"send error: retry {count + 1}"
+                    return! sendWithRetry (count + 1) bus req
                 else
-                    AppUtils.postLog runState $"Unable to reconnect aborting"
+                    Bus.postLog bus $"Unable to reconnect aborting"
                     return raise ex
         }
   
-    let startMessaging (runState:RunState) =
-        let sendLoop = 
-            runState.toCua.Reader.ReadAllAsync(runState.tokenSource.Token)
+    let startMessaging (token,bus) =
+        let sendLoop =             
+            bus.toCua.Reader.ReadAllAsync(token)
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iterAsync (fun request ->
                 async {
-                    AppUtils.postLog runState $"--> {RUtils.trimRequest request}"
-                    let! response = sendWithRetry 0 runState request                    
-                    AppUtils.postLog runState $"<-- {RUtils.trimResponse response}"    
-                    do! runState.fromCua.Writer.WriteAsync(response,runState.tokenSource.Token).AsTask() |> Async.AwaitTask
+                    Bus.postLog bus $"--> {RUtils.trimRequest request}"
+                    let! response = sendWithRetry 0 bus request                    
+                    Bus.postLog bus $"<-- {RUtils.trimResponse response}"                     
+                    do! bus.fromCua.Writer.WriteAsync(response,token).AsTask() |> Async.AwaitTask
                 }
             )
         let comp = 
@@ -40,12 +39,12 @@ module ComputerUse =
                 match! Async.Catch sendLoop with 
                 | Choice1Of2 _ -> debug "dispose sendLoop"
                 | Choice2Of2 ex -> 
-                    debug $"Error in sendLoop: %s{ex.Message}"                    
-                    runState.mailbox.Writer.TryWrite(TerminateWithException ex) |> ignore
+                    Log.exn (ex,"Error in sendLoop")
+                    Abort (Some ex,$"Error in sendLoop: %s{ex.Message}") |> Bus.postMessage bus
             }
-        Async.Start(comp, runState.tokenSource.Token)
+        Async.Start(comp,token)
 
-    let sendStartMessage (runState:RunState) instructions  =
+    let sendStartMessage bus instructions  =
        async {
                 let! imgUrl,(w,h) = Browser.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|}
@@ -59,11 +58,11 @@ module ComputerUse =
                                 model=Models.computer_use_preview
                                 truncation = Some Truncation.auto
                           }
-                do! runState.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                req |> Bus.postToCua bus
         }
 
 
-    let sendTextResponse (runState:RunState) (previousId:string option,message:string) =
+    let sendTextResponse bus (previousId:string option,message:string) =
        async {
                 try
                     let! imgUrl,(w,h) = Browser.snapshot()                    
@@ -76,7 +75,7 @@ module ComputerUse =
                                     model=Models.computer_use_preview
                                     truncation = Some Truncation.auto
                               }
-                    do! runState.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                    req |> Bus.postToCua bus
                 with ex ->
                     debug $"Error in sendTextResponse: %s{ex.Message}"
         }
@@ -100,8 +99,8 @@ module ComputerUse =
             let! page = Browser.page()
             match getResponseIdsAndChecks runState with
             | None -> 
-                runState.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
-                runState.mailbox.Writer.TryWrite(TurnEnd) |> ignore
+                runState.bus.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
+                runState.bus.mailbox.Writer.TryWrite(TurnEnd) |> ignore
                 return ()
             | Some (prevId, lastCallId, safetyChecks) -> 
                 let! imgUrl,(w,h) = Browser.snapshot()
@@ -122,7 +121,7 @@ module ComputerUse =
                                 truncation = Some Truncation.auto
                           }
 
-                do! runState.toModel.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                do! runState.bus.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
                         
@@ -130,7 +129,7 @@ module ComputerUse =
         let rec loop retryCount = 
             async {  
                 try 
-                    let! response = runState.fromCua.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
+                    let! response = runState.bus.fromCua.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
                     if runState.tokenSource.IsCancellationRequested |> not then 
                         runState.lastCuaResponse.Value <- Some response
                         let mutable hasComputerCall = false
@@ -138,8 +137,8 @@ module ComputerUse =
                             match o with
                             | Computer_call cb -> 
                                 hasComputerCall <- true
-                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> AppUtils.postWarning runState
-                                cb.action |> Actions.actionToString |> AppUtils.postAction runState
+                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning runState.bus
+                                cb.action |> Actions.actionToString |> Bus.postAction runState.bus
                                 do! Async.Sleep 500
                                 //do! Preview.previewAction 2000 cb.action
                                 do! Actions.doAction 2 cb.action 
@@ -148,13 +147,13 @@ module ComputerUse =
                             | Message m -> 
                                 let outputText = RUtils.outputText response
                                 let msg = Assistant {id = response.id; content = outputText}
-                                runState.mailbox.Writer.TryWrite(ClientMsg.Chat_Append msg) |> ignore
+                                Chat_Append msg |> Bus.postMessage runState.bus 
                             | _  -> ()
                         if runState.tokenSource.IsCancellationRequested |> not then 
                             if hasComputerCall then 
                                 return! loop 0
                             else
-                                runState.mailbox.Writer.TryWrite(ClientMsg.TurnEnd) |> ignore
+                                TurnEnd |> Bus.postMessage runState.bus
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
                     do! Connection.closeConnection()
@@ -162,8 +161,8 @@ module ComputerUse =
                     if retryCount < 10 then 
                         return! loop(retryCount + 1)                   
                     else
-                        runState.mailbox.Writer.TryWrite(ClientMsg.TerminateWithException ex) |> ignore
-
+                        Log.exn (ex,"Error in loop")
+                        Abort (Some ex,$"Error in loop: %s{ex.Message}") |> Bus.postMessage runState.bus 
             }
         Async.Start(loop 0,runState.tokenSource.Token)
         

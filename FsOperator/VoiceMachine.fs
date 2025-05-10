@@ -59,25 +59,24 @@ module Functions =
 
     let getArg (argName:string) (jsonStr:string) =    
         let jargs = JsonSerializer.Deserialize<JsonObject>(jsonStr)
-        jargs.[argName].ToString()
-    
+        jargs.[argName].ToString()    
 
     let rec sendInstructions (runState:RunState) (ev:ResponseOutputItemDoneEvent) =
         async {
             try                                                 
                 let instructions = ev.item.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
-                AppUtils.postMessage runState (ClientMsg.VoiceChat_RunInstructions (instructions,ev.item.call_id))
-                AppUtils.postLog runState $"<-- voice instr. {instructions}"
+                Bus.postMessage runState.bus (ClientMsg.VoiceChat_RunInstructions (instructions,ev.item.call_id))
+                Bus.postLog runState.bus $"<-- voice instr. {instructions}"
             with ex ->
-                AppUtils.postWarning runState ex.Message
+                Bus.postWarning runState.bus ex.Message
                 RTOpenAI.Api.Log.error $"Error in runInstructions: {ex.Message}"
         }        
 
-    let sendVoiceInstructions (runState:RunState) (instructions:string) =
+    let sendVoiceInstructions bus (prevResponseId:string option,instructions:string) =
         async {
-            match runState.lastCuaResponse.Value with 
-            | None -> do! ComputerUse.sendStartMessage runState instructions
-            | Some _ -> do! ComputerUse.sendTextResponse runState (runState.lastCuaResponse.Value|> Option.map(_.id), instructions)
+            match prevResponseId with 
+            | None -> do! ComputerUse.sendStartMessage bus instructions
+            | Some _ -> do! ComputerUse.sendTextResponse bus (prevResponseId, instructions)
         }
 
 module VoiceMachine =    
@@ -165,7 +164,7 @@ module VoiceMachine =
                     Functions.sendInstructions runState ev |> Async.Start
                 return st
             | ResponseOutputItemDone ev when isInstructionsResult ev  -> return  st            
-            | ResponseTextDelta ev -> AppUtils.postLog runState $"text delta {ev}"; return st
+            | ResponseTextDelta ev -> Bus.postLog runState.bus $"text delta {ev}"; return st
             | ResponseAudioDelta _
             | ResponseAudioTranscriptDelta _
             | ResponseFunctionCallArgumentsDelta _ -> return st // suppress logging 'delta' events 
@@ -192,22 +191,24 @@ module VoiceMachine =
     let startVoiceMachine (runState:RunState) =
         async {
             match runState.chatMode with
-            | CM_Voice v  -> 
-                let! key = AppUtils.getOpenAIEphemKey (getApiKey())
+            | CM_Voice v when v.connection.IsSome  -> 
+                let conn = v.connection.Value
                 let! ephemeralKey = AppUtils.getOpenAIEphemKey (getApiKey())
-                do! RTOpenAI.Api.Connection.connect ephemeralKey v.connection |> Async.AwaitTask
-                startReader runState v.connection
+                do! RTOpenAI.Api.Connection.connect ephemeralKey conn |> Async.AwaitTask
+                startReader runState conn
                 return ()
-            | x -> AppUtils.postLog runState $"Chat mode not supported {x}"
+            | CM_Voice _  -> Abort(None,"Voice connection not set") |> Bus.postMessage runState.bus
+            | x -> Bus.postLog runState.bus $"Chat mode not supported {x}"
             return ()
         }
 
     let stopVoiceMachine (runState:RunState) =
         async {
             match runState.chatMode with
-            | CM_Voice connection  -> 
-                RTOpenAI.Api.Connection.close connection
+            | CM_Voice v when v.connection.IsSome -> 
+                RTOpenAI.Api.Connection.close v.connection.Value
                 return ()
-            | x -> AppUtils.postLog runState $"Chat mode not supported {x}"
+            | CM_Voice _ -> Abort(None,"Voice connection not set") |> Bus.postMessage runState.bus
+            | x -> Bus.postLog runState.bus $"Chat mode not supported {x}"
             return ()
         }

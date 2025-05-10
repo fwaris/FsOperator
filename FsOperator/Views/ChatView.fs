@@ -47,7 +47,7 @@ type ChatView =
     static member chatHistory leftMargin model dispatch = 
         ListBox.create [
             ListBox.margin (Thickness(leftMargin,2.,2.,5.))
-            ListBox.dataItems (model.runState |> Option.map _.chatHistory |> Option.defaultValue [])                            
+            ListBox.dataItems (RunState.messages model.runState)                           
             ListBox.styles [ FsStyles.initStyle() ]
             ListBox.itemTemplate (
                 DataTemplateView<ChatMsg>.create (fun (msg: ChatMsg) -> 
@@ -94,7 +94,7 @@ type ChatView =
                                             TextBlock.fontWeight FontWeight.Bold
                                             TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
                                         ]
-                                        if ((csState.IsCS_Prompt || csState.IsCS_Loop) && csMode.IsCM_Text) then 
+                                        if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Text) then 
                                             Lottie.create [
                                                 Grid.row 0
                                                 Lottie.margin (Thickness(10.,0.,0.,0.))
@@ -135,7 +135,7 @@ type ChatView =
                                         Button.create [
                                             Button.isEnabled (model.initialized  && (csMode.IsCM_Init || csMode.IsCM_Text))
                                             Button.margin (Thickness(0.,0.,1.,2.))
-                                            Button.content (if csState.IsCS_Init then "Start Task" else "Cancel Task" )
+                                            Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
                                             Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
                                             Button.horizontalAlignment HorizontalAlignment.Right
                                             Button.verticalAlignment VerticalAlignment.Bottom
@@ -157,7 +157,7 @@ type ChatView =
                                             TextBlock.fontWeight FontWeight.Bold
                                             TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
                                         ]
-                                        if ((csState.IsCS_Prompt || csState.IsCS_Loop) && csMode.IsCM_Voice) then
+                                        if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Voice) then
                                             Lottie.create [
                                                 Grid.row 0
                                                 Lottie.margin (Thickness(10.,0.,0.,0.))
@@ -175,7 +175,7 @@ type ChatView =
                                         Button.create [
                                             Button.margin 2
                                             Button.verticalAlignment VerticalAlignment.Top
-                                            Button.content (if csState.IsCS_Init then "Start Task" else "StopTask")
+                                            Button.content (if csState.IsCUA_Init then "Start Task" else "StopTask")
                                             Button.isEnabled (model.initialized && (csMode.IsCM_Init || csMode.IsCM_Voice))
                                             Button.onClick (fun _ -> dispatch VoicChat_StartStop)
                                         ]
@@ -198,7 +198,7 @@ type ChatView =
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
                         match model.runState with 
-                        | Some rs when rs.cuaState.IsCS_Prompt -> 
+                        | Some rs when rs.cuaState.IsCUA_Pause -> 
                             Panel.create [
                                 DockPanel.dock Dock.Bottom
                                 Panel.margin 2
