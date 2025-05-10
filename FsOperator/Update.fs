@@ -66,7 +66,6 @@ module Update =
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
-            output = ""
             initialized = false
             url = url
             webview = ref None

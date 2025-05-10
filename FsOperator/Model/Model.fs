@@ -137,7 +137,6 @@ type Model = {
     instructions: Instructions
     mailbox : Channel<ClientMsg>
     log : string list
-    output : string
     url : string
     webview : Ref<WebView option>
     action : string

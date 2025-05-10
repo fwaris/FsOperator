@@ -5,13 +5,6 @@ open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open WebViewControl
-open WebViewControl.Ext
-open Avalonia.Controls.Shapes
-open Avalonia.FuncUI
-open Avalonia.Labs.Lottie
-open Avalonia.Labs.Lottie.Ext
-
 
 [<AbstractClass; Sealed>]
 type MainView =    

@@ -39,6 +39,9 @@
 		<Compile Include="VoiceAsst.fs" />
 		<Compile Include="Update.fs" />
 		<Compile Include="Views\BrowserView.fs" />
+		<Compile Include="Views\ChatHistoryView.fs" />
+		<Compile Include="Views\VoiceChatView.fs" />
+		<Compile Include="Views\TextChatView.fs" />
 		<Compile Include="Views\ChatView.fs" />
 		<Compile Include="Views\MainView.fs" />
 		<Compile Include="Program.fs" />
