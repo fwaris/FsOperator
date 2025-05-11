@@ -3,6 +3,7 @@ open System
 open System.Threading.Channels
 open WebViewControl
 
+
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
 type ChatMode = 
@@ -163,4 +164,5 @@ type ClientMsg =
     | Chat_Submit
     | VoicChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
+    | OpenRemoteBrower 
 

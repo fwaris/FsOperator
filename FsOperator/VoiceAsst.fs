@@ -192,7 +192,8 @@ module VoiceMachine =
             match runState.chatMode with
             | CM_Voice v when v.connection.IsSome  -> 
                 let conn = v.connection.Value
-                let! ephemeralKey = AppUtils.getOpenAIEphemKey (getApiKey())
+                let keyReq = {Api.Exts.KeyReq.Default with model = C.OPENAI_RT_MODEL_GPT4O}
+                let! ephemeralKey = Api.Exts.getOpenAIEphemKey (getApiKey()) keyReq |> Async.AwaitTask
                 do! RTOpenAI.Api.Connection.connect ephemeralKey conn |> Async.AwaitTask
                 startReader runState conn
                 return ()

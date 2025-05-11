@@ -163,6 +163,7 @@ module Update =
             match msg with
             | Initialize -> model, Cmd.none
             | BrowserConnected -> {model with initialized=true},Cmd.none
+            | OpenRemoteBrower -> model, Cmd.none
             | TextChat_StartStopTask -> startStopForTextChat model
             | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            

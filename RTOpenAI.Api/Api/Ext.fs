@@ -75,6 +75,10 @@ module Exts =
             Log.exn (ex, $"Error deserializing event {eventType}")
             UnknownEvent (eventType,j)
 
+
+
+
+
     let callApi<'input,'output>(key:string,url:string,input:'input) =
         task {
             use wc = new HttpClient()
@@ -82,4 +86,24 @@ module Exts =
             let! resp = wc.PostAsJsonAsync<'input>(Uri url, input)
             return! resp.Content.ReadFromJsonAsync<'output>()
         }
+
+    //request to get the ephemeral key    
+    type KeyReq = {
+        model : string
+        modalities : string list
+        instructions : string
+    }
+    with static member Default = {
+            model = ""
+            modalities = ["audio"; "text"]
+            instructions = "You are a friendly assistant"
+        }        
   
+    let getOpenAIEphemKey apiKey (keyRequest:KeyReq) =
+        task {
+            let! resp = callApi<_,RTOpenAI.Api.Events.Session>(apiKey,RTOpenAI.Api.C.OPENAI_SESSION_API,keyRequest) |> Async.AwaitTask
+            return
+                resp.client_secret
+                |> Option.map _.value
+                |> Option.defaultWith (fun _ -> failwith "Unable to get ephemeral key")
+        }        

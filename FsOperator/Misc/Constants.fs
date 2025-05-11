@@ -2,6 +2,7 @@
 
 module C =
     let DEBUG_PORT = 9222
+    let REMOTE_BROWSER_PORT = 51400
 
     let OPENAI_RT_API = "https://api.openai.com/v1/realtime"
     let OPENAI_SESSION_API = "https://api.openai.com/v1/realtime/sessions"

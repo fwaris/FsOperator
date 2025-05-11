@@ -17,18 +17,18 @@
 		<AvaloniaResource Include="Assets\**" />
 		<None Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
-		<Compile Include="Controls\WebView.fs" />
-		<Compile Include="Controls\Lottie.fs" />
 		<Compile Include="Misc\Constants.fs" />
 		<Compile Include="Misc\Log.fs" />
 		<Compile Include="Misc\Utils.fs" />
+		<Compile Include="Controls\WebView.fs" />
+		<Compile Include="Controls\RemoteBrowser.fs" />
+		<Compile Include="Controls\Lottie.fs" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Compile Include="Model\Chat.fs" />
 		<Compile Include="Model\Instructions.fs" />
 		<Compile Include="Model\Model.fs" />
-		<Compile Include="Model\AppUtils.fs" />
 		<Compile Include="CUA\Connection.fs" />
 		<Compile Include="CUA\StartPrompts.fs" />
 		<Compile Include="CUA\Browser.fs" />
@@ -78,6 +78,10 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <Folder Include="Browser\" />
 	</ItemGroup>
 	
 </Project>
