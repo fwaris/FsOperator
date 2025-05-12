@@ -42,6 +42,7 @@ type Model = {
     url : string
     webview : Ref<WebView option>
     action : string
+    isFlashing : bool
     statusMsg : (DateTime option*string)
 }
 
@@ -55,6 +56,7 @@ type ClientMsg =
     | ClearLog
     | SetUrl of string
     | SetAction of string
+    | FlashAction of bool
     | StatusMsg_Set of string
     | StatusMsg_Clear of DateTime option
     | TurnEnd

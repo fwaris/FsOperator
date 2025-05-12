@@ -1,11 +1,20 @@
 ﻿namespace FsOperator
 open System
+open System.Diagnostics
 open System.Threading.Channels
 open Elmish
 open FSharp.Control
 open Avalonia.FuncUI.Hosts
 
 module Update =
+    let openTools () =
+        match Connection._toolsUrl.Value with
+        | None -> debug "No URL found"
+        | Some url ->
+            let startInfo = ProcessStartInfo(url, UseShellExecute = true)
+            try System.Diagnostics.Process.Start(startInfo) |> ignore
+            with ex -> debug $"Error opening tools: {ex.Message}"
+
     let subscribeBackground (model:Model) =
         let backgroundEvent dispatch =
             let ctx = new System.Threading.CancellationTokenSource()
@@ -44,7 +53,7 @@ module Update =
         model,Cmd.none
 
     let testSomething_ (model:Model) =
-        let testChat = 
+        let testChat =
             [
                 Assistant {id = "1"; content = model.instructions}
                 User "The quick brown fox jumped over the lazy dog"
@@ -56,8 +65,9 @@ module Update =
         {model with runState =  Some runState}, Cmd.none
 
 
-    let init _   = 
-        let url,instructions = StartPrompts.amazon
+    let init _   =
+        let url,instructions = StartPrompts.jiraTasks
+        //let url,instructions = StartPrompts.amazon
         //let url,instructions = StartPrompts.netflix
         //let url,instructions = StartPrompts.linkedIn
         //let url,instructions = StartPrompts.twitter
@@ -73,10 +83,11 @@ module Update =
             webview = ref None
             action = ""
             statusMsg = None,""
-        }        
+            isFlashing = false
+        }
         model,Cmd.ofMsg Initialize
 
-    let shouldClearStatus (inComingDT:DateTime option) messageDT = 
+    let shouldClearStatus (inComingDT:DateTime option) messageDT =
         match inComingDT,messageDT with
         | None, None -> true
         | Some inComingDT, None -> true
@@ -87,7 +98,13 @@ module Update =
         async {
             do! Async.Sleep 10000
             return Some time
-        }    
+        }
+
+    let delayFlash isOn =
+        async {
+            do! Async.Sleep 1000
+            return isOn
+        }
 
     let token() = new System.Threading.CancellationTokenSource()
 
@@ -95,22 +112,22 @@ module Update =
         try
             match msg with
             | Initialize -> model, Cmd.none
-            | BrowserConnected -> {model with initialized=true},Cmd.none
+            | BrowserConnected -> openTools() ; {model with initialized=true},Cmd.none
             | StartStopTask ->
-                match model.runState with 
-                | None when model.initialized -> 
+                match model.runState with
+                | None when model.initialized ->
                     let runState = RunState.Create model.mailbox model.instructions
                     let runState = {runState with chatHistory = []; chatState = CS_Loop}
                     ComputerUse.startMessaging runState
                     ComputerUse.sendStartMessage runState |> Async.Start
-                    ComputerUse.loop runState 
+                    ComputerUse.loop runState
                     {model with runState =  Some runState}, Cmd.none
                 | None -> model, Cmd.none
-                | Some runState-> 
+                | Some runState->
                     runState.tokenSource.Cancel()
                     runState.fromModel.Writer.TryComplete() |> ignore
-                    runState.toModel.Writer.TryComplete()   |> ignore                    
-                    {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none 
+                    runState.toModel.Writer.TryComplete()   |> ignore
+                    {model with runState=Some {runState with chatState = CS_Init}}, Cmd.none
             | StopIfRunning -> model, (if model.runState.IsSome then Cmd.ofMsg StartStopTask else Cmd.none)
 
             | SetInstructions txt -> {model with instructions=txt}, Cmd.none
@@ -119,12 +136,12 @@ module Update =
             | Chat_UpdateQuestion txt -> {model with runState = model.runState |> Option.map (fun rs -> {rs with question = txt})}, Cmd.none
             | Chat_Append msg -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatHistory = Chat.append msg rs.chatHistory})}, Cmd.none
             | Chat_Respond -> {model with runState = model.runState |> Option.map (fun rs -> {rs with chatState = CS_Prompt})}, Cmd.none
-            | Chat_Submit -> 
+            | Chat_Submit ->
                 match model.runState with
-                | Some runState when runState.chatState.IsCS_Prompt -> 
+                | Some runState when runState.chatState.IsCS_Prompt ->
                     let prevId = runState.lastResponse.Value |> Option.map (fun r -> r.id)
                     let question = runState.question
-                    let runState = {runState with 
+                    let runState = {runState with
                                         chatState = CS_Loop
                                         chatHistory = runState.chatHistory |> Chat.append (User runState.question)
                                         question = ""
@@ -137,7 +154,8 @@ module Update =
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> {model with url=txt}, Cmd.none
 
-            | SetAction txt -> {model with action=txt}, Cmd.none
+            | SetAction txt -> {model with action=txt}, Cmd.ofMsg (FlashAction true)
+            | FlashAction isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) FlashAction else Cmd.none
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 
@@ -146,6 +164,6 @@ module Update =
             | TestSomething -> testSomething model
 
             //| _ -> model, Cmd.none
-        with ex -> 
+        with ex ->
             printfn "%A" ex
             model, Cmd.none

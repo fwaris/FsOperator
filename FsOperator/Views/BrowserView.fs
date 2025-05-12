@@ -20,7 +20,7 @@ module Cache =
 [<AbstractClass; Sealed>]
 type BrowserView =
 
-    static member navigationBar model dispatch = 
+    static member navigationBar model dispatch =
         Border.create [
             Grid.row 0
             Border.borderThickness 1.0
@@ -28,12 +28,12 @@ type BrowserView =
             Border.borderBrush Brushes.LightBlue
             Border.verticalAlignment VerticalAlignment.Top
             Border.horizontalAlignment HorizontalAlignment.Stretch
-            Border.child (        
+            Border.child (
                 Grid.create [
                     Grid.columnDefinitions "65*,35*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.verticalAlignment VerticalAlignment.Stretch
-                    Grid.children [                    
+                    Grid.children [
                         TextBox.create [
                             Grid.column 0
                             TextBox.init (fun x -> Cache.nav.Value <- x)
@@ -42,23 +42,23 @@ type BrowserView =
                             TextBox.margin 5
                             TextBox.verticalAlignment VerticalAlignment.Center
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
-                            TextBox.onKeyDown (fun e -> 
+                            TextBox.onKeyDown (fun e ->
                                 if e.Key = Avalonia.Input.Key.Enter then
                                     if Cache.nav.Value<> Unchecked.defaultof<_> then
                                         let url = Cache.nav.Value.Text
-                                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
+                                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
                                             dispatch (SetUrl url)
                                         else
                                             debug($"Invalid URL: {url}")
                                     else
-                                        debug("URL is empty")            
+                                        debug("URL is empty")
                             )
                         ]
                         TextBlock.create [
                                 Grid.column 1
                                 TextBlock.verticalAlignment VerticalAlignment.Center
                                 TextBlock.horizontalAlignment HorizontalAlignment.Stretch
-                                TextBlock.background Brushes.DarkSlateBlue
+                                TextBlock.background (if model.isFlashing then Brushes.DarkSalmon else Brushes.DarkSlateBlue)
                                 TextBlock.text model.action
                                 TextBlock.margin (Thickness(1,1,5,1))
                                 TextBlock.padding 3
@@ -66,10 +66,10 @@ type BrowserView =
                     ]
 
                 ]
-            )    
+            )
         ]
-        
-    static member internalWebView model dispatch = 
+
+    static member internalWebView model dispatch =
          WebView.create [
             Visual.zIndex -21
             Grid.row 1
@@ -83,20 +83,24 @@ type BrowserView =
             WebView.init (fun wv ->
                 match model.webview.Value with
                 | Some _ -> ()
-                | None -> 
+                | None ->
                     model.webview.Value <- Some wv
-                    wv.Initialized.Add (fun args ->     
+                    model.webview.Value <- Some wv
+                    wv.add_PopupOpening(fun p ->
+                        dispatch (SetUrl p)
+                    )
+                    wv.Initialized.Add (fun args ->
                             task {
                                 try
                                     let! browser = Connection.connection()
                                     dispatch BrowserConnected
-                                with ex ->                                                                         
+                                with ex ->
                                     debug (sprintf "%A" ex)
                             }
-                            |> ignore                            
+                            |> ignore
                             ()
                 ))
-        ]                                
+        ]
 
     static member webview model dispatch =
         BrowserView.internalWebView model dispatch
