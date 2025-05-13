@@ -23,7 +23,7 @@ module Utility =
         else
             let left = s.Substring(0,n/2)
             let right = s.Substring(s.Length - n/2)
-            left + "[\u2026]" + right
+            left + " [\u2026] " + right
 
     
     let newId() = 

@@ -56,7 +56,10 @@ type App() =
 
 module Program =
     [<EntryPoint; STAThread>]
-    let main(args: string[]) =
+    let main(args: string[]) =        
+        match Array.toList args with 
+        | clientId::port:: _ -> Main.clientId <- clientId; Main.port <- int port
+        | _ -> ()
         //WebViewControl.WebView.Settings.OsrEnabled <- true
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         //WebViewControl.WebView.Settings.LogFile <- @"e:\\s\\log.txt"
