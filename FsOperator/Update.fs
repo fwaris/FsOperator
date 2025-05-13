@@ -71,6 +71,7 @@ module Update =
             url = url
             action = ""
             statusMsg = None,""
+            browserState = BrowserAppState.Create()
         }        
         model,Cmd.ofMsg Initialize
 
@@ -156,14 +157,59 @@ module Update =
         | Some rs when rs.chatMode.IsCM_Text -> ComputerUse.sendTextResponse rs.bus (prevCuaId,question) |> Async.Start
         | Some rs when rs.chatMode.IsCM_Voice -> VoiceAsst.sendVoiceInstructions rs.bus (prevCuaId,question) |> Async.Start
         | _ -> ()
-        model,Cmd.none              
-   
+        model,Cmd.none   
+        
+    let p2pMap = function
+        | P2PFromClient.Client_Connected c  -> Browser_Connected {| clientId = c.clientId; pid=c.pid |}
+        | P2PFromClient.Client_Disconnect id -> Browser_Disconnected id
+        | P2PFromClient.Client_UrlSet url -> Browser_UrlSet url
+
+    let launchBrowser (model:Model) =        
+        let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"\..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
+        let si = System.Diagnostics.ProcessStartInfo() 
+        si.FileName <- "dotnet"
+        si.Arguments <- $"\"{dllPath}\" {model.browserState.clientId} {model.browserState.port}"
+        let pd = new System.Diagnostics.Process()
+        pd.StartInfo <- si
+        pd.Start()
+        
+    let startBrowser model =
+        async {
+            let started = launchBrowser model
+            if not started then
+                return failwith "Failed to start browser"
+            let bst = model.browserState
+            let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
+            P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel            
+        }
+        |> Async.Start
+        
+    let restartBrowser (model,clientId) =
+        async {
+            if model.browserState.clientId <> clientId then
+                return None
+            else
+                let started = launchBrowser model
+                if not started then
+                    return failwith "Failed to start browser"
+                let bst = model.browserState
+                model.browserState.tokenSource.Cancel()
+                do! Async.Sleep 1000
+                let bst = {bst with tokenSource = new System.Threading.CancellationTokenSource()}
+                let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
+                P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel
+                return (Some bst)
+        }
+          
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | Initialize -> model, Cmd.none
-            | BrowserConnected -> {model with initialized=true},Cmd.none
-            | OpenRemoteBrower -> model, Cmd.none
+            | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
+            | Initialize -> startBrowser model; model, Cmd.none
+            | Browser_Connected c  -> if c.clientId = model.browserState.clientId then {model with browserState.pid = Some c.pid}, Cmd.none else model, Cmd.none
+            | Browser_Disconnected c -> model, Cmd.OfAsync.either restartBrowser (model,c) Browser_Restarted Error
+            | Browser_Restarted None -> model, Cmd.none
+            | Browser_Restarted (Some bst) -> {model with browserState = bst}, Cmd.none
             | TextChat_StartStopTask -> startStopForTextChat model
             | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            

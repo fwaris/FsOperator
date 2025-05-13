@@ -24,6 +24,8 @@ type Model = {
 }
 
 module Main = 
+    let outchannel = Channel.CreateBounded<P2PFromClient>(10)
+    let tokenSource = new System.Threading.CancellationTokenSource()
 
     let mutable clientId = ""
     let mutable port = P2p.defaultPort
@@ -35,8 +37,8 @@ module Main =
             webview = ref None
             action = ""
             mailbox = Channel.CreateBounded(10)
-            outChannel = Channel.CreateBounded(10)
-            tokenSource = new System.Threading.CancellationTokenSource()
+            outChannel = outchannel
+            tokenSource = tokenSource
         }        
         model,Cmd.ofMsg Initialize    
 

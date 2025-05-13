@@ -1,7 +1,7 @@
 ﻿namespace rec FsOperator
 open System
 open System.Threading.Channels
-
+open FsOpCore
 
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
@@ -51,6 +51,22 @@ with static member Create mailbox instructions =
                 cuaState = CUA_Init
                 chatMode = CM_Text Chat.Default
                 lastFunctionCallId = ref None
+            }
+
+type BrowserAppState = {
+    clientId    : string
+    port        : int
+    tokenSource : System.Threading.CancellationTokenSource
+    outChannel  : Channel<P2PFromServer>
+    pid         : int option
+}
+with static member Create() =
+            {
+                clientId = newId()
+                port = P2p.defaultPort
+                tokenSource = new System.Threading.CancellationTokenSource()
+                outChannel = Channel.CreateBounded(10)
+                pid = None
             }
 
 //convenice functions to manage RunState
@@ -140,12 +156,20 @@ type Model = {
     url : string
     action : string
     statusMsg : (DateTime option*string)
+    browserState : BrowserAppState
 }
 
 type ClientMsg =
     | Initialize
     | TextChat_StartStopTask
-    | BrowserConnected
+
+    | Browser_Connect of (string*int)
+    | Browser_Connected of {|clientId:string; pid:int|}
+    | Browser_Restarted of BrowserAppState option
+    | Browser_Disconnected of string
+    | Browser_UrlSet of string
+    | Error of exn
+
     | SetInstructions of string
     | AppendLog of string
     | ClearLog
@@ -156,11 +180,13 @@ type ClientMsg =
     | TurnEnd
     | Abort of (exn option*string)
     | TestSomething
+
     | Chat_Append of ChatMsg
     | Chat_UpdateQuestion of string
     | Chat_HandleTurnEnd
     | Chat_Submit
+
     | VoicChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
-    | OpenRemoteBrower 
+
 

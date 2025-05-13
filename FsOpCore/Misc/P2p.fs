@@ -12,7 +12,7 @@ open System.Threading.Channels
 type P2PFromClient =
     | Client_Connected of {|clientId:string; pid:int|}
     | Client_UrlSet of string
-    | Client_Closed of string
+    | Client_Disconnect of string
 
 type P2PFromServer =
     | Server_CloseClient of string
@@ -57,7 +57,7 @@ module P2p =
             do! sndr
         }
     
-    let startServer clientId port (token:CancellationToken) (poster:P2PFromClient->unit) (outChannel:Channel<P2PFromServer>)  =
+    let startServer port (token:CancellationToken) (poster:P2PFromClient->unit) (outChannel:Channel<P2PFromServer>)  =
         let ip = IPAddress.Loopback
         let listener = new TcpListener(ip, port)
 
@@ -65,7 +65,7 @@ module P2p =
         printfn "Server listening on %O:%d" ip port
         let comp = 
             async {
-                use! client = listener.AcceptTcpClientAsync() |> Async.AwaitTask
+                use! client = listener.AcceptTcpClientAsync(token).AsTask() |> Async.AwaitTask
                 printfn "Client connected"
                 use stream = client.GetStream()
                 let loop = messageLoop token stream poster outChannel

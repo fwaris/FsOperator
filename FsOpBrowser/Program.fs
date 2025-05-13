@@ -24,7 +24,7 @@ type MainWindow() as this =
 
         Program.mkProgram Main.init (Main.update this) BrowserView.main
         |> Program.withHost this
-        //|> Program.withSubscription Update.subscriptions        
+        |> Program.withSubscription Main.subscriptions
         //|> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
@@ -36,9 +36,6 @@ type App() =
         this.Styles.Add (FluentTheme())
         this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
         this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"    
-        //this.Resources.MergedDictionaries.Add (
-        //    ResourceInclude(baseUri = null, Source = Uri("avares://FsOperator/Resources.axaml"))
-        //)
 
         this.AttachDevTools(Diagnostics.DevToolsOptions(Gesture=KeyGesture(Key.F12)))
 
@@ -51,7 +48,14 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) -> 
-                Async.RunSynchronously(async {CefRuntime.Shutdown()},1000))
+                async {
+                    Main.tokenSource.CancelAfter(500)
+                    Main.outchannel.Writer.TryWrite(P2PFromClient.Client_Disconnect Main.clientId) |> ignore
+                    let! _ = Async.StartChild(async {CefRuntime.Shutdown()}, 1000)
+                    do! Async.Sleep(1000)
+                }
+                |> Async.RunSynchronously
+            )
         | _ -> ()
 
 module Program =
