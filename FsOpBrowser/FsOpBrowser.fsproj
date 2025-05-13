@@ -43,15 +43,12 @@
 		<PackageReference Include="System.Text.Json" Version="9.0.4" />
 		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.2.0" />
 	</ItemGroup>
-	<ItemGroup>
+	<ItemGroup Condition="$(IsOSX)">
 		<PackageReference Include="WebViewControl-Avalonia-ARM64" Version="3.120.9" />
 	</ItemGroup>
-<!--	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm'">
-		<PackageReference Include="WebViewControl-Avalonia-ARM64" Version="3.120.9" />
-	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' != 'win-64'">
+	<ItemGroup Condition="$(IsWindows)">
 		<PackageReference Include="WebViewControl-Avalonia" Version="3.120.9" />
-	</ItemGroup>-->
+	</ItemGroup>
 	<ItemGroup>
 	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
 	</ItemGroup>
