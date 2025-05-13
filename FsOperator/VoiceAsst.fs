@@ -4,6 +4,7 @@ open FSharp.Control
 open RTOpenAI
 open RTOpenAI.Api.Events
 open System.Text.Json.Nodes
+open FsOpCore
 
 module VoicePrompts =
     let rtInstructions = $"""

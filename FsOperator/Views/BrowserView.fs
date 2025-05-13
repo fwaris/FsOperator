@@ -6,12 +6,11 @@ open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open WebViewControl
-open WebViewControl.Ext
 open Avalonia.Controls.Shapes
 open Avalonia.FuncUI
 open Avalonia.Labs.Lottie
 open Avalonia.Labs.Lottie.Ext
+open FsOpCore
 
 module Cache =
     let nav : Ref<TextBox> = ref Unchecked.defaultof<_>
@@ -72,33 +71,37 @@ type BrowserView =
         ]
         
     static member internalWebView model dispatch = 
-         WebView.create [
-            Visual.zIndex -21
+        TextBlock.create [
             Grid.row 1
-            (*
-            WebView.height 725
-            WebView.width 1285
-            *)
-            WebView.maxHeight 725
-            WebView.maxWidth 1285
-            WebView.address model.url
-            WebView.init (fun wv ->
-                match model.webview.Value with
-                | Some _ -> ()
-                | None -> 
-                    model.webview.Value <- Some wv
-                    wv.Initialized.Add (fun args ->     
-                            task {
-                                try
-                                    let! browser = Connection.connection()
-                                    dispatch BrowserConnected
-                                with ex ->                                                                         
-                                    debug (sprintf "%A" ex)
-                            }
-                            |> ignore                            
-                            ()
-                ))
-        ]                                
+            TextBlock.text " webview"
+        ]
+        // WebView.create [
+        //    Visual.zIndex -21
+        //    Grid.row 1
+        //    (*
+        //    WebView.height 725
+        //    WebView.width 1285
+        //    *)
+        //    WebView.maxHeight 725
+        //    WebView.maxWidth 1285
+        //    WebView.address model.url
+        //    WebView.init (fun wv ->
+        //        match model.webview.Value with
+        //        | Some _ -> ()
+        //        | None -> 
+        //            model.webview.Value <- Some wv
+        //            wv.Initialized.Add (fun args ->     
+        //                    task {
+        //                        try
+        //                            let! browser = Connection.connection()
+        //                            dispatch BrowserConnected
+        //                        with ex ->                                                                         
+        //                            debug (sprintf "%A" ex)
+        //                    }
+        //                    |> ignore                            
+        //                    ()
+        //        ))
+        //]                                
 
     static member webview model dispatch =
         BrowserView.internalWebView model dispatch

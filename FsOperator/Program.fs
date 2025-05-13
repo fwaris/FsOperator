@@ -10,7 +10,6 @@ open Avalonia.FuncUI.Hosts
 open System
 open Microsoft.Extensions.DependencyInjection
 open Avalonia.Input
-open Xilium.CefGlue
 open Avalonia.Markup.Xaml.Styling
 open Avalonia.Logging
 
@@ -52,20 +51,13 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) -> 
-                Async.RunSynchronously(Connection.shutdown(),1000) 
-                Async.RunSynchronously(async {CefRuntime.Shutdown()},1000))
+                Async.RunSynchronously(Connection.shutdown(),1000))
         | _ -> ()
 
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
-        //WebViewControl.WebView.Settings.OsrEnabled <- true
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
-        //WebViewControl.WebView.Settings.LogFile <- @"e:\\s\\log.txt"
-        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", string C.DEBUG_PORT)
-        WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", $"http://localhost:{C.DEBUG_PORT}")
-        //WebViewControl.WebView.Settings.AddCommandLineSwitch("auto-open-devtools-for-tabs","")
-        WebViewControl.WebView.Settings.AddCommandLineSwitch("no-sandbox", "")
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()

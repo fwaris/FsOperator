@@ -1,7 +1,6 @@
 ﻿namespace rec FsOperator
 open System
 open System.Threading.Channels
-open WebViewControl
 
 
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
@@ -139,7 +138,6 @@ type Model = {
     mailbox : Channel<ClientMsg>
     log : string list
     url : string
-    webview : Ref<WebView option>
     action : string
     statusMsg : (DateTime option*string)
 }

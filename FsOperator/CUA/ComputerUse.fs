@@ -5,6 +5,8 @@ open PuppeteerSharp
 open FsResponses
 open System.IO
 open PuppeteerSharp.Input
+open FsOperator
+open FsOpCore
 
 module ComputerUse =    
 

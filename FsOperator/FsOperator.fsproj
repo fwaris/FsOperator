@@ -17,12 +17,6 @@
 		<AvaloniaResource Include="Assets\**" />
 		<None Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
-		<Compile Include="Misc\Constants.fs" />
-		<Compile Include="Misc\Log.fs" />
-		<Compile Include="Misc\Utils.fs" />
-		<Compile Include="Controls\WebView.fs" />
-		<Compile Include="Controls\RemoteBrowser.fs" />
-		<Compile Include="Controls\Lottie.fs" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -50,38 +44,21 @@
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.0" />
-		<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
-		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
 		<PackageReference Include="FSharp.Control.AsyncSeq" Version="3.2.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.4" />
-		<!--<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />-->
 		<PackageReference Include="PuppeteerSharp" Version="20.1.3" />
-		<PackageReference Include="System.Drawing.Common" Version="9.0.4" />
 		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
 		<PackageReference Include="System.Text.Json" Version="9.0.4" />
-		<!--<PackageReference Include="WebView.Avalonia.Cross" Version="11.2.4" />
-		<PackageReference Include="WebView.Avalonia.Desktop.Cross" Version="11.2.4" />-->
 		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.2.0" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm'">
-		<PackageReference Include="WebViewControl-Avalonia-ARM64" Version="3.120.9" />
-	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' != 'osx-arm'">
-		<PackageReference Include="WebViewControl-Avalonia" Version="3.120.9" />
 	</ItemGroup>
 	
 	<ItemGroup>
+	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
 	</ItemGroup>
-	
-	<ItemGroup>
-	  <Folder Include="Browser\" />
-	</ItemGroup>
-	
+		
 </Project>

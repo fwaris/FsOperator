@@ -4,6 +4,7 @@ open System.Threading.Channels
 open Elmish
 open FSharp.Control
 open Avalonia.FuncUI.Hosts
+open FsOpCore
 
 module Update =
     let subscribeBackground (model:Model) =
@@ -68,7 +69,6 @@ module Update =
             log = []
             initialized = false
             url = url
-            webview = ref None
             action = ""
             statusMsg = None,""
         }        

@@ -5,6 +5,8 @@ open PuppeteerSharp
 open FsResponses
 open System.IO
 open PuppeteerSharp.Input
+open FsOpCore
+
 
 module Preview = 
     let drawClick (x:int) (y:int) (duration:int) = 

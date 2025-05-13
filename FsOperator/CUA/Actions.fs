@@ -4,6 +4,7 @@ open FSharp.Control
 open PuppeteerSharp
 open FsResponses
 open System.IO
+open FsOpCore
 open PuppeteerSharp.Input
 
 

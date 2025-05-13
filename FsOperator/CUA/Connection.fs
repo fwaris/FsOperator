@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open System.Net.Http
 open System.Text.Json
 open PuppeteerSharp
+open FsOpCore
 
 module Connection =
 

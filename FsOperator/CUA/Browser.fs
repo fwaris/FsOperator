@@ -1,4 +1,5 @@
 ﻿namespace  FsOperator
+open FsOpCore
 
 open PuppeteerSharp
 open System.IO
