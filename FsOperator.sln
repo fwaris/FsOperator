@@ -11,6 +11,10 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RTOpenAI.Api", "RTOpenAI.Ap
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RTTest", "RTTest\RTTest.fsproj", "{CC260714-5D16-4D3A-848D-2660AB853B2D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpBrowser", "FsOpBrowser\FsOpBrowser.fsproj", "{18D017FA-1D20-4554-BD22-0AA0B7312586}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCore", "FsOpCore\FsOpCore.fsproj", "{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +37,14 @@ Global
 		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC260714-5D16-4D3A-848D-2660AB853B2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18D017FA-1D20-4554-BD22-0AA0B7312586}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18D017FA-1D20-4554-BD22-0AA0B7312586}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18D017FA-1D20-4554-BD22-0AA0B7312586}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18D017FA-1D20-4554-BD22-0AA0B7312586}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
