@@ -73,7 +73,8 @@ module Update =
             statusMsg = None,""
             browserState = BrowserAppState.Create()
         }        
-        model,Cmd.ofMsg Initialize
+        //model,Cmd.ofMsg Initialize
+        model,Cmd.ofMsg InitializeDevMode
 
     let shouldClearStatus (inComingDT:DateTime option) messageDT = 
         match inComingDT,messageDT with
@@ -160,7 +161,7 @@ module Update =
         model,Cmd.none   
         
     let p2pMap = function
-        | P2PFromClient.Client_Connected c  -> Browser_Connected {| clientId = c.clientId; pid=c.pid |}
+        | P2PFromClient.Client_Connected c  -> Browser_Connected {| pid=c.pid |}
         | P2PFromClient.Client_Disconnect -> Browser_SocketDisconnected
         | P2PFromClient.Client_UrlSet url -> Browser_UrlSet url
 
@@ -169,7 +170,7 @@ module Update =
         let dllPath = System.IO.Path.GetFullPath(dllPath)
         let si = System.Diagnostics.ProcessStartInfo() 
         si.FileName <- "dotnet"
-        si.Arguments <- $""" "{dllPath}" {model.browserState.clientId} {model.browserState.port}"""
+        si.Arguments <- $""" "{dllPath}" {model.browserState.port}"""
         let pd = new System.Diagnostics.Process()
         pd.StartInfo <- si
         pd.EnableRaisingEvents <- true
@@ -179,49 +180,54 @@ module Update =
             pd.Dispose()
             model.mailbox.Writer.TryWrite(Browser_ProcessExited) |> ignore)           
         pd.Start()
-        
-    let startBrowser model =
+
+
+    let startP2pServer (model:Model) =
         async {
-            let started = launchBrowser model
-            if not started then
-                return failwith "Failed to start browser"
             let bst = model.browserState
             let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
             let listener = P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel            
             return Some {bst with listener = Some listener}
         }
         
-    let restartBrowser (model,clientId) =
+    let startBrowser model =
         async {
-            if model.browserState.clientId <> clientId then
-                return None
-            else
-                model.browserState.listener |> Option.iter (fun l -> l.Dispose())
-                let started = launchBrowser model
-                if not started then
-                    return failwith "Failed to start browser"
-                let bst = model.browserState
-                model.browserState.tokenSource.Cancel()
-                do! Async.Sleep 1000
-                let bst = {bst with tokenSource = new System.Threading.CancellationTokenSource()}
-                let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
-                let listener = P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel
-                let bst = {bst with listener = Some listener}
-                return (Some bst)
+            let started = launchBrowser model
+            if not started then
+                return failwith "Failed to start browser"
+            return! startP2pServer model
         }
+        
+    let restartBrowser model   =
+        async {        
+            model.browserState.listener |> Option.iter (fun l -> l.Dispose())
+            let started = launchBrowser model
+            if not started then
+                return failwith "Failed to start browser"
+            let bst = model.browserState
+            model.browserState.tokenSource.Cancel()
+            do! Async.Sleep 1000
+            let bst = {bst with tokenSource = new System.Threading.CancellationTokenSource()}
+            let model = {model with browserState = bst}
+            return! startP2pServer model
+        }
+
+    let browserPostUrl model =
+        model.browserState.outChannel.Writer.TryWrite(P2PFromServer.Server_SetUrl model.url) |> ignore
           
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
             | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
             | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Started Error
+            | InitializeDevMode -> model, Cmd.OfAsync.either startP2pServer model Browser_Started Error
 
-            | Browser_Connected c  -> if c.clientId = model.browserState.clientId then {model with browserState.pid = Some c.pid}, Cmd.none else model, Cmd.none
-            | Browser_ProcessExited -> model, Cmd.OfAsync.either restartBrowser (model,model.browserState.clientId) Browser_Started Error
+            | Browser_Connected c  -> browserPostUrl model; {model with browserState.pid = Some c.pid; browserState.state=BST_AwaitAck}, Cmd.none
+            | Browser_ProcessExited -> model, Cmd.OfAsync.either restartBrowser model Browser_Started Error
             | Browser_SocketDisconnected -> model, Cmd.none //browser exited signal seems to be stronger so just handle that
             | Browser_Started None -> model, Cmd.none
-            | Browser_Started (Some bst) -> {model with browserState = bst}, Cmd.none
-            | Browser_UrlSet url -> Log.info $"Browser URL set to {url} TODO"; model, Cmd.none
+            | Browser_Started (Some bst) ->  {model with browserState = bst}, Cmd.none
+            | Browser_UrlSet url -> {model with browserState.state = BST_Ready}, Cmd.none
 
             | TextChat_StartStopTask -> startStopForTextChat model
             | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none

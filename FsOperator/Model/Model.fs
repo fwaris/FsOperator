@@ -54,22 +54,24 @@ with static member Create mailbox instructions =
                 lastFunctionCallId = ref None
             }
 
+type BST = BST_Init | BST_Ready | BST_AwaitAck
 type BrowserAppState = {
-    clientId    : string
     port        : int
     tokenSource : System.Threading.CancellationTokenSource
     outChannel  : Channel<P2PFromServer>
     pid         : int option
     listener    : TcpListener option
+    state       : BST
+
 }
 with static member Create() =
             {
-                clientId = newId()
                 port = P2p.defaultPort
                 tokenSource = new System.Threading.CancellationTokenSource()
                 outChannel = Channel.CreateBounded(10)
                 pid = None
                 listener = None
+                state = BST_Init
             }
 
 //convenice functions to manage RunState
@@ -164,9 +166,10 @@ type Model = {
 
 type ClientMsg =
     | Initialize
+    | InitializeDevMode
     | TextChat_StartStopTask
 
-    | Browser_Connected of {|clientId:string; pid:int|}
+    | Browser_Connected of {|pid:int|}
     | Browser_Started of BrowserAppState option
     | Browser_SocketDisconnected 
     | Browser_ProcessExited

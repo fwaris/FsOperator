@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open System
+open System.IO
 open System.Net
 open System.Net.Sockets
 open System.Text
@@ -8,9 +9,10 @@ open System.Threading
 open System.Text.Json
 open System.Text.Json.Serialization
 open System.Threading.Channels
+open FSharp.Control
 
 type P2PFromClient =
-    | Client_Connected of {|clientId:string; pid:int|}
+    | Client_Connected of {| pid:int|}
     | Client_UrlSet of string
     | Client_Disconnect
 
@@ -29,19 +31,19 @@ module P2p =
             .AddToJsonSerializerOptions(o)        
         o
         
-    let internal receiver<'t> (token:CancellationToken) (stream:NetworkStream) (poster:'t->unit) (disconnectionMsg:'t) =
+    let internal receiver<'t> (token:CancellationToken) (stream:StreamReader) (poster:'t->unit) (disconnectionMsg:'t) =
         task {
-            let mutable go = true
-            while go && not token.IsCancellationRequested do 
-                try 
-                    let! (msg:'t) = JsonSerializer.DeserializeAsync<'t>(stream,serOptionsFSharp,token)
+            try 
+                while not stream.EndOfStream do
+                    let! line = stream.ReadLineAsync(token)
+                    let msg = JsonSerializer.Deserialize<'t>(line,serOptionsFSharp)
+                    Log.info $"P2P message received: {msg}"                    
                     poster msg
-                with 
-                | :? System.IO.IOException as ex ->  
-                    Log.info "P2P connection closed"
-                    poster disconnectionMsg //generate disconnection message internally
-                    go <- false
-                | ex -> Log.exn (ex,"Error in p2p srever receive loop")                                           
+            with 
+            | :? System.IO.IOException as ex ->  
+                Log.info "P2P connection closed"
+                poster disconnectionMsg //generate disconnection message internally
+            | ex -> Log.exn (ex,"Error in p2p srever receive loop")                                           
         }            
         
     let internal sender<'t> (token:CancellationToken) (stream:NetworkStream) (channel:Channel<'t>) =
@@ -51,7 +53,9 @@ module P2p =
                 try 
                     let! (msg:'t)  = channel.Reader.ReadAsync(token)
                     do! JsonSerializer.SerializeAsync(stream,msg,serOptionsFSharp)
+                    stream.WriteByte (0x0Auy) //write new line
                     do! stream.FlushAsync(token)
+                    Log.info $"P2P message sent: {msg}"                    
                 with 
                 | :? System.IO.IOException as ex ->  
                     Log.info "P2P connection closed"
@@ -61,9 +65,10 @@ module P2p =
                     Log.exn (ex,"Error in p2p server send loop")                                           
         }
 
-    let internal messageLoop<'recvr,'sndr> token stream poster outChannel disconnectionMsg  =         
+    let internal messageLoop<'recvr,'sndr> token (stream:NetworkStream) poster outChannel disconnectionMsg  =         
         async {
-            let! recvr = Async.StartChild (Async.AwaitTask (receiver<'recvr> token stream poster disconnectionMsg))
+            use reader = new StreamReader(stream,Encoding.UTF8)
+            let! recvr = Async.StartChild (Async.AwaitTask (receiver<'recvr> token reader poster disconnectionMsg))
             let! sndr = Async.StartChild (Async.AwaitTask (sender<'sndr>  token stream outChannel))
             do! recvr
             do! sndr

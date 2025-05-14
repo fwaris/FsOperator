@@ -12,6 +12,7 @@ type Msg =
     | Close 
     | Initialize    
     | ConnectedToServer of unit
+    | ConnectionError of exn
     | Error of exn
 
 type Model = {
@@ -27,13 +28,12 @@ module Main =
     let outchannel = Channel.CreateBounded<P2PFromClient>(10)
     let tokenSource = new System.Threading.CancellationTokenSource()
 
-    let mutable clientId = ""
     let mutable port = P2p.defaultPort
 
     open Avalonia.FuncUI.Hosts
     let init _   = 
         let model = {
-            url = "https://www.amazon.com"
+            url = "about:blank"
             webview = ref None
             action = ""
             mailbox = Channel.CreateBounded(10)
@@ -78,11 +78,17 @@ module Main =
             ()
         }
 
+    let re_connect model =
+        async {
+            do! Async.Sleep(1000)
+            return! connect model
+        }
+
     let postToServer model msg =
         model.outChannel.Writer.TryWrite msg |> ignore
 
     let postConnectAck model =         
-        let msg = P2PFromClient.Client_Connected {| clientId=clientId; pid=System.Diagnostics.Process.GetCurrentProcess().Id|}
+        let msg = P2PFromClient.Client_Connected {|pid=System.Diagnostics.Process.GetCurrentProcess().Id|}
         postToServer model msg
 
     let postUrlSet model url =
@@ -100,8 +106,9 @@ module Main =
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | Initialize -> model, Cmd.OfAsync.either connect model ConnectedToServer Error
+            | Initialize -> model, Cmd.OfAsync.either connect model ConnectedToServer ConnectionError
             | ConnectedToServer _ -> postConnectAck model; model, Cmd.none
+            | ConnectionError _ -> model, Cmd.OfAsync.either re_connect model ConnectedToServer ConnectionError
             | SetUrl url -> {model with url = url},Cmd.ofMsg (AckUrl url)
             | Close -> shutdown model; model, Cmd.none
             | AckUrl url -> postUrlSet model url; model, Cmd.none
