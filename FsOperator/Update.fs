@@ -1,5 +1,8 @@
 ﻿namespace FsOperator
 open System
+open System.Linq.Expressions
+open System.Threading
+open System.Threading.Tasks
 open System.Threading.Channels
 open Elmish
 open FSharp.Control
@@ -164,25 +167,37 @@ module Update =
         | P2PFromClient.Client_Disconnect -> Browser_SocketDisconnected
         | P2PFromClient.Client_UrlSet url -> Browser_UrlSet url
 
-    let launchBrowser (model:Model) =        
-        let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
-        let dllPath = System.IO.Path.GetFullPath(dllPath)
-        let si = System.Diagnostics.ProcessStartInfo() 
-        si.FileName <- "dotnet"
-        si.Arguments <- $""" "{dllPath}" {model.browserState.clientId} {model.browserState.port}"""
-        let pd = new System.Diagnostics.Process()
-        pd.StartInfo <- si
-        pd.EnableRaisingEvents <- true
-        pd.Exited.Add(fun _ -> 
-            let msg = $"Browser process exited with code {pd.ExitCode}"
-            Log.info msg           
-            pd.Dispose()
-            model.mailbox.Writer.TryWrite(Browser_ProcessExited) |> ignore)           
-        pd.Start()
+    let launchBrowser (model:Model) =
+        task { 
+            let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
+            let dllPath = dllPath.Replace(@"\","/") ///+ "XXX"
+            let dllPath = System.IO.Path.GetFullPath(dllPath)
+            let si = System.Diagnostics.ProcessStartInfo() 
+            si.FileName <- "dotnet"
+            si.Arguments <- $""" "{dllPath}" {model.browserState.clientId} {model.browserState.port}"""
+            let pd = new System.Diagnostics.Process()
+            pd.StartInfo <- si
+            pd.EnableRaisingEvents <- true
+            let started = pd.Start()
+            let cts= new CancellationTokenSource()
+            cts.CancelAfter(500)
+            try 
+                let! r = pd.WaitForExitAsync(cts.Token)
+                Log.error "Unable to start browser" //process exited on its own 
+                return false
+            with _ -> //timeout
+                 pd.Exited.Add(fun _ -> 
+                        let msg = $"Browser process exited with code {pd.ExitCode}"
+                        Log.info msg           
+                        pd.Dispose()
+                        model.mailbox.Writer.TryWrite(Browser_ProcessExited) |> ignore)                       
+  
+                 return true     
+        }
         
     let startBrowser model =
         async {
-            let started = launchBrowser model
+            let! started = launchBrowser model |> Async.AwaitTask
             if not started then
                 return failwith "Failed to start browser"
             let bst = model.browserState
@@ -197,7 +212,7 @@ module Update =
                 return None
             else
                 model.browserState.listener |> Option.iter (fun l -> l.Dispose())
-                let started = launchBrowser model
+                let! started = launchBrowser model |> Async.AwaitTask
                 if not started then
                     return failwith "Failed to start browser"
                 let bst = model.browserState
@@ -213,7 +228,7 @@ module Update =
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
+            | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
             | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Started Error
 
             | Browser_Connected c  -> if c.clientId = model.browserState.clientId then {model with browserState.pid = Some c.pid}, Cmd.none else model, Cmd.none
@@ -239,7 +254,7 @@ module Update =
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 
             | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
-            | Abort (ex,msg) -> if model.runState.IsNone then model,Cmd.none else model, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
+            | Abort (ex,msg) -> {model with runState = RunState.stop model.runState}, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
             | TestSomething -> testSomething model
 
             | VoicChat_StartStop -> startStopForVoiceChat model
