@@ -18,7 +18,7 @@ type MainWindow() as this =
     inherit HostWindow()
 
     do
-        base.Title <- "CUA Browser (do not close"
+        base.Title <- "CUA Browser (do not close)"
         base.Width <- 800.0
         base.Height <- 400.0
 
@@ -50,7 +50,7 @@ type App() =
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) -> 
                 async {
                     Main.tokenSource.CancelAfter(500)
-                    Main.outchannel.Writer.TryWrite(P2PFromClient.Client_Disconnect Main.clientId) |> ignore
+                    //Main.outchannel.Writer.TryWrite(P2PFromClient.Client_Disconnect Main.clientId) |> ignore
                     let! _ = Async.StartChild(async {CefRuntime.Shutdown()}, 1000)
                     do! Async.Sleep(1000)
                 }

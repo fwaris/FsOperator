@@ -161,16 +161,23 @@ module Update =
         
     let p2pMap = function
         | P2PFromClient.Client_Connected c  -> Browser_Connected {| clientId = c.clientId; pid=c.pid |}
-        | P2PFromClient.Client_Disconnect id -> Browser_Disconnected id
+        | P2PFromClient.Client_Disconnect -> Browser_SocketDisconnected
         | P2PFromClient.Client_UrlSet url -> Browser_UrlSet url
 
     let launchBrowser (model:Model) =        
-        let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"\..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
+        let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
+        let dllPath = System.IO.Path.GetFullPath(dllPath)
         let si = System.Diagnostics.ProcessStartInfo() 
         si.FileName <- "dotnet"
-        si.Arguments <- $"\"{dllPath}\" {model.browserState.clientId} {model.browserState.port}"
+        si.Arguments <- $""" "{dllPath}" {model.browserState.clientId} {model.browserState.port}"""
         let pd = new System.Diagnostics.Process()
         pd.StartInfo <- si
+        pd.EnableRaisingEvents <- true
+        pd.Exited.Add(fun _ -> 
+            let msg = $"Browser process exited with code {pd.ExitCode}"
+            Log.info msg           
+            pd.Dispose()
+            model.mailbox.Writer.TryWrite(Browser_ProcessExited) |> ignore)           
         pd.Start()
         
     let startBrowser model =
@@ -180,15 +187,16 @@ module Update =
                 return failwith "Failed to start browser"
             let bst = model.browserState
             let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
-            P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel            
+            let listener = P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel            
+            return Some {bst with listener = Some listener}
         }
-        |> Async.Start
         
     let restartBrowser (model,clientId) =
         async {
             if model.browserState.clientId <> clientId then
                 return None
             else
+                model.browserState.listener |> Option.iter (fun l -> l.Dispose())
                 let started = launchBrowser model
                 if not started then
                     return failwith "Failed to start browser"
@@ -197,7 +205,8 @@ module Update =
                 do! Async.Sleep 1000
                 let bst = {bst with tokenSource = new System.Threading.CancellationTokenSource()}
                 let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
-                P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel
+                let listener = P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel
+                let bst = {bst with listener = Some listener}
                 return (Some bst)
         }
           
@@ -205,17 +214,22 @@ module Update =
         try
             match msg with
             | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
-            | Initialize -> startBrowser model; model, Cmd.none
+            | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Started Error
+
             | Browser_Connected c  -> if c.clientId = model.browserState.clientId then {model with browserState.pid = Some c.pid}, Cmd.none else model, Cmd.none
-            | Browser_Disconnected c -> model, Cmd.OfAsync.either restartBrowser (model,c) Browser_Restarted Error
-            | Browser_Restarted None -> model, Cmd.none
-            | Browser_Restarted (Some bst) -> {model with browserState = bst}, Cmd.none
+            | Browser_ProcessExited -> model, Cmd.OfAsync.either restartBrowser (model,model.browserState.clientId) Browser_Started Error
+            | Browser_SocketDisconnected -> model, Cmd.none //browser exited signal seems to be stronger so just handle that
+            | Browser_Started None -> model, Cmd.none
+            | Browser_Started (Some bst) -> {model with browserState = bst}, Cmd.none
+            | Browser_UrlSet url -> Log.info $"Browser URL set to {url} TODO"; model, Cmd.none
+
             | TextChat_StartStopTask -> startStopForTextChat model
             | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Submit ->  resumeChat model             
+
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> {model with url=txt}, Cmd.none

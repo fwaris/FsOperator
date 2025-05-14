@@ -50,7 +50,7 @@ type App() =
             //win.Closing.Add(fun _ -> Connection.disconnect())
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
-            desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) -> 
+            desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) ->                 
                 Async.RunSynchronously(Connection.shutdown(),1000))
         | _ -> ()
 

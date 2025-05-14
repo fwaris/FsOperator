@@ -2,6 +2,7 @@
 open System
 open System.Threading.Channels
 open FsOpCore
+open System.Net.Sockets
 
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
@@ -59,6 +60,7 @@ type BrowserAppState = {
     tokenSource : System.Threading.CancellationTokenSource
     outChannel  : Channel<P2PFromServer>
     pid         : int option
+    listener    : TcpListener option
 }
 with static member Create() =
             {
@@ -67,6 +69,7 @@ with static member Create() =
                 tokenSource = new System.Threading.CancellationTokenSource()
                 outChannel = Channel.CreateBounded(10)
                 pid = None
+                listener = None
             }
 
 //convenice functions to manage RunState
@@ -163,10 +166,10 @@ type ClientMsg =
     | Initialize
     | TextChat_StartStopTask
 
-    | Browser_Connect of (string*int)
     | Browser_Connected of {|clientId:string; pid:int|}
-    | Browser_Restarted of BrowserAppState option
-    | Browser_Disconnected of string
+    | Browser_Started of BrowserAppState option
+    | Browser_SocketDisconnected 
+    | Browser_ProcessExited
     | Browser_UrlSet of string
     | Error of exn
 

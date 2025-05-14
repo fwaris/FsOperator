@@ -12,11 +12,11 @@ open System.Threading.Channels
 type P2PFromClient =
     | Client_Connected of {|clientId:string; pid:int|}
     | Client_UrlSet of string
-    | Client_Disconnect of string
+    | Client_Disconnect
 
 type P2PFromServer =
-    | Server_CloseClient of string
     | Server_SetUrl of string
+    | Server_Disconnect
 
 module P2p =
     let defaultPort = 53091
@@ -29,30 +29,42 @@ module P2p =
             .AddToJsonSerializerOptions(o)        
         o
         
-    let internal receiver<'t> (token:CancellationToken) (stream:NetworkStream) (poster:'t->unit) =
+    let internal receiver<'t> (token:CancellationToken) (stream:NetworkStream) (poster:'t->unit) (disconnectionMsg:'t) =
         task {
-            while not token.IsCancellationRequested do 
+            let mutable go = true
+            while go && not token.IsCancellationRequested do 
                 try 
                     let! (msg:'t) = JsonSerializer.DeserializeAsync<'t>(stream,serOptionsFSharp,token)
                     poster msg
-                with ex ->
-                    Log.exn (ex,"Error in p2p srever receive loop")                                           
+                with 
+                | :? System.IO.IOException as ex ->  
+                    Log.info "P2P connection closed"
+                    poster disconnectionMsg //generate disconnection message internally
+                    go <- false
+                | ex -> Log.exn (ex,"Error in p2p srever receive loop")                                           
         }            
         
-    let internal sender<'t> (token:CancellationToken) (stream:NetworkStream) (channel:Channel<'t>)  =
+    let internal sender<'t> (token:CancellationToken) (stream:NetworkStream) (channel:Channel<'t>) =
         task {
-            while not token.IsCancellationRequested do 
+            let mutable go = true
+            while go && not token.IsCancellationRequested do 
                 try 
                     let! (msg:'t)  = channel.Reader.ReadAsync(token)
                     do! JsonSerializer.SerializeAsync(stream,msg,serOptionsFSharp)
-                with ex ->
+                    do! stream.FlushAsync(token)
+                with 
+                | :? System.IO.IOException as ex ->  
+                    Log.info "P2P connection closed"
+                    go <- false
+                | ex ->
+                    do! Async.Sleep(1000)
                     Log.exn (ex,"Error in p2p server send loop")                                           
         }
 
-    let internal messageLoop token stream poster outChannel  =         
+    let internal messageLoop<'recvr,'sndr> token stream poster outChannel disconnectionMsg  =         
         async {
-            let! recvr = Async.StartChild (Async.AwaitTask (receiver token stream poster))
-            let! sndr = Async.StartChild (Async.AwaitTask (sender  token stream outChannel))
+            let! recvr = Async.StartChild (Async.AwaitTask (receiver<'recvr> token stream poster disconnectionMsg))
+            let! sndr = Async.StartChild (Async.AwaitTask (sender<'sndr>  token stream outChannel))
             do! recvr
             do! sndr
         }
@@ -60,7 +72,6 @@ module P2p =
     let startServer port (token:CancellationToken) (poster:P2PFromClient->unit) (outChannel:Channel<P2PFromServer>)  =
         let ip = IPAddress.Loopback
         let listener = new TcpListener(ip, port)
-
         listener.Start()
         printfn "Server listening on %O:%d" ip port
         let comp = 
@@ -68,12 +79,13 @@ module P2p =
                 use! client = listener.AcceptTcpClientAsync(token).AsTask() |> Async.AwaitTask
                 printfn "Client connected"
                 use stream = client.GetStream()
-                let loop = messageLoop token stream poster outChannel
+                let loop = messageLoop token stream poster outChannel Client_Disconnect
                 match! Async.Catch loop with
                 | Choice1Of2 _ -> printfn "dispose p2p server"
                 | Choice2Of2 ex -> Log.exn (ex,"Error in p2p server")
             }
         Async.Start(comp,token) 
+        listener
 
     let startClient port (token:CancellationToken) (poster:P2PFromServer->unit) (outChannel:Channel<P2PFromClient>)  =
         let ip = IPAddress.Loopback
@@ -82,7 +94,7 @@ module P2p =
         let comp = 
             async {
                 use stream = client.GetStream()
-                let loop = messageLoop token stream poster outChannel
+                let loop = messageLoop token stream poster outChannel Server_Disconnect
                 match! Async.Catch loop with
                 | Choice1Of2 _ -> printfn "dispose p2p client"
                 | Choice2Of2 ex -> Log.exn (ex,"Error in p2p client")

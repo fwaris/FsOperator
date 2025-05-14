@@ -9,7 +9,7 @@ open System.Threading.Channels
 type Msg = 
     | SetUrl of string 
     | AckUrl of string
-    | Close of string 
+    | Close 
     | Initialize    
     | ConnectedToServer of unit
     | Error of exn
@@ -67,8 +67,9 @@ module Main =
         ]
 
     let msgMap = function
-        | P2PFromServer.Server_CloseClient incomingId ->  Close incomingId
         | P2PFromServer.Server_SetUrl url -> SetUrl url
+        | P2PFromServer.Server_Disconnect -> Close 
+
 
     let connect model =
         async {
@@ -87,6 +88,14 @@ module Main =
     let postUrlSet model url =
         let msg = P2PFromClient.Client_UrlSet url
         postToServer model msg
+
+    let shutdown model =
+        async {
+            model.tokenSource.Cancel() |> ignore
+            do! Async.Sleep(1000)        
+            Environment.Exit(0)
+        }        
+        |> Async.Start
         
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -94,7 +103,7 @@ module Main =
             | Initialize -> model, Cmd.OfAsync.either connect model ConnectedToServer Error
             | ConnectedToServer _ -> postConnectAck model; model, Cmd.none
             | SetUrl url -> {model with url = url},Cmd.ofMsg (AckUrl url)
-            | Close id -> (if clientId = id then Environment.Exit(0)); model, Cmd.none
+            | Close -> shutdown model; model, Cmd.none
             | AckUrl url -> postUrlSet model url; model, Cmd.none
             | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
         with ex -> 
