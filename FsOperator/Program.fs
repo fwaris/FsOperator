@@ -36,10 +36,6 @@ type App() =
         this.Styles.Add (FluentTheme())
         this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
         this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"    
-        //this.Resources.MergedDictionaries.Add (
-        //    ResourceInclude(baseUri = null, Source = Uri("avares://FsOperator/Resources.axaml"))
-        //)
-
         this.AttachDevTools(Diagnostics.DevToolsOptions(Gesture=KeyGesture(Key.F12)))
 
     override this.OnFrameworkInitializationCompleted() =
@@ -57,7 +53,6 @@ type App() =
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
-        System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()

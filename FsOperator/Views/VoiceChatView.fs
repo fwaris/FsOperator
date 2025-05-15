@@ -48,7 +48,7 @@ type VoiceChatView =
                             TextBlock.fontSize 14.
                         ]
                         Button.create [
-                            Button.isEnabled (model.initialized  && (csMode.IsCM_Init || csMode.IsCM_Text))
+                            Button.isEnabled (model.browserState.state.IsBST_Ready  && (csMode.IsCM_Init || csMode.IsCM_Voice))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
                             Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 

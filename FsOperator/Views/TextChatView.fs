@@ -51,7 +51,7 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (model.initialized  && (csMode.IsCM_Init || csMode.IsCM_Text))
+                            Button.isEnabled (model.browserState.state.IsBST_Ready  && (csMode.IsCM_Init || csMode.IsCM_Text))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )

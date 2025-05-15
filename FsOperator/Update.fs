@@ -70,14 +70,13 @@ module Update =
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
-            initialized = false
             url = url
             action = ""
             statusMsg = None,""
             browserState = BrowserAppState.Create()
         }        
-        //model,Cmd.ofMsg Initialize
-        model,Cmd.ofMsg InitializeDevMode
+        model,Cmd.ofMsg Initialize
+        //model,Cmd.ofMsg InitializeDevMode
 
     let shouldClearStatus (inComingDT:DateTime option) messageDT = 
         match inComingDT,messageDT with
@@ -95,7 +94,7 @@ module Update =
     ///start or stop text mode task
     let startStopForTextChat model =
         match model.runState with 
-        | None when model.initialized -> 
+        | None when model.browserState.state.IsBST_Ready -> 
             let runState = {RunState.initForText model.mailbox model.instructions with cuaState = CUA_Loop}
             ComputerUse.startMessaging (runState.tokenSource.Token,runState.bus)
             ComputerUse.sendStartMessage runState.bus (Instructions.getTextChat model.instructions) |> Async.Start
@@ -112,7 +111,7 @@ module Update =
     ///start or stop voice mode task
     let startStopForVoiceChat (model:Model) = 
         match model.runState with 
-        | None when model.initialized -> 
+        | None when model.browserState.state.IsBST_Ready -> 
             let runState = {RunState.initForVoice model.mailbox model.instructions with cuaState = CUA_Loop}
             ComputerUse.startMessaging (runState.tokenSource.Token, runState.bus)
             ComputerUse.loop runState 
@@ -241,7 +240,7 @@ module Update =
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
-            | SetUrl txt -> {model with url=txt}, Cmd.none
+            | SetUrl txt -> let m = {model with url=txt; browserState.state = BST_AwaitAck} in browserPostUrl m; m , Cmd.none
 
             | SetAction txt -> {model with action=txt}, Cmd.none
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none

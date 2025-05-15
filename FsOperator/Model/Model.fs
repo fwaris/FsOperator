@@ -164,7 +164,6 @@ with static member Default = {
 
 type Model = {
     runState : RunState option
-    initialized : bool
     instructions: Instructions
     mailbox : Channel<ClientMsg>
     log : string list
