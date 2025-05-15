@@ -76,6 +76,7 @@ with static member Create() =
 
 //convenice functions to manage RunState
 module RunState =
+    
 
     let appendChatMsg msg (runState:RunState option) =
         runState
@@ -139,7 +140,16 @@ module RunState =
                          chat = Chat.Default                         
                         |}
         }
-
+        
+    let stop (runState:RunState option ) =
+        match runState with
+        | Some runState -> 
+            runState.tokenSource.Cancel()
+            runState.bus.fromCua.Writer.TryComplete() |> ignore
+            runState.bus.toCua.Writer.TryComplete()   |> ignore
+            Some {runState with cuaState = CUA_Init}
+        | None -> None
+ 
 //request to get the ephemeral key    
 type KeyReq = {
     model : string

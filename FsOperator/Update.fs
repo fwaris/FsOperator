@@ -1,5 +1,8 @@
 ﻿namespace FsOperator
 open System
+open System.Linq.Expressions
+open System.Threading
+open System.Threading.Tasks
 open System.Threading.Channels
 open Elmish
 open FSharp.Control
@@ -218,7 +221,7 @@ module Update =
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | Error exn -> Log.exn(exn,""); model, Cmd.none //terminate app
+            | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
             | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Started Error
             | InitializeDevMode -> model, Cmd.OfAsync.either startP2pServer model Browser_Started Error
 
@@ -245,7 +248,7 @@ module Update =
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 
             | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
-            | Abort (ex,msg) -> if model.runState.IsNone then model,Cmd.none else model, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
+            | Abort (ex,msg) -> {model with runState = RunState.stop model.runState}, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
             | TestSomething -> testSomething model
 
             | VoicChat_StartStop -> startStopForVoiceChat model
