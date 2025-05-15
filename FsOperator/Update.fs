@@ -138,18 +138,18 @@ module Update =
     ///For voice mode we send the cua assistant's last message to the voice assistant
     ///For text, no action required (for now until reasoning is enabled) the user can see the message and respond 
     let handleTurnEnd model =
+        let model = {model with runState = RunState.setState CUA_Pause model.runState}
         match model.runState with 
         | Some r when r.chatMode.IsCM_Voice -> 
-            let rs = RunState.setState CUA_Pause model.runState
-            let callId = RunState.lastFunctionCallId rs
-            let asstMsg = RunState.lastAssistantMessage rs
-            let conn = RunState.voiceConnection rs
+            let callId = RunState.lastFunctionCallId model.runState
+            let asstMsg = RunState.lastAssistantMessage model.runState
+            let conn = RunState.voiceConnection model.runState
             match conn,asstMsg,callId with
             | Some cnn, Some m, Some callId -> VoiceAsst.sendFunctionResponse cnn m.content callId
             | None,_,_ ->  failwith "no voice connection"
             | _,None,_ -> failwith  "no assistant message as the last message of chat"
             | _,_,None -> failwith "no function call id found to respond to voice assistant"
-            {model with runState=rs}, Cmd.none
+            model, Cmd.none
         | _ -> model,Cmd.none                 
         
     ///Either the voice assistant, the reasoning model or the user has submitted a question (i.e. a response)

@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="scripts\recorder.fsx" />
     <None Include="scripts\packages.fsx" />
     <None Include="scripts\test_serialization.fsx" />
     <None Include="scripts\testoperator.fsx" />

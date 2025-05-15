@@ -141,8 +141,7 @@ module ComputerUse =
                                 hasComputerCall <- true
                                 cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning runState.bus
                                 cb.action |> Actions.actionToString |> Bus.postAction runState.bus
-                                do! Async.Sleep 500
-                                //do! Preview.previewAction 2000 cb.action
+                                do! Async.Sleep 100
                                 do! Actions.doAction 2 cb.action 
                                 do! Async.Sleep 1000
                                 do! computerCallResponse runState
