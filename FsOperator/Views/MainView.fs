@@ -81,14 +81,6 @@ type MainView =
                     Grid.children [
                         BrowserView.navigationBar model dispatch
                         ChatView.chat model dispatch
-                        GridSplitter.create [
-                            Grid.column 1
-                            Grid.rowSpan 2
-                            GridSplitter.verticalAlignment VerticalAlignment.Center
-                            GridSplitter.height 50.
-                            GridSplitter.horizontalAlignment HorizontalAlignment.Left                                
-                            GridSplitter.background Brushes.DarkGray                                
-                        ]
                     ]
                 ]               
             ]
