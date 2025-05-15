@@ -31,11 +31,12 @@ module P2p =
             .AddToJsonSerializerOptions(o)        
         o
         
-    let internal receiver<'t> (token:CancellationToken) (stream:StreamReader) (poster:'t->unit) (disconnectionMsg:'t) =
-        task {
+    let internal receiver<'t> (token:CancellationToken) (stream:NetworkStream) (poster:'t->unit) (disconnectionMsg:'t) =
+        async {
             try 
-                while not stream.EndOfStream do
-                    let! line = stream.ReadLineAsync(token)
+                use strw = new StreamReader(stream,Encoding.UTF8)
+                while not strw.EndOfStream do
+                    let! line = strw.ReadLineAsync(token).AsTask() |> Async.AwaitTask
                     let msg = JsonSerializer.Deserialize<'t>(line,serOptionsFSharp)
                     Log.info $"P2P message received: {msg}"                    
                     poster msg
@@ -47,14 +48,15 @@ module P2p =
         }            
         
     let internal sender<'t> (token:CancellationToken) (stream:NetworkStream) (channel:Channel<'t>) =
-        task {
+        async {
+            use strw = new StreamWriter(stream,Encoding.UTF8)
             let mutable go = true
             while go && not token.IsCancellationRequested do 
                 try 
-                    let! (msg:'t)  = channel.Reader.ReadAsync(token)
-                    do! JsonSerializer.SerializeAsync(stream,msg,serOptionsFSharp)
-                    stream.WriteByte (0x0Auy) //write new line
-                    do! stream.FlushAsync(token)
+                    let! (msg:'t)  = channel.Reader.ReadAsync(token).AsTask() |> Async.AwaitTask
+                    let msgStr = JsonSerializer.Serialize(msg,serOptionsFSharp)
+                    do! strw.WriteLineAsync(msgStr) |> Async.AwaitTask
+                    do! strw.FlushAsync(token) |> Async.AwaitTask
                     Log.info $"P2P message sent: {msg}"                    
                 with 
                 | :? System.IO.IOException as ex ->  
@@ -67,9 +69,8 @@ module P2p =
 
     let internal messageLoop<'recvr,'sndr> token (stream:NetworkStream) poster outChannel disconnectionMsg  =         
         async {
-            use reader = new StreamReader(stream,Encoding.UTF8)
-            let! recvr = Async.StartChild (Async.AwaitTask (receiver<'recvr> token reader poster disconnectionMsg))
-            let! sndr = Async.StartChild (Async.AwaitTask (sender<'sndr>  token stream outChannel))
+            let! recvr = Async.StartChild (receiver<'recvr> token stream poster disconnectionMsg)
+            let! sndr = Async.StartChild (sender<'sndr>  token stream outChannel)
             do! recvr
             do! sndr
         }
@@ -78,11 +79,10 @@ module P2p =
         let ip = IPAddress.Loopback
         let listener = new TcpListener(ip, port)
         listener.Start()
-        printfn "Server listening on %O:%d" ip port
+        Log.info $"Server listening on {ip}:{port}"
         let comp = 
             async {
                 use! client = listener.AcceptTcpClientAsync(token).AsTask() |> Async.AwaitTask
-                printfn "Client connected"
                 use stream = client.GetStream()
                 let loop = messageLoop token stream poster outChannel Client_Disconnect
                 match! Async.Catch loop with
@@ -95,7 +95,7 @@ module P2p =
     let startClient port (token:CancellationToken) (poster:P2PFromServer->unit) (outChannel:Channel<P2PFromClient>)  =
         let ip = IPAddress.Loopback
         let client = new TcpClient(ip.ToString(), port)
-        printfn "client connected %O:%d" ip port
+        Log.info $"Client connected on {ip}:{port}"        
         let comp = 
             async {
                 use stream = client.GetStream()

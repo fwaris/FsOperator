@@ -25,9 +25,8 @@ type Model = {
 }
 
 module Main = 
-    let outchannel = Channel.CreateBounded<P2PFromClient>(10)
     let tokenSource = new System.Threading.CancellationTokenSource()
-
+    let outchannel = Channel.CreateBounded<P2PFromClient>(10)
     let mutable port = P2p.defaultPort
 
     open Avalonia.FuncUI.Hosts
