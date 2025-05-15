@@ -23,9 +23,7 @@ type ChatView =
         TabControl.create [
             TabControl.horizontalAlignment HorizontalAlignment.Stretch
             TabControl.verticalAlignment VerticalAlignment.Stretch
-            Grid.row 0
-            Grid.column 1
-            Grid.rowSpan 2
+            Grid.row 1
             TabControl.viewItems [
                 //text mode
                 TabItem.create [

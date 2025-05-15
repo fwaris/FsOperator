@@ -224,6 +224,19 @@ module Update =
 
     let browserPostUrl model =
         model.browserState.outChannel.Writer.TryWrite(P2PFromServer.Server_SetUrl model.url) |> ignore
+
+    let setUrl model (origUrl:string) =
+        let url = 
+            if Uri.IsWellFormedUriString(origUrl, UriKind.Absolute) then
+                origUrl
+            else
+                Uri("https://"+origUrl).ToString()
+        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
+            let m = {model with url = url; browserState.state = BST_AwaitAck}
+            browserPostUrl m
+            m, Cmd.none
+        else
+           model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'") 
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -248,7 +261,7 @@ module Update =
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
-            | SetUrl txt -> let m = {model with url=txt; browserState.state = BST_AwaitAck} in browserPostUrl m; m , Cmd.none
+            | SetUrl txt -> setUrl model txt
 
             | SetAction txt -> {model with action=txt}, Cmd.ofMsg (FlashAction true)
             | FlashAction isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) FlashAction else Cmd.none

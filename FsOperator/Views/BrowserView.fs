@@ -46,10 +46,7 @@ type BrowserView =
                                 if e.Key = Avalonia.Input.Key.Enter then
                                     if Cache.nav.Value<> Unchecked.defaultof<_> then
                                         let url = Cache.nav.Value.Text
-                                        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then                            
-                                            dispatch (SetUrl url)
-                                        else
-                                            debug($"Invalid URL: {url}")
+                                        dispatch (SetUrl url)
                                     else
                                         debug("URL is empty")            
                             )

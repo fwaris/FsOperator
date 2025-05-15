@@ -60,12 +60,10 @@ type MainView =
                 ]
                 Grid.create [
                     Grid.rowDefinitions "50,*,33"
-                    Grid.columnDefinitions "*,300"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
                         BrowserView.navigationBar model dispatch
-                        BrowserView.webview model dispatch
                         ChatView.chat model dispatch
                         MainView.statusBar model dispatch
                         GridSplitter.create [
