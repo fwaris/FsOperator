@@ -79,7 +79,7 @@ module ComputerUse =
                               }
                     req |> Bus.postToCua bus
                 with ex ->
-                    debug $"Error in sendTextResponse: %s{ex.Message}"
+                    Log.exn (ex,"Error in sendTextResponse")
         }
 
 
@@ -157,7 +157,7 @@ module ComputerUse =
                                 TurnEnd |> Bus.postMessage runState.bus
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
-                    do! Connection.closeConnection()
+                    do! Browser.closeConnection()
                     do! Async.Sleep 1000
                     if retryCount < 10 then 
                         return! loop(retryCount + 1)                   

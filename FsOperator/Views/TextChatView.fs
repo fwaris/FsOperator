@@ -37,7 +37,7 @@ type TextChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         TextBox.create [
-                            TextBox.text (Instructions.getTextChat model.instructions)
+                            TextBox.text (model.instructions.textPrompt)
                             TextBox.textWrapping TextWrapping.Wrap
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                             TextBox.verticalAlignment VerticalAlignment.Stretch
@@ -51,7 +51,7 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (model.browserState.state.IsBST_Ready  && (csMode.IsCM_Init || csMode.IsCM_Text))
+                            Button.isEnabled (BrowserMode.isReady model.browserMode  && (csMode.IsCM_Init || csMode.IsCM_Text))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
@@ -105,6 +105,7 @@ type TextChatView =
                             ]
                         | _ -> ()                        
                         ScrollViewer.create [
+                            ScrollViewer.init(fun s -> Cache.scrollViewText.Value <- s)
                             ScrollViewer.verticalScrollBarVisibility Primitives.ScrollBarVisibility.Auto
                             ScrollViewer.content (ChatHistoryView.chatHistory leftMargin model dispatch)                            
                         ]

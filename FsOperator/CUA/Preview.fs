@@ -77,6 +77,6 @@ module Preview =
                 *)
                 | _ -> ()
             with ex -> 
-                do! Connection.closeConnection()
+                do! Browser.closeConnection()
                 debug $"Error in previewAction: %s{ex.Message}"
         }

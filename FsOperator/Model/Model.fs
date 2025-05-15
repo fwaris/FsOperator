@@ -54,6 +54,8 @@ with static member Create mailbox instructions =
                 lastFunctionCallId = ref None
             }
 
+
+
 type BST = BST_Init | BST_Ready | BST_AwaitAck
 type BrowserAppState = {
     port        : int
@@ -73,6 +75,28 @@ with static member Create() =
                 listener = None
                 state = BST_Init
             }
+
+
+type BrowserMode = External of {|pid:int option|} | Embedded of BrowserAppState
+
+module BrowserMode =
+    let isEmbedded = function | Embedded _ -> true | _ -> false
+    let isExternal = function | External _ -> true | _ -> false
+    let pid = function | External p -> p.pid | Embedded b -> b.pid
+    let port = function | External p -> P2p.defaultPort | Embedded b -> b.port
+    let setPid pid = function | External p -> External {|pid = Some pid|} | Embedded b -> Embedded {b with pid= Some pid}
+    let setEmbState state = function | External p -> External p | Embedded b -> Embedded {b with state=state}
+    let setEmbAppState bst = function | External p -> External p | Embedded b -> Embedded bst
+
+    let postUrl url = function
+        | External p -> Browser.goToPage url |> Async.Start
+        | Embedded b -> b.outChannel.Writer.TryWrite (P2PFromServer.Server_SetUrl url ) |> ignore
+
+    let isReady browserMode =
+        match browserMode with
+        | External p -> p.pid.IsSome
+        | Embedded b -> b.state = BST_Ready
+
 
 //convenice functions to manage RunState
 module RunState =
@@ -140,6 +164,21 @@ module RunState =
                          chat = Chat.Default                         
                         |}
         }
+
+    let voiceInstructions (runState:RunState option) = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Voice v -> v.chat.systemMessage
+            | _ -> None)
+        |> Option.defaultValue ""
+
+    let lastResponseComputerCall (runState:RunState option) = 
+        runState 
+        |> Option.bind (fun rs -> 
+            rs.lastCuaResponse.Value
+            |> Option.bind (fun r -> 
+                r.output |> List.tryPick (function FsResponses.Computer_call cb -> Some cb | _ -> None)))
         
     let stop (runState:RunState option ) =
         match runState with
@@ -170,20 +209,21 @@ type Model = {
     url : string
     action : string
     statusMsg : (DateTime option*string)
-    browserState : BrowserAppState
+    browserMode : BrowserMode
     isFlashing : bool
 }
 
 type ClientMsg =
     | Initialize
     | InitializeDevMode
+    | InitializeExternalBrowser
     | TextChat_StartStopTask
 
     | Browser_Connected of {|pid:int|}
-    | Browser_Started of BrowserAppState option
-    | Browser_SocketDisconnected 
-    | Browser_ProcessExited
-    | Browser_UrlSet of string
+    | Browser_Emb_Started of BrowserAppState option
+    | Browser_Emb_SocketDisconnected 
+    | Browser_Emb_ProcessExited
+    | Browser_Emb_UrlSet of string
     | Error of exn
 
     | SetInstructions of string

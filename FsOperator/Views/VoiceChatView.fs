@@ -37,7 +37,7 @@ type VoiceChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         TextBlock.create [
-                            TextBlock.text (Instructions.getTextChat model.instructions)
+                            TextBlock.text (RunState.voiceInstructions model.runState)
                             TextBlock.textWrapping TextWrapping.Wrap
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Stretch
@@ -48,7 +48,7 @@ type VoiceChatView =
                             TextBlock.fontSize 14.
                         ]
                         Button.create [
-                            Button.isEnabled (model.browserState.state.IsBST_Ready  && (csMode.IsCM_Init || csMode.IsCM_Voice))
+                            Button.isEnabled (BrowserMode.isReady model.browserMode  && (csMode.IsCM_Init || csMode.IsCM_Voice))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
                             Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
@@ -59,6 +59,9 @@ type VoiceChatView =
                 ]
                 ScrollViewer.create [
                     Grid.row 1
+                    ScrollViewer.init (fun s -> 
+                        Cache.scrollViewVoice.Value <- s
+                        s.SizeChanged.Add(fun x -> s.ScrollToEnd()))
                     ScrollViewer.verticalScrollBarVisibility Primitives.ScrollBarVisibility.Auto
                     ScrollViewer.content (ChatHistoryView.chatHistory leftMargin model dispatch)                            
                 ]

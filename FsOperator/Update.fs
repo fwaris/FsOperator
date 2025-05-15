@@ -51,7 +51,7 @@ module Update =
     let testSomething_ (model:Model) =
         let testChat =
             [
-                Assistant {id = "1"; content = Instructions.getTextChat model.instructions}
+                Assistant {id = "1"; content = model.instructions.textPrompt}
                 User "The quick brown fox jumped over the lazy dog"
                 Assistant {id = "2"; content = "How can I help you?"}
             ]
@@ -61,24 +61,22 @@ module Update =
 
 
     let init _   =
-        let url,instructions = StartPrompts.amazon
-        //let url,instructions = StartPrompts.netflix
-        //let url,instructions = StartPrompts.linkedIn
-        //let url,instructions = StartPrompts.twitter
-        //sResponses.debug_logging <- true
+        //FsResponses.debug_logging <- true
+        let sample = Instructions.sampleNetflix
         let model = {
-            instructions = Instructions.sample
+            instructions = sample
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
-            url = url
+            url = sample.startUrl
             action = ""
             statusMsg = None,""
-            browserState = BrowserAppState.Create()
+            browserMode = Embedded (BrowserAppState.Create())
             isFlashing = false
         }        
         model,Cmd.ofMsg Initialize
         //model,Cmd.ofMsg InitializeDevMode
+        //model,Cmd.ofMsg InitializeExternalBrowser
 
     let shouldClearStatus (inComingDT:DateTime option) messageDT =
         match inComingDT,messageDT with
@@ -102,24 +100,21 @@ module Update =
     ///start or stop text mode task
     let startStopForTextChat model =
         match model.runState with 
-        | None when model.browserState.state.IsBST_Ready -> 
+        | None when BrowserMode.isReady model.browserMode -> 
             let runState = {RunState.initForText model.mailbox model.instructions with cuaState = CUA_Loop}
             ComputerUse.startMessaging (runState.tokenSource.Token,runState.bus)
-            ComputerUse.sendStartMessage runState.bus (Instructions.getTextChat model.instructions) |> Async.Start
+            ComputerUse.sendStartMessage runState.bus (model.instructions.textPrompt) |> Async.Start
             ComputerUse.loop runState 
             {model with runState =  Some runState}, Cmd.none
         | None -> model, Cmd.none
         | Some runState when runState.chatMode.IsCM_Text -> 
-            runState.tokenSource.Cancel()
-            runState.bus.fromCua.Writer.TryComplete() |> ignore
-            runState.bus.toCua.Writer.TryComplete()   |> ignore                    
-            {model with runState=Some {runState with cuaState = CUA_Init}}, Cmd.none 
+            {model with runState = RunState.stop model.runState}, Cmd.none
         | _ -> model, Cmd.none //ignore any other state
 
     ///start or stop voice mode task
     let startStopForVoiceChat (model:Model) = 
         match model.runState with 
-        | None when model.browserState.state.IsBST_Ready -> 
+        | None when BrowserMode.isReady model.browserMode -> 
             let runState = {RunState.initForVoice model.mailbox model.instructions with cuaState = CUA_Loop}
             ComputerUse.startMessaging (runState.tokenSource.Token, runState.bus)
             ComputerUse.loop runState 
@@ -127,11 +122,8 @@ module Update =
             {model with runState =  Some runState}, Cmd.none
         | None -> model, Cmd.none
         | Some runState when runState.chatMode.IsCM_Voice -> 
-            runState.tokenSource.Cancel()
-            runState.bus.fromCua.Writer.TryComplete() |> ignore
-            runState.bus.toCua.Writer.TryComplete()   |> ignore                    
             VoiceMachine.stopVoiceMachine runState |> Async.Start
-            {model with runState = Some {runState with cuaState = CUA_Init}}, Cmd.none
+            {model with runState = RunState.stop model.runState}, Cmd.none
         | _ -> model, Cmd.none //ignore voice mode
 
     ///cua assistant loop has stopped and we need to respond to the assistant's last message (and chatHistory)
@@ -156,7 +148,12 @@ module Update =
     ///Send that to the CUA assitant to continue the task
     let resumeChat (model:Model) = 
         let question = RunState.question model.runState
-        let prevCuaId = model.runState |> RunState.lastCuaResponse |> Option.bind(_.previous_response_id)
+        //last response id is only needed if there was a request for a computer call in the last response (for the computer use agent)
+        let prevCuaId = 
+            RunState.lastResponseComputerCall model.runState
+            |> Option.bind (fun _ -> RunState.lastCuaResponse model.runState)
+            |> Option.bind _.previous_response_id
+                        
         let model =
             {model with 
                 runState = 
@@ -168,19 +165,20 @@ module Update =
         | Some rs when rs.chatMode.IsCM_Text -> ComputerUse.sendTextResponse rs.bus (prevCuaId,question) |> Async.Start
         | Some rs when rs.chatMode.IsCM_Voice -> VoiceAsst.sendVoiceInstructions rs.bus (prevCuaId,question) |> Async.Start
         | _ -> ()
+        ComputerUse.loop model.runState.Value 
         model,Cmd.none   
         
     let p2pMap = function
         | P2PFromClient.Client_Connected c  -> Browser_Connected {| pid=c.pid |}
-        | P2PFromClient.Client_Disconnect -> Browser_SocketDisconnected
-        | P2PFromClient.Client_UrlSet url -> Browser_UrlSet url
+        | P2PFromClient.Client_Disconnect -> Browser_Emb_SocketDisconnected
+        | P2PFromClient.Client_UrlSet url -> Browser_Emb_UrlSet url
 
     let launchBrowser (model:Model) =        
         let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
         let dllPath = System.IO.Path.GetFullPath(dllPath)
         let si = System.Diagnostics.ProcessStartInfo() 
         si.FileName <- "dotnet"
-        si.Arguments <- $""" "{dllPath}" {model.browserState.port}"""
+        si.Arguments <- $""" "{dllPath}" {BrowserMode.port model.browserMode}"""
         let pd = new System.Diagnostics.Process()
         pd.StartInfo <- si
         pd.EnableRaisingEvents <- true
@@ -188,13 +186,13 @@ module Update =
             let msg = $"Browser process exited with code {pd.ExitCode}"
             Log.info msg           
             pd.Dispose()
-            model.mailbox.Writer.TryWrite(Browser_ProcessExited) |> ignore)           
+            model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore)           
         pd.Start()
 
 
     let startP2pServer (model:Model) =
         async {
-            let bst = model.browserState
+            let bst = match model.browserMode with Embedded bst -> bst | _ -> failwith "startP2pServer called without embedded browser mode"
             let poster = p2pMap >> model.mailbox.Writer.TryWrite >> ignore
             let listener = P2p.startServer bst.port bst.tokenSource.Token poster bst.outChannel            
             return Some {bst with listener = Some listener}
@@ -210,20 +208,19 @@ module Update =
         
     let restartBrowser model   =
         async {        
-            model.browserState.listener |> Option.iter (fun l -> l.Dispose())
+            let bst = match model.browserMode with Embedded bst -> bst | _ -> failwith "startP2pServer called without embedded browser mode"
+            bst.listener |> Option.iter (fun l -> l.Dispose())
             let started = launchBrowser model
             if not started then
                 return failwith "Failed to start browser"
-            let bst = model.browserState
-            model.browserState.tokenSource.Cancel()
+            bst.tokenSource.Cancel()
             do! Async.Sleep 1000
             let bst = {bst with tokenSource = new System.Threading.CancellationTokenSource()}
-            let model = {model with browserState = bst}
+            let model = {model with browserMode = Embedded bst}
             return! startP2pServer model
         }
 
-    let browserPostUrl model =
-        model.browserState.outChannel.Writer.TryWrite(P2PFromServer.Server_SetUrl model.url) |> ignore
+    let browserPostUrl model = BrowserMode.postUrl model.url model.browserMode
 
     let setUrl model (origUrl:string) =
         let url = 
@@ -232,7 +229,7 @@ module Update =
             else
                 Uri("https://"+origUrl).ToString()
         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
-            let m = {model with url = url; browserState.state = BST_AwaitAck}
+            let m = {model with url = url; browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
             browserPostUrl m
             m, Cmd.none
         else
@@ -242,24 +239,25 @@ module Update =
         try
             match msg with
             | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
-            | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Started Error
-            | InitializeDevMode -> model, Cmd.OfAsync.either startP2pServer model Browser_Started Error
+            | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Emb_Started Error
+            | InitializeDevMode -> model, Cmd.OfAsync.either startP2pServer model Browser_Emb_Started Error
+            | InitializeExternalBrowser -> {model with browserMode = External {|pid=None|}}, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
 
-            | Browser_Connected c  -> browserPostUrl model; {model with browserState.pid = Some c.pid; browserState.state=BST_AwaitAck}, Cmd.none
-            | Browser_ProcessExited -> model, Cmd.OfAsync.either restartBrowser model Browser_Started Error
-            | Browser_SocketDisconnected -> model, Cmd.none //browser exited signal seems to be stronger so just handle that
-            | Browser_Started None -> model, Cmd.none
-            | Browser_Started (Some bst) ->  {model with browserState = bst}, Cmd.none
-            | Browser_UrlSet url -> {model with browserState.state = BST_Ready}, Cmd.none
+            | Browser_Connected c  -> browserPostUrl model;  {model with browserMode = model.browserMode |>  BrowserMode.setPid c.pid |> BrowserMode.setEmbState BST_AwaitAck}, Cmd.none
+            | Browser_Emb_ProcessExited -> model, Cmd.OfAsync.either restartBrowser model Browser_Emb_Started Error
+            | Browser_Emb_SocketDisconnected -> model, Cmd.none //browser exited signal seems to be stronger so just handle that
+            | Browser_Emb_Started None -> model, Cmd.none
+            | Browser_Emb_Started (Some bst) ->  {model with browserMode = BrowserMode.setEmbAppState bst model.browserMode}, Cmd.none
+            | Browser_Emb_UrlSet url -> {model with browserMode = BrowserMode.setEmbState BST_Ready model.browserMode}, Cmd.none
 
             | TextChat_StartStopTask -> startStopForTextChat model
-            | SetInstructions txt -> {model with instructions=Instructions.setTextChat txt model.instructions}, Cmd.none
+            | SetInstructions txt -> {model with instructions=Instructions.setTextPrompt txt model.instructions}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Submit ->  resumeChat model             
 
-            | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 100}, Cmd.none
+            | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> setUrl model txt
 

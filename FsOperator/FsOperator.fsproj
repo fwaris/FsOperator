@@ -17,15 +17,13 @@
 		<AvaloniaResource Include="Assets\**" />
 		<None Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
+		<Compile Include="Browser.fs" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Compile Include="Model\Chat.fs" />
 		<Compile Include="Model\Instructions.fs" />
 		<Compile Include="Model\Model.fs" />
-		<Compile Include="CUA\Connection.fs" />
-		<Compile Include="CUA\StartPrompts.fs" />
-		<Compile Include="CUA\Browser.fs" />
 		<Compile Include="CUA\Scripts.fs" />
 		<Compile Include="CUA\Preview.fs" />
 		<Compile Include="CUA\Actions.fs" />

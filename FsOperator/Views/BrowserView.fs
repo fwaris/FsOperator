@@ -14,6 +14,8 @@ open FsOpCore
 
 module Cache =
     let nav : Ref<TextBox> = ref Unchecked.defaultof<_>
+    let scrollViewText : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
+    let scrollViewVoice : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
 
 
 [<AbstractClass; Sealed>]

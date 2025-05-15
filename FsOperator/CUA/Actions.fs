@@ -114,7 +114,7 @@ module Actions =
             try
                 do! perform action
             with ex -> 
-                do! Connection.closeConnection()
+                do! Browser.closeConnection()
                 debug $"Error in doAction: %s{ex.Message}"
                 do! Async.Sleep(500)
                 if retryCount < 2 then 

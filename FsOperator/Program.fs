@@ -47,12 +47,13 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) ->                 
-                Async.RunSynchronously(Connection.shutdown(),1000))
+                Async.RunSynchronously(Browser.shutdown(),1000))
         | _ -> ()
 
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
+        System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()

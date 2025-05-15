@@ -236,9 +236,16 @@ let runT (t:Task<'t>) = t.Result
 exception ApiError of ResponseErrorObj
 
 module RUtils =
-    let private shorten (s:string) = if s.Length < 100 then s else s.Substring(0,100)
+    let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
+    let private shorten (s:string) = shortenN s 100
+
+    let trimScreenshot (cco:OutputDetail) =
+        match cco with 
+        | Computer_creenshot i -> Computer_creenshot {|image_url=shortenN i.image_url 20|}
+        | x -> x
     
     let trimImage = function
+        | Computer_call_output cco -> Computer_call_output {cco with output = trimScreenshot cco.output}
         | Image i ->  Image {|image = shorten i.image; annotations=i.annotations|}
         | x -> x
         
