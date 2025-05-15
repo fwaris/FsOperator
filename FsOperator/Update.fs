@@ -10,6 +10,7 @@ open Avalonia.FuncUI.Hosts
 open FsOpCore
 
 module Update =
+
     let subscribeBackground (model:Model) =
         let backgroundEvent dispatch =
             let ctx = new System.Threading.CancellationTokenSource()
@@ -48,7 +49,7 @@ module Update =
         model,Cmd.none
 
     let testSomething_ (model:Model) =
-        let testChat = 
+        let testChat =
             [
                 Assistant {id = "1"; content = Instructions.getTextChat model.instructions}
                 User "The quick brown fox jumped over the lazy dog"
@@ -59,7 +60,7 @@ module Update =
         {model with runState =  Some runState}, Cmd.none
 
 
-    let init _   = 
+    let init _   =
         let url,instructions = StartPrompts.amazon
         //let url,instructions = StartPrompts.netflix
         //let url,instructions = StartPrompts.linkedIn
@@ -74,11 +75,12 @@ module Update =
             action = ""
             statusMsg = None,""
             browserState = BrowserAppState.Create()
+            isFlashing = false
         }        
         model,Cmd.ofMsg Initialize
         //model,Cmd.ofMsg InitializeDevMode
 
-    let shouldClearStatus (inComingDT:DateTime option) messageDT = 
+    let shouldClearStatus (inComingDT:DateTime option) messageDT =
         match inComingDT,messageDT with
         | None, None -> true
         | Some inComingDT, None -> true
@@ -89,7 +91,13 @@ module Update =
         async {
             do! Async.Sleep 10000
             return Some time
-        }    
+        }
+
+    let delayFlash isOn =
+            async {
+                do! Async.Sleep 1000
+                return isOn
+            }
 
     ///start or stop text mode task
     let startStopForTextChat model =
@@ -242,7 +250,8 @@ module Update =
             | ClearLog -> {model with log = []}, Cmd.none
             | SetUrl txt -> let m = {model with url=txt; browserState.state = BST_AwaitAck} in browserPostUrl m; m , Cmd.none
 
-            | SetAction txt -> {model with action=txt}, Cmd.none
+            | SetAction txt -> {model with action=txt}, Cmd.ofMsg (FlashAction true)
+            | FlashAction isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) FlashAction else Cmd.none
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
 

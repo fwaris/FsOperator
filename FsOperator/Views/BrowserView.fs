@@ -58,7 +58,7 @@ type BrowserView =
                                 Grid.column 1
                                 TextBlock.verticalAlignment VerticalAlignment.Center
                                 TextBlock.horizontalAlignment HorizontalAlignment.Stretch
-                                TextBlock.background Brushes.DarkSlateBlue
+                                TextBlock.background (if model.isFlashing then Brushes.DarkOrange else Brushes.DarkSlateBlue)
                                 TextBlock.text model.action
                                 TextBlock.margin (Thickness(1,1,5,1))
                                 TextBlock.padding 3

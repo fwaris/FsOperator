@@ -171,6 +171,7 @@ type Model = {
     action : string
     statusMsg : (DateTime option*string)
     browserState : BrowserAppState
+    isFlashing : bool
 }
 
 type ClientMsg =
@@ -190,6 +191,7 @@ type ClientMsg =
     | ClearLog
     | SetUrl of string
     | SetAction of string
+    | FlashAction of bool
     | StatusMsg_Set of string
     | StatusMsg_Clear of DateTime option
     | TurnEnd
