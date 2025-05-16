@@ -36,12 +36,10 @@ Always confirm with the user first before sending the instructions to the assist
             startUrl="https://www.amazon.com" 
             voicePrompt= defaultVoicePrompt
             textPrompt = """On Amazon, find me an iphone 16 pro max case that has 
-**built in screen protector** and is less than $50 with good rating.
-*make sure the price is less than $50*
-Use the search box to find products. 
+**built in screen protector**. 
+Find me the top rated case regardless of price.
 **Ignore any sign-in pages and continue without signing in**
 I just want to search for products not purchase them yet."""
-
         }
 
 

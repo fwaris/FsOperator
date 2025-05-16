@@ -1,14 +1,14 @@
 # FsOperator
 
-**FsOperator** is an F# sample application that utilizes the OpenAI [responses API](https://platform.openai.com/docs/api-reference/responses) to enable a *computer using agent*.
+**FsOperator** is an F# sample application that utilizes the OpenAI [responses API](https://platform.openai.com/docs/api-reference/responses) to enable a *computer use agent*.
 
-It currently includes a **partial implementation** of the **responses** API, which will likely become the dominant interface over time—combining capabilities from both *chat* and *assistant* APIs.
+It currently includes a *partial implementation* of the **responses** API, which will likely become the dominant interface over time—combining capabilities from both *chat* and *assistant* APIs.
 
 The application uses the new OpenAI [computer_use_preview](https://platform.openai.com/docs/guides/tools-computer-use) generative model as its core. This model operates in an observe-act-observe loop: it visually interprets a browser page and issues commands (*click*, *scroll*, *type*, etc.) to accomplish tasks based on user instructions.
 
-Below is a screenshot demonstrating an Amazon search session to find a specific type of cell phone case:
+Below is a demonstration an Amazon search session to find a specific type of cell phone case:
 
-![screenshot](imgs/cua.png)
+![screenshot](imgs/amazonshop.gif)
 
 ---
 
@@ -21,7 +21,8 @@ Below is a screenshot demonstrating an Amazon search session to find a specific 
 ### 🚀 Application Usage
 
 - Ensure **.NET 9.x runtime** is installed. (May require Chromium components to be installed also)
-- The app has only been tested on **Windows**, but should theoretically work on **macOS** as well (with some modifications).
+- Text chat mode has been tested successfully on Windows and MacOS.
+- *Voice chat mode currently works on Windows only (the WebRTC library for MacOS is yet to be included)*
 - Set the `OPENAI_API_KEY` environment variable to provide your OpenAI API key.
 
 #### Steps:
@@ -30,8 +31,9 @@ Below is a screenshot demonstrating an Amazon search session to find a specific 
 2. **Hit Enter** to navigate. Log in manually if required.
 3. **Input task instructions** in the instructions box.
 4. **Click 'Start Task'** to begin the task.
-5. **Observe computer actions** issued by the model on right end of the addres bar. Any warnings, status or error messages are shown at the bottom. 
-6. **See log messages** by expanding the panel on the right. It shows all API messages tha are sent and received.
+5. **Alternatively, use the voice mode** to directly chat with the OpenAI real-time voice assistant to generate and execute instructions for CUA model.
+6. **Observe computer actions** issued by the model on right end of the address bar. Any warnings, status or error messages are shown at the bottom.
+7. **See log messages** by expanding the panel on the right. It shows all API messages that are sent and received.
 
 > Note: the screen shakes when Puppeteer takes a screenshot. It seems to be coming from Chromium itself - not sure if there is a fix available.
 
@@ -42,7 +44,7 @@ The model may issue **security warnings** that ideally should be acknowledged by
 - You may respond to the message and continue the task further
 - Or cancel the task by clicking **Cancel Task**
 
-> ⚠️ *This is beta code. It has not been fully battle-tested.*
+> ⚠️ *Caveat: This is beta code. It has not been fully battle-tested.*
 
 ---
 
@@ -52,11 +54,11 @@ The model may issue **security warnings** that ideally should be acknowledged by
   - On Windows, this requires **Chromium**.
 - The embedded browser comes from [WebViewControl-Avalonia](https://www.nuget.org/packages/WebViewControl-Avalonia)
 - Internally uses [PuppeteerSharp](https://www.nuget.org/packages/PuppeteerSharp) to drive browser automation and take screenshots.
-  - Note: You may need to install additional Chromium components.
+  - Note: In the code you can switch to the external browser as an option.
 - The UI is built using the versatile [Avalonia.FuncUI](https://github.com/fsprojects/Avalonia.FuncUI), a functional UI framework for Avalonia.
 
 
-Technically, Puppeteer makes a websocket connection to the embedded browser via CDP (Chrome DevTools Protocol). This connection is used to take screenshots to send to the CUA model and also to execute the commands issued by the model.
+Internally, Puppeteer makes a WebSocket connection to the embedded browser via CDP (Chrome DevTools Protocol). This connection is used to take screenshots to send to the CUA model and also to execute the commands issued by the model.
 
 ---
 

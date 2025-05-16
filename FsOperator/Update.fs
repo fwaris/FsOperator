@@ -63,7 +63,7 @@ module Update =
     let init _   =
         //FsResponses.debug_logging <- true
         //let sample = Instructions.sampleNetflix
-        let sample = Instructions.sampleJira
+        let sample = Instructions.sample
         let model = {
             instructions = sample
             runState = None
