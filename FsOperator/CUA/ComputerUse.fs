@@ -63,25 +63,36 @@ module ComputerUse =
                 req |> Bus.postToCua bus
         }
 
+    let toMessages (chatMsgs:ChatMsg list) = 
+        chatMsgs
+        |> List.map (function 
+            | ChatMsg.User m -> {id = None; role="user"; content = [Input_text {| text = m |}]; status = None}
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Output_text {text = m.content; annotations=None}] ; status = None})                
 
-    let sendTextResponse bus (previousId:string option,message:string) =
+    let toChatHistory = function 
+        | CM_Text c -> c.systemMessage, toMessages c.messages
+        | CM_Voice c -> c.chat.systemMessage, toMessages c.chat.messages
+        | CM_Init -> failwith "toChatHistory: CM_Init not supported"
+
+    let sendTextResponse bus (instructions: string option, messages:Message list) =
        async {
-                try
-                    let! imgUrl,(w,h) = Browser.snapshot()                    
-                    let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
-                    let contMsg = Message {id = None; role="user"; content = [Input_text {|text = message|}] ; status = None}
-                    let req = {Request.Default with 
-                                    input = [contMsg]; tools=[tool]
-                                    previous_response_id = previousId
-                                    store = true
-                                    model=Models.computer_use_preview
-                                    truncation = Some Truncation.auto
-                              }
-                    req |> Bus.postToCua bus
-                with ex ->
-                    Log.exn (ex,"Error in sendTextResponse")
+            try
+                let! imgUrl,(w,h) = Browser.snapshot()                    
+                let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
+                //let contMsg = Message {id = None; role="user"; content = [Input_text {|text = message|}] ; status = None}
+                let messages = messages |>  List.map InputOutputItem.Message
+                let req = {Request.Default with 
+                                input = messages; tools=[tool]
+                                previous_response_id = None
+                                instructions = instructions
+                                store = true
+                                model=Models.computer_use_preview
+                                truncation = Some Truncation.auto
+                            }
+                req |> Bus.postToCua bus
+            with ex ->
+                Log.exn (ex,"Error in sendTextResponse")
         }
-
 
     let getResponseIdsAndChecks (runState:RunState) = 
         runState.lastCuaResponse.Value

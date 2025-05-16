@@ -62,7 +62,8 @@ module Update =
 
     let init _   =
         //FsResponses.debug_logging <- true
-        let sample = Instructions.sampleNetflix
+        //let sample = Instructions.sampleNetflix
+        let sample = Instructions.sampleJira
         let model = {
             instructions = sample
             runState = None
@@ -155,17 +156,11 @@ module Update =
         
     ///Either the voice assistant, the reasoning model or the user has submitted a question (i.e. a response)
     ///Send that to the CUA assitant to continue the task
-    let resumeTextChat (model:Model) = 
+    let resumeTextCuaLoop (model:Model) = 
         let question = RunState.question model.runState
-        //last response id is only needed if there was a request for a computer call in the last response (for the computer use agent)
         let model =
             match model.runState with
             | Some rs when rs.chatMode.IsCM_Text -> 
-
-                let prevCuaId = 
-                    RunState.lastResponseComputerCall model.runState
-                    |> Option.bind (fun _ -> RunState.lastCuaResponse model.runState)
-                    |> Option.bind _.previous_response_id
                         
                 let model =
                     {model with 
@@ -175,20 +170,39 @@ module Update =
                             |> RunState.setQuestion ""
                             |> RunState.setState CUA_Loop}
 
-                ComputerUse.sendTextResponse rs.bus (prevCuaId,question) |> Async.Start
+                let chatMode = RunState.chatMode model.runState
+                let history = ComputerUse.toChatHistory chatMode
+                ComputerUse.sendTextResponse rs.bus history |> Async.Start
                 ComputerUse.startCuaLoop model.runState.Value 
                 model
             | _ -> model
         model,Cmd.none   
 
-    let resumeVoiceChat (model:Model) instructions ev =
+    let startOrResumeVoiceCuaLoop (model:Model) instrFromVoiceAsst funcCallId =
         match model.runState with 
         | Some rs when rs.chatMode.IsCM_Voice -> 
-            rs.lastFunctionCallId.Value <- Some ev
-            VoiceAsst.sendVoiceInstructions rs.bus (None,instructions) |> Async.Start
-            ComputerUse.startCuaLoop rs
-        | _ -> ()        
-        {model with runState = RunState.appendVoiceMessage instructions model.runState } , Cmd.none
+            rs.lastFunctionCallId.Value <- Some funcCallId 
+            let prevVoiceState = RunState.chatMode model.runState |> function | CM_Voice v -> v | _ -> failwith "resumeVoiceChat: not a voice chat mode"
+            let voiceState = 
+                match prevVoiceState.chat.messages with 
+                | [] -> {prevVoiceState with chat.systemMessage = Some instrFromVoiceAsst }
+                | msgs -> {prevVoiceState with chat.messages = msgs @ [User instrFromVoiceAsst]}
+            let model =
+                {model with 
+                    runState = 
+                        model.runState 
+                        |> RunState.setMode (CM_Voice voiceState)
+                        |> RunState.setState CUA_Loop}
+
+            match prevVoiceState.chat.messages with 
+            | [] -> ComputerUse.sendStartMessage rs.bus instrFromVoiceAsst |> Async.Start   // for first instruction from voice assistant treat as the instructions to start the CUA loop
+            | _  -> //otherwise resume the chat 
+                let chatMode = RunState.chatMode model.runState
+                let history = ComputerUse.toChatHistory chatMode
+                ComputerUse.sendTextResponse rs.bus history |> Async.Start
+            ComputerUse.startCuaLoop model.runState.Value
+            model,Cmd.none
+        | _ -> model, Cmd.none
         
     let p2pMap = function
         | P2PFromClient.Client_Connected c  -> Browser_Connected {| pid=c.pid |}
@@ -210,7 +224,6 @@ module Update =
             pd.Dispose()
             model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore)           
         pd.Start()
-
 
     let startP2pServer (model:Model) =
         async {
@@ -277,7 +290,7 @@ module Update =
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
-            | Chat_Submit ->  resumeTextChat model             
+            | Chat_Submit ->  resumeTextCuaLoop model             
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
@@ -294,7 +307,7 @@ module Update =
 
             | VoicChat_StartStop -> startStopForVoiceChat model
 
-            | VoiceChat_RunInstructions (instructions,ev) -> resumeVoiceChat model instructions ev
+            | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
             //| _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex 

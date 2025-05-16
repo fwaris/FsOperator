@@ -125,6 +125,7 @@ module RunState =
             | x -> x 
             |> fun chatMode -> {rs with chatMode = chatMode})
 
+    let chatMode = function | Some (rs:RunState) -> rs.chatMode | _ -> CM_Init
     let setMode mode (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with chatMode=mode})
     let setState state (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with cuaState=state})
     let lastFunctionCallId (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastFunctionCallId.Value)

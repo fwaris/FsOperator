@@ -1,8 +1,9 @@
 {
   "profiles": {
-    "FsOperator": {
-      "commandName": "Project",
-      "nativeDebugging": true
+    "DotnetDll": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+      "commandLineArgs": "$(TargetPath)"
     }
   }
 }

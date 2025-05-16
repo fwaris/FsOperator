@@ -73,13 +73,6 @@ module VoiceAsst =
                 RTOpenAI.Api.Log.error $"Error in runInstructions: {ex.Message}"
         }        
 
-    let sendVoiceInstructions bus (prevResponseId:string option,instructions:string) =
-        async {
-            match prevResponseId with 
-            | None -> do! ComputerUse.sendStartMessage bus instructions
-            | Some _ -> do! ComputerUse.sendTextResponse bus (prevResponseId, instructions)
-        }
-
 module VoiceMachine =    
     let ASST_INSTRUCTIONS_FUNCTION = "assistantInstructions"
     let M_AUDIO = "audio"
