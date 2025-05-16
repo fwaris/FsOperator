@@ -98,12 +98,12 @@ module VoiceMachine =
     let ssInit = State.Default          //initial state for server event handling
         
     //take an existing session and 'update' it to new settings       
-    let reconfigure (s:Session) =
+    let reconfigure instructions (s:Session) =
         { s with
             id = None                               //*** set 'id' and 'object' to None when updating an existing session
             object = None   
                                                     // set, unset, or override other fields as needed 
-            instructions = Some VoicePrompts.rtInstructions
+            instructions = instructions
             tool_choice = Some "auto"
             tools = [
                 {
@@ -126,9 +126,9 @@ module VoiceMachine =
             session = s}
         |> SessionUpdate
             
-    let sendUpdateSession conn session =
+    let sendUpdateSession instructions conn session =
         session
-        |> reconfigure
+        |> reconfigure instructions
         |> toUpdateEvent
         |> Api.Connection.sendClientEvent conn
             
@@ -154,10 +154,11 @@ module VoiceMachine =
     let update (runState:RunState) conn (st:State) ev =
         async {
             match ev with
-            | SessionCreated s when not st.initialized ->  sendUpdateSession conn s.session; return {st with initialized = true} 
+            | SessionCreated s when not st.initialized ->  sendUpdateSession (Some(RunState.voiceAsstInstructions (Some runState))) conn s.session; return {st with initialized = true} 
             | SessionCreated s -> return {st with currentSession = s.session }
             | SessionUpdated s -> VoiceAsst.sendInitResp conn; return {st with currentSession = s.session }
             | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
+                Log.info $"<-- function call {ev.item.name}"
                 if runState.lastFunctionCallId.Value.IsSome then 
                     debug $"Ignoring function call {ev.item.name} as we are already processing a function call"
                 else
@@ -191,14 +192,18 @@ module VoiceMachine =
     let startVoiceMachine (runState:RunState) =
         async {
             match runState.chatMode with
-            | CM_Voice v when v.connection.IsSome  -> 
-                let conn = v.connection.Value
+            | CM_Voice v when v.connection.Value.IsSome && v.connection.Value.Value.WebRtcClient.State.IsConnected  -> return()
+            | CM_Voice v ->
+                match v.connection.Value with
+                | Some x -> RTOpenAI.Api.Connection.close x
+                | None -> ()
+                let conn = RTOpenAI.Api.Connection.create()
                 let keyReq = {Api.Exts.KeyReq.Default with model = C.OPENAI_RT_MODEL_GPT4O}
                 let! ephemeralKey = Api.Exts.getOpenAIEphemKey (getApiKey()) keyReq |> Async.AwaitTask
                 do! RTOpenAI.Api.Connection.connect ephemeralKey conn |> Async.AwaitTask
                 startReader runState conn
+                v.connection .Value <- Some conn
                 return ()
-            | CM_Voice _  -> Abort(None,"Voice connection not set") |> Bus.postMessage runState.bus
             | x -> Bus.postLog runState.bus $"Chat mode not supported {x}"
             return ()
         }
@@ -206,8 +211,9 @@ module VoiceMachine =
     let stopVoiceMachine (runState:RunState) =
         async {
             match runState.chatMode with
-            | CM_Voice v when v.connection.IsSome -> 
-                RTOpenAI.Api.Connection.close v.connection.Value
+            | CM_Voice v when v.connection.Value.IsSome -> 
+                RTOpenAI.Api.Connection.close v.connection.Value.Value
+                v.connection.Value <- None
                 return ()
             | CM_Voice _ -> Abort(None,"Voice connection not set") |> Bus.postMessage runState.bus
             | x -> Bus.postLog runState.bus $"Chat mode not supported {x}"

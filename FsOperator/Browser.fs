@@ -130,6 +130,7 @@ module Browser =
             let! browser = connection() 
             let! pages = browser.PagesAsync() |> Async.AwaitTask     
             let page = pages |> Seq.toList |> Seq.head
+            do! page.BringToFrontAsync() |> Async.AwaitTask
             //for f in page.Frames do 
             //    debug $"frame: {f.Url} isMain {page.MainFrame.Url = f.Url}"
             //debug "----"

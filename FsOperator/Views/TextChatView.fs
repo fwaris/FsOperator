@@ -46,12 +46,15 @@ type TextChatView =
                             TextBox.textAlignment TextAlignment.Left
                             TextBox.background Brushes.Transparent
                             TextBox.borderThickness 2.
-                            TextBox.margin (Thickness(leftMargin,20.,2.,37.))
+                            TextBox.margin (Thickness(leftMargin,40.,2.,2.))
                             TextBox.fontSize 14.
                             TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (BrowserMode.isReady model.browserMode  && (csMode.IsCM_Init || csMode.IsCM_Text))
+                            Button.isEnabled (BrowserMode.isReady model.browserMode  
+                                              && (csMode.IsCM_Init 
+                                                  || csMode.IsCM_Text
+                                                  || csState.IsCUA_Init))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
@@ -107,7 +110,12 @@ type TextChatView =
                         ScrollViewer.create [
                             ScrollViewer.init(fun s -> Cache.scrollViewText.Value <- s)
                             ScrollViewer.verticalScrollBarVisibility Primitives.ScrollBarVisibility.Auto
-                            ScrollViewer.content (ChatHistoryView.chatHistory leftMargin model dispatch)                            
+                            ScrollViewer.content (
+                                ChatHistoryView.chatHistory 
+                                    leftMargin 
+                                    model 
+                                    (RunState.textChatMessages model.runState)
+                                    dispatch)                            
                         ]
                     ]
                 ]

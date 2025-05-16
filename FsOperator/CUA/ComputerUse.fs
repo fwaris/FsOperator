@@ -24,7 +24,7 @@ module ComputerUse =
                     return raise ex
         }
   
-    let startMessaging (token,bus) =
+    let startApiMessaging (token,bus) =
         let sendLoop =             
             bus.toCua.Reader.ReadAllAsync(token)
             |> AsyncSeq.ofAsyncEnum
@@ -127,7 +127,7 @@ module ComputerUse =
         }
 
                         
-    let loop (runState:RunState) = 
+    let startCuaLoop (runState:RunState) = 
         let rec loop retryCount = 
             async {  
                 try 
@@ -141,9 +141,9 @@ module ComputerUse =
                                 hasComputerCall <- true
                                 cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning runState.bus
                                 cb.action |> Actions.actionToString |> Bus.postAction runState.bus
-                                do! Async.Sleep 100
+                                //do! Async.Sleep 100
                                 do! Actions.doAction 2 cb.action 
-                                do! Async.Sleep 1000
+                                //do! Async.Sleep 1000
                                 do! computerCallResponse runState
                             | Message m -> 
                                 let outputText = RUtils.outputText response

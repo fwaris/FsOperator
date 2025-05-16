@@ -6,9 +6,15 @@ open System.Net.Sockets
 
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
+type VoiceChatState = {
+    connection: Ref<RTOpenAI.Api.Connection option>
+    chat : Chat 
+    voiceAsstInstructions : string
+}
+
 type ChatMode = 
     | CM_Text of Chat
-    | CM_Voice of {| connection: RTOpenAI.Api.Connection option; chat : Chat |}
+    | CM_Voice of VoiceChatState
     | CM_Init
 
 type Bus = {
@@ -100,7 +106,6 @@ module BrowserMode =
 
 //convenice functions to manage RunState
 module RunState =
-    
 
     let appendChatMsg msg (runState:RunState option) =
         runState
@@ -108,7 +113,7 @@ module RunState =
             let chatMode = 
                 match runState.chatMode with
                 | CM_Text msgs -> CM_Text (Chat.append msg msgs)
-                | CM_Voice v -> CM_Voice {|v with chat = Chat.append msg v.chat |}
+                | CM_Voice v -> CM_Voice {v with chat = Chat.append msg v.chat }
                 | CM_Init -> CM_Init
             {runState with chatMode = chatMode})
 
@@ -116,7 +121,7 @@ module RunState =
         rs 
         |> Option.map (fun rs ->
             match rs.chatMode with 
-            | CM_Voice v -> CM_Voice {|v with connection = conn|}
+            | CM_Voice v -> CM_Voice {v with connection = conn}
             | x -> x 
             |> fun chatMode -> {rs with chatMode = chatMode})
 
@@ -135,7 +140,24 @@ module RunState =
             | CM_Voice v -> v.chat.messages 
             | CM_Init -> [])
         |> Option.defaultValue []
-        
+
+    let textChatMessages (runState:RunState option)  = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Text c -> Some c.messages
+            | _ -> None)
+        |> Option.defaultValue []
+
+    let voiceChatMessages (runState:RunState option)  = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Voice v -> Some v.chat.messages
+            | _ -> None)
+        |> Option.defaultValue []
+
+
     let lastAssistantMessage (runState:RunState option)  = 
         runState
         |> messages
@@ -144,9 +166,9 @@ module RunState =
         
     let voiceConnection (runState:RunState option)  = 
         runState 
-        |> Option.map (fun rs -> 
+        |> Option.bind (fun rs -> 
             match rs.chatMode with
-            | CM_Voice v when v.connection.IsSome -> v.connection.Value
+            | CM_Voice v when v.connection.Value.IsSome  -> v.connection.Value
             | CM_Voice v -> failwith "no voice connection set"
             | _ -> failwith "not a voice connection")
 
@@ -159,19 +181,58 @@ module RunState =
     let initForVoice mailbox instructions = 
         {RunState.Create mailbox instructions with             
             chatMode = CM_Voice 
-                        {|
-                         connection = RTOpenAI.Api.Connection.create() |> Some
-                         chat = Chat.Default                         
-                        |}
+                        {
+                         connection = ref (RTOpenAI.Api.Connection.create() |> Some)
+                         chat = Chat.Default
+                         voiceAsstInstructions = instructions.voicePrompt
+                        }
         }
+    
+    let voiceAsstInstructions (runState:RunState option) = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Voice v -> Some v.voiceAsstInstructions
+            | _ -> None)
+        |> Option.defaultValue ""
 
-    let voiceInstructions (runState:RunState option) = 
+    let setVoiceAsstInstructions text (runState:RunState option) = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Voice v -> 
+                let mode = CM_Voice {v with voiceAsstInstructions = text}
+                Some {rs with chatMode = mode}
+            | _ -> None)
+
+    let voiceSysMsg (runState:RunState option) = 
         runState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Voice v -> v.chat.systemMessage
             | _ -> None)
         |> Option.defaultValue ""
+
+    let setVoiceSysMsg text (runState:RunState option) = 
+        runState 
+        |> Option.bind (fun rs -> 
+            match rs.chatMode with
+            | CM_Voice v -> 
+                let mode = CM_Voice {v with chat = Chat.setSystemMessage text v.chat}
+                Some {rs with chatMode = mode}
+            | _ -> None)                
+
+    let appendVoiceMessage text (runState:RunState option) =
+        match runState with 
+        | Some rs -> 
+            match rs.chatMode with 
+            | CM_Voice v -> 
+                if v.chat.systemMessage.IsNone then 
+                   Some {rs with chatMode = CM_Voice {v with chat.systemMessage = Some text}}
+                else 
+                    RunState.appendChatMsg (User text) runState 
+            | _ -> runState
+        | None -> None
 
     let lastResponseComputerCall (runState:RunState option) = 
         runState 

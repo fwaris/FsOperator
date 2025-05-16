@@ -37,23 +37,27 @@ type VoiceChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         TextBlock.create [
-                            TextBlock.text (RunState.voiceInstructions model.runState)
+                            TextBlock.text (RunState.voiceSysMsg model.runState)
                             TextBlock.textWrapping TextWrapping.Wrap
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Stretch
                             TextBlock.multiline true
                             TextBlock.textAlignment TextAlignment.Left
                             TextBlock.background Brushes.Transparent
-                            TextBlock.margin (Thickness(leftMargin,30.,2.,37.))
+                            TextBlock.margin (Thickness(leftMargin,40.,2.,2.))
                             TextBlock.fontSize 14.
                         ]
                         Button.create [
-                            Button.isEnabled (BrowserMode.isReady model.browserMode  && (csMode.IsCM_Init || csMode.IsCM_Voice))
+                            Button.isEnabled (BrowserMode.isReady model.browserMode  
+                                              && (csMode.IsCM_Init 
+                                                  || csMode.IsCM_Voice
+                                                  || csState.IsCUA_Init))
                             Button.margin (Thickness(0.,0.,1.,2.))
+                            Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
-                            Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
+                            Button.onClick (fun _ -> dispatch VoicChat_StartStop) 
                             Button.horizontalAlignment HorizontalAlignment.Right
-                            Button.verticalAlignment VerticalAlignment.Bottom
+                            Button.verticalAlignment VerticalAlignment.Top
                         ]
                     ]
                 ]
@@ -63,7 +67,12 @@ type VoiceChatView =
                         Cache.scrollViewVoice.Value <- s
                         s.SizeChanged.Add(fun x -> s.ScrollToEnd()))
                     ScrollViewer.verticalScrollBarVisibility Primitives.ScrollBarVisibility.Auto
-                    ScrollViewer.content (ChatHistoryView.chatHistory leftMargin model dispatch)                            
+                    ScrollViewer.content (
+                        ChatHistoryView.chatHistory 
+                            leftMargin 
+                            model 
+                            (RunState.voiceChatMessages model.runState)
+                            dispatch)                            
                 ]
                 GridSplitter.create [
                     Grid.row 1

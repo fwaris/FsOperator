@@ -1,13 +1,5 @@
 ﻿namespace FsOperator
 
-type InstructionType =
-    ///Starting instructions for the CUA model for the text chat mode.
-    | TextChat
-
-    ///Instructions for the voice assistant. It is the voice assistant that generates the CUA instructions after conversing with the user.
-    | VoiceChat
-
-
 type Instructions = {
     id : string
     description : string
@@ -29,11 +21,13 @@ module Instructions =
 
     let private defaultVoicePrompt = """
 You are to collaborate with a user to help complete a task.
-The task is performed by a separate 'assistant'. 
+The task is actually performed by a separate 'assistant'. 
+The assistant has the capability to perform computer actions if instructed.
 You job is to converse with the human user to generate and sumbit the instructions to the assistant.
 The assistant will carry out the task and return with a response - which may be a question or a clarification.
 Again, converse with the user before generating the next instruction for the assistant.
-Always confirm with the user first before sending the instructions to the assistant."""
+Always confirm with the user first before sending the instructions to the assistant.
+"""
 
     let sample  = 
         {

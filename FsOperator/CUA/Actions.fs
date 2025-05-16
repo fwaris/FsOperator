@@ -107,6 +107,7 @@ module Actions =
                 //do! page.Mouse.ClickAsync(s.x,s.y, ClickOptions(Count=1)) |> Async.AwaitTask
 //                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y, delay=500) |> Async.AwaitTask
                 debug $"done drag"
+            do! page.WaitForNetworkIdleAsync() |> Async.AwaitTask
         }
 
     let rec doAction retryCount (action:Action) = 
