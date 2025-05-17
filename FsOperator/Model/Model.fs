@@ -43,7 +43,7 @@ type RunState = {
     lastCuaResponse : Ref<FsResponses.Response option>
     question : string
     tokenSource : System.Threading.CancellationTokenSource
-    instructions : Instructions
+    instructions : OpTask
     cuaState : CUAState
     chatMode : ChatMode
     lastFunctionCallId : Ref<string option> 
@@ -185,7 +185,7 @@ module RunState =
                         {
                          connection = ref (RTOpenAI.Api.Connection.create() |> Some)
                          chat = Chat.Default
-                         voiceAsstInstructions = instructions.voicePrompt
+                         voiceAsstInstructions = instructions.voiceAsstInstructions
                         }
         }
     
@@ -265,7 +265,7 @@ with static member Default = {
 
 type Model = {
     runState : RunState option
-    instructions: Instructions
+    opTask: OpTask
     mailbox : Channel<ClientMsg>
     log : string list
     url : string
@@ -289,7 +289,8 @@ type ClientMsg =
     | Browser_Emb_UrlSet of string
     | Error of exn
 
-    | SetInstructions of string
+    | SetTextPrompt of string
+    | SetOpTask of OpTask
     | AppendLog of string
     | ClearLog
     | SetUrl of string

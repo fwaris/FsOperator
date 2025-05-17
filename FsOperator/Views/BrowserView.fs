@@ -16,7 +16,8 @@ module Cache =
     let nav : Ref<TextBox> = ref Unchecked.defaultof<_>
     let scrollViewText : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
     let scrollViewVoice : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
-
+    let splitView : Ref<SplitView> = ref Unchecked.defaultof<_>
+    let instrEdits : Ref<TextBox> list = [for _ in 1 .. 5 -> (ref Unchecked.defaultof<_>)]
 
 [<AbstractClass; Sealed>]
 type BrowserView =

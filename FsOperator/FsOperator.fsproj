@@ -22,7 +22,7 @@
 
 	<ItemGroup>
 		<Compile Include="Model\Chat.fs" />
-		<Compile Include="Model\Instructions.fs" />
+		<Compile Include="Model\OpTask.fs" />
 		<Compile Include="Model\Model.fs" />
 		<Compile Include="CUA\Scripts.fs" />
 		<Compile Include="CUA\Preview.fs" />

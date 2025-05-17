@@ -43,6 +43,173 @@ type MainView =
             )
         ]                            
 
+    static member instructionEdit model dispatch = 
+        let cache = Cache.instrEdits
+        Grid.create [
+            Grid.rowDefinitions "*,*,*,*,*,*"
+            Grid.columnDefinitions "100,*"
+            Grid.maxWidth 400.
+            Grid.maxHeight 700.
+            Grid.children [
+                TextBlock.create [                    
+                    Grid.row 0
+                    Grid.column 0
+                    TextBlock.text "Id"
+                    Control.horizontalAlignment HorizontalAlignment.Right
+                    Control.verticalAlignment VerticalAlignment.Center
+                    Control.margin 2
+                ]
+                TextBox.create [
+                    TextBox.init (fun x -> cache.[0].Value <- x)
+                    Grid.row 0
+                    Grid.column 1
+                    Control.margin 2
+                    TextBox.text model.opTask.id
+                ]
+                TextBlock.create [
+                    Grid.row 1
+                    Grid.column 0
+                    TextBlock.text "Description"
+                    Control.margin 2
+                    Control.verticalAlignment VerticalAlignment.Center
+                    Control.horizontalAlignment HorizontalAlignment.Right
+                ]
+                TextBox.create [
+                    TextBox.init (fun x -> cache.[1].Value <- x)
+                    Grid.row 1
+                    Grid.column 1
+                    TextBox.text model.opTask.description
+                    Control.margin 2
+                ]
+                TextBlock.create [
+                    Grid.row 2
+                    Grid.column 0
+                    TextBlock.text "Start URL"
+                    Control.verticalAlignment VerticalAlignment.Center
+                    Control.horizontalAlignment HorizontalAlignment.Right
+                    Control.margin 2
+                ]
+                TextBox.create [
+                    TextBox.init (fun x -> cache.[2].Value <- x)
+                    Grid.row 2
+                    Grid.column 1
+                    Control.margin 2
+                    TextBox.text model.opTask.url
+                ]
+                TextBlock.create [
+                    Grid.row 3
+                    Grid.column 0
+                    TextBlock.text "Text Prompt"                    
+                    Control.margin 2
+                    Control.horizontalAlignment HorizontalAlignment.Right
+                ]
+                TextBox.create [
+                    TextBox.init (fun x -> cache.[3].Value <- x)
+                    Grid.row 3
+                    Grid.column 1
+                    Control.margin 2
+                    TextBox.acceptsReturn true
+                    TextBox.multiline true
+                    TextBox.text model.opTask.textModeInstructions
+                ]
+                TextBlock.create [
+                    Grid.row 4
+                    Grid.column 0
+                    TextBlock.text "Voice Prompt"
+                    Control.margin 2
+                    Control.horizontalAlignment HorizontalAlignment.Right
+                ]
+                TextBox.create [
+                    TextBox.init (fun x -> cache.[4].Value <- x)
+                    Grid.row 4
+                    Grid.column 1
+                    Control.margin 2
+                    TextBox.text model.opTask.voiceAsstInstructions
+                    TextBox.acceptsReturn true
+                    TextBox.multiline true
+                ]
+                Button.create [
+                    Grid.row 5
+                    Grid.column 0
+                    Grid.columnSpan 2
+                    Control.margin 2
+                    Button.content "Apply"
+                    Button.onClick (fun _ -> 
+                        let id = cache.[0].Value.Text
+                        let description = cache.[1].Value.Text
+                        let startUrl = cache.[2].Value.Text
+                        let textPrompt = cache.[3].Value.Text
+                        let voicePrompt = cache.[4].Value.Text
+                        dispatch (SetOpTask { id = id; description = description; url = startUrl; textModeInstructions = textPrompt; voiceAsstInstructions = voicePrompt })
+                    )
+                ]
+            ]
+        ]
+    
+    static member mainMenu model dispatch = 
+            Menu.create [
+                Menu.horizontalAlignment HorizontalAlignment.Right
+                Menu.verticalAlignment VerticalAlignment.Top
+                Menu.margin 2.
+                Menu.viewItems [
+                    MenuItem.create [                           
+                        MenuItem.header "☰"
+                        MenuItem.viewItems [
+                            Menu.create [
+                                MenuItem.viewItems [
+                                    MenuItem.create [
+                                        MenuItem.header "Load Task"
+                                        ///MenuItem.onClick (fun _ -> "#e74c3c" |> SetColor |> dispatch)
+                                    ]
+                                    MenuItem.create [
+                                        MenuItem.header "Save Task"
+                                        ///MenuItem.onClick (fun _ -> "#e74c3c" |> SetColor |> dispatch)
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ] 
+                ]
+            ]                         
+
+    static member toolBar model dispatch = 
+        StackPanel.create [
+            StackPanel.margin 2
+            StackPanel.background Brushes.DarkBlue
+            StackPanel.orientation Orientation.Horizontal
+            StackPanel.horizontalAlignment HorizontalAlignment.Right
+            StackPanel.verticalAlignment VerticalAlignment.Top
+            StackPanel.children [
+                Button.create [
+                    Button.content "\u270f"
+                    Button.tip "Edit Instruction"
+                    Button.background Brushes.Transparent
+                    Button.flyout(
+                        Flyout.create [
+                            Flyout.placement PlacementMode.LeftEdgeAlignedTop
+                            Flyout.showMode FlyoutShowMode.Standard
+                            Flyout.content (MainView.instructionEdit model dispatch)
+                        ]
+                    )
+                ]
+                MainView.mainMenu model dispatch
+            ]
+        ]
+
+    static member contentWrapper model dispatch =
+        let leftMargin = 10.
+        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+       
+        Panel.create [
+            Grid.row 1
+            Panel.horizontalAlignment HorizontalAlignment.Stretch
+            Panel.verticalAlignment VerticalAlignment.Stretch
+            Panel.children [
+                ChatView.chat model dispatch
+                MainView.toolBar model dispatch
+            ]
+        ]    
 
     static member main model dispatch =
         DockPanel.create [               
@@ -80,7 +247,7 @@ type MainView =
                     Grid.clipToBounds true
                     Grid.children [
                         BrowserView.navigationBar model dispatch
-                        ChatView.chatWrapper model dispatch
+                        MainView.contentWrapper model dispatch
                     ]
                 ]               
             ]

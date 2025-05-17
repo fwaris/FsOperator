@@ -51,11 +51,11 @@ module Update =
     let testSomething_ (model:Model) =
         let testChat =
             [
-                Assistant {id = "1"; content = model.instructions.textPrompt}
+                Assistant {id = "1"; content = model.opTask.textModeInstructions}
                 User "The quick brown fox jumped over the lazy dog"
                 Assistant {id = "2"; content = "How can I help you?"}
             ]
-        let runState = RunState.Create model.mailbox model.instructions
+        let runState = RunState.Create model.mailbox model.opTask
         let runState = {runState with chatMode = CM_Text {Chat.Default with messages=testChat} ; cuaState = CUAState.CUA_Pause}
         {model with runState =  Some runState}, Cmd.none
 
@@ -63,13 +63,13 @@ module Update =
     let init _   =
         //FsResponses.debug_logging <- true
         //let sample = Instructions.sampleNetflix
-        let sample = Instructions.sample
+        let sample = OpTask.sample
         let model = {
-            instructions = sample
+            opTask = sample
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
-            url = sample.startUrl
+            url = sample.url
             action = ""
             statusMsg = None,""
             browserMode = Embedded (BrowserAppState.Create())
@@ -100,9 +100,9 @@ module Update =
             }
 
     let startTextLoop model = 
-        let runState = {RunState.initForText model.mailbox model.instructions with cuaState = CUA_Loop}
+        let runState = {RunState.initForText model.mailbox model.opTask with cuaState = CUA_Loop}
         ComputerUse.startApiMessaging (runState.tokenSource.Token,runState.bus)
-        ComputerUse.sendStartMessage runState.bus (model.instructions.textPrompt) |> Async.Start
+        ComputerUse.sendStartMessage runState.bus (model.opTask.textModeInstructions) |> Async.Start
         ComputerUse.startCuaLoop runState 
         {model with runState =  Some runState}, Cmd.none
 
@@ -118,7 +118,7 @@ module Update =
         | _ -> model, Cmd.none //ignore any other state
 
     let startVoiceLoop model = 
-        let runState = {RunState.initForVoice model.mailbox model.instructions with cuaState = CUA_Loop}
+        let runState = {RunState.initForVoice model.mailbox model.opTask with cuaState = CUA_Loop}
         ComputerUse.startApiMessaging (runState.tokenSource.Token, runState.bus)
         VoiceMachine.startVoiceMachine runState |> Async.Start
         {model with runState =  Some runState}, Cmd.none
@@ -287,11 +287,13 @@ module Update =
             | Browser_Emb_UrlSet url -> {model with browserMode = BrowserMode.setEmbState BST_Ready model.browserMode}, Cmd.none
 
             | TextChat_StartStopTask -> startStopForTextChat model
-            | SetInstructions txt -> {model with instructions=Instructions.setTextPrompt txt model.instructions}, Cmd.none
+            | SetTextPrompt txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.none
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Submit ->  resumeTextCuaLoop model             
+
+            | SetOpTask instr -> {model with opTask=instr}, Cmd.none
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none

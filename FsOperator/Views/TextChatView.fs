@@ -37,7 +37,7 @@ type TextChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         TextBox.create [
-                            TextBox.text (model.instructions.textPrompt)
+                            TextBox.text (model.opTask.textModeInstructions)
                             TextBox.textWrapping TextWrapping.Wrap
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                             TextBox.verticalAlignment VerticalAlignment.Stretch
@@ -48,7 +48,7 @@ type TextChatView =
                             TextBox.borderThickness 2.
                             TextBox.margin (Thickness(leftMargin,40.,2.,2.))
                             TextBox.fontSize 14.
-                            TextBox.onTextChanged (fun t -> dispatch (SetInstructions t))
+                            TextBox.onTextChanged (fun t -> dispatch (SetTextPrompt t))
                         ]
                         Button.create [
                             Button.isEnabled (BrowserMode.isReady model.browserMode  

@@ -29,10 +29,10 @@ type VoiceChatView =
                     Grid.row 0
                     Panel.children [
                         TextBlock.create  [                            
-                            TextBlock.text "Generated Instructions"
+                            TextBlock.text "Voice Asst. Generated Instructions"
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Top
-                            TextBlock.fontSize 10.
+                            TextBlock.fontSize 11.
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]

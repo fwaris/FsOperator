@@ -1,23 +1,23 @@
 ﻿namespace FsOperator
 
-type Instructions = {
+type OpTask = {
     id : string
     description : string
 
     ///The browser will open to this page when the instructions are loaded. 
     //The user may log in or perform other set up before starting the task (in either text or voice mode).
-    startUrl : string
+    url : string
 
-    ///List of instructions - one per instruction type (if there are multiple of the same type the first one is used)
-    textPrompt : string 
-    voicePrompt : string 
+    //instructions to be used in text mode 
+    textModeInstructions : string 
+    voiceAsstInstructions : string 
 
     //guardrails : string option //to be added later
 }
 
-module Instructions =
-    let setTextPrompt text instructions = {instructions with textPrompt = text}
-    let setVoicePrompt text instructions = {instructions with voicePrompt = text}
+module OpTask =
+    let setTextPrompt text opTask = {opTask with textModeInstructions = text}
+    let setVoicePrompt text opTask = {opTask with voiceAsstInstructions = text}
 
     let private defaultVoicePrompt = """
 You are to collaborate with a user to help complete a task.
@@ -33,9 +33,9 @@ Always confirm with the user first before sending the instructions to the assist
         {
             id="amazon"
             description="look for a cell phone case"
-            startUrl="https://www.amazon.com" 
-            voicePrompt= defaultVoicePrompt
-            textPrompt = """On Amazon, find me an iphone 16 pro max case that has 
+            url="https://www.amazon.com" 
+            voiceAsstInstructions= defaultVoicePrompt
+            textModeInstructions = """On Amazon, find me an iphone 16 pro max case that has 
 **built in screen protector**. 
 Find me the top rated case regardless of price.
 **Ignore any sign-in pages and continue without signing in**
@@ -47,19 +47,19 @@ I just want to search for products not purchase them yet."""
         {
             id="netflix"
             description="scifi movies"
-            startUrl="https://www.netflix.com" 
-            voicePrompt=defaultVoicePrompt
-            textPrompt = """On netflix.com search for well rate scifi movies 
+            url="https://www.netflix.com" 
+            voiceAsstInstructions=defaultVoicePrompt
+            textModeInstructions = """On netflix.com search for well rated scifi movies 
 and give me a list."""
         }
 
     let sampleTwitter  = 
         {
             id="twitter"
-            description="scifi movies"
-            startUrl="https://twitter.com" 
-            voicePrompt=defaultVoicePrompt
-            textPrompt = """on twitter find out if anyone has posted about 
+            description="summarize recent gen ai posts"
+            url="https://twitter.com" 
+            voiceAsstInstructions=defaultVoicePrompt
+            textModeInstructions = """on twitter find out if anyone has posted about 
 generative AI in the recent past and 
 summarize the postings"""
         }
@@ -68,8 +68,8 @@ summarize the postings"""
         {
             id="linkedin"
             description="summarize latest posts"
-            startUrl="https://linkedin.com" 
-            voicePrompt=defaultVoicePrompt
-            textPrompt = """Summarize what my connections have posted today
+            url="https://linkedin.com" 
+            voiceAsstInstructions=defaultVoicePrompt
+            textModeInstructions = """Summarize what my connections have posted today
 on LinkedIn."""
         }

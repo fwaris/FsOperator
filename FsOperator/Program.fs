@@ -1,5 +1,5 @@
 ﻿namespace FsOperator
-
+open FsOpCore
 open Elmish
 open Avalonia
 open Avalonia.Controls.ApplicationLifetimes
@@ -18,9 +18,9 @@ type MainWindow() as this =
     inherit HostWindow()
 
     do
-        base.Title <- "Computer Use Agent"
-        base.Width <- 800.0
-        base.Height <- 400.0
+        base.Title <- C.WIN_TITLE
+        base.Width <- 400.0
+        base.Height <- 600.0
 
         Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
