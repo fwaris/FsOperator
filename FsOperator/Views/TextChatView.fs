@@ -48,7 +48,7 @@ type TextChatView =
                             TextBox.borderThickness 2.
                             TextBox.margin (Thickness(leftMargin,40.,2.,2.))
                             TextBox.fontSize 14.
-                            TextBox.onTextChanged (fun t -> dispatch (SetTextPrompt t))
+                            TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))
                         ]
                         Button.create [
                             Button.isEnabled (BrowserMode.isReady model.browserMode  
@@ -100,7 +100,7 @@ type TextChatView =
                                     Button.create [
                                         Button.margin (Thickness(0.,0.,1.,2.))
                                         Button.content "\u27a1"
-                                        Button.onClick (fun _ -> dispatch Chat_Submit) 
+                                        Button.onClick (fun _ -> dispatch Chat_Resume) 
                                         Button.horizontalAlignment HorizontalAlignment.Right
                                         Button.verticalAlignment VerticalAlignment.Bottom
                                     ]

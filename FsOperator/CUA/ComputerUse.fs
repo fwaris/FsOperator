@@ -112,8 +112,8 @@ module ComputerUse =
             let! page = Browser.page()
             match getResponseIdsAndChecks runState with
             | None -> 
-                runState.bus.mailbox.Writer.TryWrite(AppendLog "turn end") |> ignore
-                runState.bus.mailbox.Writer.TryWrite(TurnEnd) |> ignore
+                runState.bus.mailbox.Writer.TryWrite(Log_Append "turn end") |> ignore
+                runState.bus.mailbox.Writer.TryWrite(Chat_CUATurnEnd) |> ignore
                 return ()
             | Some (prevId, lastCallId, safetyChecks) -> 
                 let! imgUrl,(w,h) = Browser.snapshot()
@@ -165,7 +165,7 @@ module ComputerUse =
                             if hasComputerCall then 
                                 return! loop 0
                             else
-                                TurnEnd |> Bus.postMessage runState.bus
+                                Chat_CUATurnEnd |> Bus.postMessage runState.bus
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
                     do! Browser.closeConnection()

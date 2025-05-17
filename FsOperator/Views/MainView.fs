@@ -148,8 +148,9 @@ type MainView =
                               textModeInstructions = textPrompt
                               voiceAsstInstructions = voicePrompt 
                             }
-                            |> UpdateOpTask
+                            |> OpTask_Update
                             |> dispatch
+                            dispatch (StatusMsg_Set $"Task `{id}` updated")
                         | None -> dispatch (StatusMsg_Set $"Invalid URL Please enter a valid URL")
                         )
                 ]

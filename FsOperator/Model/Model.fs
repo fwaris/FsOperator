@@ -31,8 +31,8 @@ with static member Create mailbox =
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
-    let postLog bus msg =  postMessage bus (ClientMsg.AppendLog msg) 
-    let postAction bus action = postMessage bus (SetAction action) 
+    let postLog bus msg =  postMessage bus (ClientMsg.Log_Append msg) 
+    let postAction bus action = postMessage bus (Action_Set action) 
     let postWarning bus warning = postMessage bus (StatusMsg_Set warning)
     let postToCua bus req = bus.toCua.Writer.TryWrite(req) |> ignore
 
@@ -279,34 +279,40 @@ type ClientMsg =
     | Initialize
     | InitializeDevMode
     | InitializeExternalBrowser
-    | TextChat_StartStopTask
 
     | Browser_Connected of {|pid:int|}
     | Browser_Emb_Started of BrowserAppState option
     | Browser_Emb_SocketDisconnected 
     | Browser_Emb_ProcessExited
     | Browser_Emb_UrlSet of string
-    | Error of exn
-    | MarkDirty of bool
 
-    | SetTextPrompt of string
-    | UpdateOpTask of OpTask
-    | AppendLog of string
-    | ClearLog
-    | SetUrl of string
-    | SetAction of string
-    | FlashAction of bool
+    | OpTask_SetTextInstructions of string
+    | OpTask_Update of OpTask
+    | OpTask_SetUrl of string
+    | OpTask_MarkDirty of bool
+    | OpTask_Load
+    | OpTask_Loaded of OpTask
+    | OpTask_Save
+
+    | Action_Set of string
+    | Action_Flash of bool
+
+    | Log_Append of string
+    | Log_Clear
+
     | StatusMsg_Set of string
     | StatusMsg_Clear of DateTime option
-    | TurnEnd
+    | Error of exn
     | Abort of (exn option*string)
     | TestSomething
 
+    | Chat_CUATurnEnd
     | Chat_Append of ChatMsg
     | Chat_UpdateQuestion of string
     | Chat_HandleTurnEnd
-    | Chat_Submit
+    | Chat_Resume
 
+    | TextChat_StartStopTask
     | VoicChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
 

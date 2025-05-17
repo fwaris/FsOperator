@@ -272,7 +272,7 @@ module Update =
         | Some url -> 
             let m = {model with opTask = OpTask.setUrl url model.opTask;  browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
             browserPostUrl m
-            m, Cmd.ofMsg (MarkDirty true)
+            m, Cmd.ofMsg (OpTask_MarkDirty true)
         | None -> model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'")
 
     let setTitle (win:HostWindow) model =
@@ -283,7 +283,6 @@ module Update =
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
             | Initialize -> setTitle win model; model, Cmd.OfAsync.either startBrowser model Browser_Emb_Started Error
             | InitializeDevMode -> setTitle win model; model, Cmd.OfAsync.either startP2pServer model Browser_Emb_Started Error
             | InitializeExternalBrowser ->setTitle win model; {model with browserMode = External {|pid=None|}}, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
@@ -295,31 +294,34 @@ module Update =
             | Browser_Emb_Started (Some bst) ->  {model with browserMode = BrowserMode.setEmbAppState bst model.browserMode}, Cmd.none
             | Browser_Emb_UrlSet url -> {model with browserMode = BrowserMode.setEmbState BST_Ready model.browserMode}, Cmd.none
 
-            | TextChat_StartStopTask -> startStopTextChat model
-            | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
-            | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
-            | Chat_HandleTurnEnd -> handleTurnEnd model
-            | Chat_Submit ->  resumeTextCuaLoop model             
+            | OpTask_SetTextInstructions txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty true)
+            | OpTask_Update instr -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty true)
+            | OpTask_MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
+            | OpTask_SetUrl txt -> setUrl model txt
+            | OpTask_Load -> model, Cmd.none
+            | OpTask_Loaded instr -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Save -> model, Cmd.ofMsg (OpTask_MarkDirty false)
 
-            | SetTextPrompt txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (MarkDirty true)
-            | UpdateOpTask instr -> {model with opTask=instr}, Cmd.ofMsg (MarkDirty true)
-            | MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
-            | SetUrl txt -> setUrl model txt
+            | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
+            | Action_Flash isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) Action_Flash else Cmd.none
 
-            | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
-            | ClearLog -> {model with log = []}, Cmd.none
+            | Log_Append txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
+            | Log_Clear -> {model with log = []}, Cmd.none
 
-            | SetAction txt -> {model with action=txt}, Cmd.ofMsg (FlashAction true)
-            | FlashAction isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) FlashAction else Cmd.none
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
-
-            | TurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
+            | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
             | Abort (ex,msg) -> {model with runState = RunState.stop model.runState}, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
             | TestSomething -> testSomething model
 
-            | VoicChat_StartStop -> startStopVoiceChat model
+            | Chat_CUATurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
+            | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
+            | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
+            | Chat_HandleTurnEnd -> handleTurnEnd model
+            | Chat_Resume ->  resumeTextCuaLoop model             
 
+            | TextChat_StartStopTask -> startStopTextChat model
+            | VoicChat_StartStop -> startStopVoiceChat model
             | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
             //| _ -> model, Cmd.none
         with ex -> 

@@ -49,7 +49,7 @@ type BrowserView =
                                 if e.Key = Avalonia.Input.Key.Enter then
                                     if Cache.nav.Value<> Unchecked.defaultof<_> then
                                         let url = Cache.nav.Value.Text
-                                        dispatch (SetUrl url)
+                                        dispatch (OpTask_SetUrl url)
                                     else
                                         debug("URL is empty")            
                             )
