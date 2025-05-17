@@ -40,7 +40,7 @@ type BrowserView =
                         TextBox.create [
                             Grid.column 0
                             TextBox.init (fun x -> Cache.nav.Value <- x)
-                            TextBox.text (model.url.ToString())
+                            TextBox.text (model.opTask.url)
                             TextBox.borderThickness 0.
                             TextBox.margin 5
                             TextBox.verticalAlignment VerticalAlignment.Center

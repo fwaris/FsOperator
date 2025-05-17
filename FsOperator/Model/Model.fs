@@ -266,14 +266,13 @@ with static member Default = {
 type Model = {
     runState : RunState option
     opTask: OpTask
+    isDirty : bool
     mailbox : Channel<ClientMsg>
     log : string list
-    url : string
     action : string
     statusMsg : (DateTime option*string)
     browserMode : BrowserMode
     isFlashing : bool
-    isMenuOpen : bool
 }
 
 type ClientMsg =
@@ -288,9 +287,10 @@ type ClientMsg =
     | Browser_Emb_ProcessExited
     | Browser_Emb_UrlSet of string
     | Error of exn
+    | MarkDirty of bool
 
     | SetTextPrompt of string
-    | SetOpTask of OpTask
+    | UpdateOpTask of OpTask
     | AppendLog of string
     | ClearLog
     | SetUrl of string
@@ -309,6 +309,5 @@ type ClientMsg =
 
     | VoicChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
-    | OpenMenu of bool
 
 

@@ -18,6 +18,7 @@ type OpTask = {
 module OpTask =
     let setTextPrompt text opTask = {opTask with textModeInstructions = text}
     let setVoicePrompt text opTask = {opTask with voiceAsstInstructions = text}
+    let setUrl url opTask = {opTask with url = url}
 
     let private defaultVoicePrompt = """
 You are to collaborate with a user to help complete a task.

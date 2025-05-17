@@ -66,15 +66,14 @@ module Update =
         let sample = OpTask.sample
         let model = {
             opTask = sample
+            isDirty = false
             runState = None
             mailbox = Channel.CreateBounded(10)
             log = []
-            url = sample.url
             action = ""
             statusMsg = None,""
             browserMode = Embedded (BrowserAppState.Create())
             isFlashing = false
-            isMenuOpen = false
         }        
         model,Cmd.ofMsg Initialize
         //model,Cmd.ofMsg InitializeDevMode
@@ -107,7 +106,7 @@ module Update =
         {model with runState =  Some runState}, Cmd.none
 
     ///start or stop text mode task
-    let startStopForTextChat model =
+    let startStopTextChat model =
         match model.runState with 
         | Some r when (r.cuaState.IsCUA_Init 
                        && BrowserMode.isReady model.browserMode) -> startTextLoop model
@@ -124,7 +123,7 @@ module Update =
         {model with runState =  Some runState}, Cmd.none
 
     ///start or stop voice mode task
-    let startStopForVoiceChat (model:Model) = 
+    let startStopVoiceChat (model:Model) = 
         match model.runState with 
         | Some r when  (r.cuaState.IsCUA_Init 
                        && BrowserMode.isReady model.browserMode) -> startVoiceLoop model
@@ -256,28 +255,38 @@ module Update =
             return! startP2pServer model
         }
 
-    let browserPostUrl model = BrowserMode.postUrl model.url model.browserMode
+    let browserPostUrl model = BrowserMode.postUrl model.opTask.url model.browserMode
+
+    let checkUrl (url:string) =
+        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
+            Some url
+        else
+            let url = "https://"+url
+            if Uri.IsWellFormedUriString(url, UriKind.Absolute) then 
+                Some url
+            else 
+                None
 
     let setUrl model (origUrl:string) =
-        let url = 
-            if Uri.IsWellFormedUriString(origUrl, UriKind.Absolute) then
-                origUrl
-            else
-                Uri("https://"+origUrl).ToString()
-        if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
-            let m = {model with url = url; browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
+        match checkUrl origUrl with
+        | Some url -> 
+            let m = {model with opTask = OpTask.setUrl url model.opTask;  browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
             browserPostUrl m
-            m, Cmd.none
-        else
-           model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'") 
+            m, Cmd.ofMsg (MarkDirty true)
+        | None -> model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'")
+
+    let setTitle (win:HostWindow) model =
+        let dirty = if model.isDirty then "*" else ""
+        let title = $"{C.WIN_TITLE} - {model.opTask.id}{dirty}"
+        win.Title <- title
           
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
             | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
-            | Initialize -> model, Cmd.OfAsync.either startBrowser model Browser_Emb_Started Error
-            | InitializeDevMode -> model, Cmd.OfAsync.either startP2pServer model Browser_Emb_Started Error
-            | InitializeExternalBrowser -> {model with browserMode = External {|pid=None|}}, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
+            | Initialize -> setTitle win model; model, Cmd.OfAsync.either startBrowser model Browser_Emb_Started Error
+            | InitializeDevMode -> setTitle win model; model, Cmd.OfAsync.either startP2pServer model Browser_Emb_Started Error
+            | InitializeExternalBrowser ->setTitle win model; {model with browserMode = External {|pid=None|}}, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
 
             | Browser_Connected c  -> browserPostUrl model;  {model with browserMode = model.browserMode |>  BrowserMode.setPid c.pid |> BrowserMode.setEmbState BST_AwaitAck}, Cmd.none
             | Browser_Emb_ProcessExited -> model, Cmd.OfAsync.either restartBrowser model Browser_Emb_Started Error
@@ -286,18 +295,19 @@ module Update =
             | Browser_Emb_Started (Some bst) ->  {model with browserMode = BrowserMode.setEmbAppState bst model.browserMode}, Cmd.none
             | Browser_Emb_UrlSet url -> {model with browserMode = BrowserMode.setEmbState BST_Ready model.browserMode}, Cmd.none
 
-            | TextChat_StartStopTask -> startStopForTextChat model
-            | SetTextPrompt txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.none
+            | TextChat_StartStopTask -> startStopTextChat model
             | Chat_UpdateQuestion txt -> {model with runState = RunState.setQuestion txt model.runState}, Cmd.none            
             | Chat_Append msg -> {model with runState = RunState.appendChatMsg msg model.runState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Submit ->  resumeTextCuaLoop model             
 
-            | SetOpTask instr -> {model with opTask=instr}, Cmd.none
+            | SetTextPrompt txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (MarkDirty true)
+            | UpdateOpTask instr -> {model with opTask=instr}, Cmd.ofMsg (MarkDirty true)
+            | MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
+            | SetUrl txt -> setUrl model txt
 
             | AppendLog txt -> {model with log = (txt:: model.log) |> List.truncate 10}, Cmd.none
             | ClearLog -> {model with log = []}, Cmd.none
-            | SetUrl txt -> setUrl model txt
 
             | SetAction txt -> {model with action=txt}, Cmd.ofMsg (FlashAction true)
             | FlashAction isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) FlashAction else Cmd.none
@@ -308,10 +318,9 @@ module Update =
             | Abort (ex,msg) -> {model with runState = RunState.stop model.runState}, Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
             | TestSomething -> testSomething model
 
-            | VoicChat_StartStop -> startStopForVoiceChat model
+            | VoicChat_StartStop -> startStopVoiceChat model
 
             | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
-            | OpenMenu b -> {model with isMenuOpen = b}, Cmd.none
             //| _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex 

@@ -137,11 +137,21 @@ type MainView =
                     Button.onClick (fun _ -> 
                         let id = cache.[0].Value.Text
                         let description = cache.[1].Value.Text
-                        let startUrl = cache.[2].Value.Text
+                        let url = cache.[2].Value.Text
                         let textPrompt = cache.[3].Value.Text
                         let voicePrompt = cache.[4].Value.Text
-                        dispatch (SetOpTask { id = id; description = description; url = startUrl; textModeInstructions = textPrompt; voiceAsstInstructions = voicePrompt })
-                    )
+                        match Update.checkUrl url with 
+                        | Some url -> 
+                            { id = id
+                              description = description
+                              url = url
+                              textModeInstructions = textPrompt
+                              voiceAsstInstructions = voicePrompt 
+                            }
+                            |> UpdateOpTask
+                            |> dispatch
+                        | None -> dispatch (StatusMsg_Set $"Invalid URL Please enter a valid URL")
+                        )
                 ]
             ]
         ]
