@@ -85,4 +85,45 @@ type ChatView =
                 ]
             ]
         ]
+
+    static member chatWrapper model dispatch =
+        let leftMargin = 10.
+        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+       
+        Panel.create [
+            Grid.row 1
+            Panel.horizontalAlignment HorizontalAlignment.Stretch
+            Panel.verticalAlignment VerticalAlignment.Stretch
+            Panel.children [
+                ChatView.chat model dispatch
+                SplitView.create [
+                    SplitView.isOpen model.isMenuOpen
+                    SplitView.horizontalAlignment HorizontalAlignment.Right
+                    SplitView.verticalAlignment VerticalAlignment.Top
+                    SplitView.displayMode SplitViewDisplayMode.Overlay
+                    SplitView.pane (
+                        StackPanel.create [
+                            StackPanel.orientation Orientation.Horizontal
+                            StackPanel.children [
+                                Button.create [
+                                    Button.height 30.
+                                    Button.content "..."
+                                    Button.margin (Thickness(2.))
+                                    Button.onClick(fun _ -> dispatch TestSomething)
+                                ]
+                            ]
+                        ]
+                    )                                            
+                    SplitView.content (
+                        Button.create [
+                            Button.content "☰"
+                            Button.onClick (fun _ -> dispatch (OpenMenu true))
+                            Button.horizontalAlignment HorizontalAlignment.Right
+                            Button.verticalAlignment VerticalAlignment.Top
+                        ]
+                    )
+                ]
+            ]
+        ]
     

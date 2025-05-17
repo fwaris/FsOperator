@@ -74,6 +74,7 @@ module Update =
             statusMsg = None,""
             browserMode = Embedded (BrowserAppState.Create())
             isFlashing = false
+            isMenuOpen = false
         }        
         model,Cmd.ofMsg Initialize
         //model,Cmd.ofMsg InitializeDevMode
@@ -308,6 +309,7 @@ module Update =
             | VoicChat_StartStop -> startStopForVoiceChat model
 
             | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
+            | OpenMenu b -> {model with isMenuOpen = b}, Cmd.none
             //| _ -> model, Cmd.none
         with ex -> 
             printfn "%A" ex 

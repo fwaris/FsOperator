@@ -273,6 +273,7 @@ type Model = {
     statusMsg : (DateTime option*string)
     browserMode : BrowserMode
     isFlashing : bool
+    isMenuOpen : bool
 }
 
 type ClientMsg =
@@ -307,5 +308,6 @@ type ClientMsg =
 
     | VoicChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
+    | OpenMenu of bool
 
 

@@ -80,7 +80,7 @@ type MainView =
                     Grid.clipToBounds true
                     Grid.children [
                         BrowserView.navigationBar model dispatch
-                        ChatView.chat model dispatch
+                        ChatView.chatWrapper model dispatch
                     ]
                 ]               
             ]
