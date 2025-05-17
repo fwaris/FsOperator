@@ -279,6 +279,26 @@ module Update =
         let dirty = if model.isDirty then "*" else ""
         let title = $"{C.WIN_TITLE} - {model.opTask.id}{dirty}"
         win.Title <- title
+
+    let loadTask (win:HostWindow) = 
+        async {
+            match! Dialogs.openFileDialog win  with 
+            | Some file -> return(System.Text.Json.JsonSerializer.Deserialize<OpTask>(file) |> Some)
+            | None -> return None
+        }
+
+    let saveTask (win:HostWindow, opTask:OpTask) = 
+        async {
+            let! file = Dialogs.saveFileDialog win
+            let rslt = 
+                match file with
+                | Some file -> 
+                    use strw = System.IO.File.Create file
+                    do (System.Text.Json.JsonSerializer.Serialize<OpTask>(strw,opTask))
+                    true
+                | None -> false
+            return rslt
+        }
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -298,9 +318,14 @@ module Update =
             | OpTask_Update instr -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty true)
             | OpTask_MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
             | OpTask_SetUrl txt -> setUrl model txt
-            | OpTask_Load -> model, Cmd.none
-            | OpTask_Loaded instr -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty false)
-            | OpTask_Save -> model, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Load when (RunState.cuaMode model.runState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask win OpTask_Loaded Error
+            | OpTask_Load -> model,Cmd.none
+            | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Loaded None -> model, Cmd.none
+            | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
+            | OpTask_Saved true -> model, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Saved false -> model, Cmd.none
+
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
             | Action_Flash isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) Action_Flash else Cmd.none

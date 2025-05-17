@@ -126,6 +126,7 @@ module RunState =
             |> fun chatMode -> {rs with chatMode = chatMode})
 
     let chatMode = function | Some (rs:RunState) -> rs.chatMode | _ -> CM_Init
+    let cuaMode = function | Some (rs:RunState) -> rs.cuaState | _ -> CUA_Init
     let setMode mode (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with chatMode=mode})
     let setState state (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with cuaState=state})
     let lastFunctionCallId (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastFunctionCallId.Value)
@@ -291,8 +292,9 @@ type ClientMsg =
     | OpTask_SetUrl of string
     | OpTask_MarkDirty of bool
     | OpTask_Load
-    | OpTask_Loaded of OpTask
+    | OpTask_Loaded of OpTask option
     | OpTask_Save
+    | OpTask_Saved of bool
 
     | Action_Set of string
     | Action_Flash of bool
