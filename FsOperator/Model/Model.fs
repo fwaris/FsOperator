@@ -174,9 +174,9 @@ module RunState =
             | CM_Voice v -> failwith "no voice connection set"
             | _ -> failwith "not a voice connection")
 
-    let initForText mailbox instructions = 
-        {RunState.Create mailbox instructions with 
-            chatMode = CM_Text Chat.Default
+    let initForText mailbox opTask = 
+        {RunState.Create mailbox opTask with 
+            chatMode = CM_Text {Chat.Default with systemMessage = Some opTask.textModeInstructions}
             cuaState = CUA_Init
         }
 
@@ -186,7 +186,7 @@ module RunState =
                         {
                          connection = ref (RTOpenAI.Api.Connection.create() |> Some)
                          chat = Chat.Default
-                         voiceAsstInstructions = instructions.voiceAsstInstructions
+                         voiceAsstInstructions = OpTask.voicePromptOrDefault instructions.voiceAsstInstructions
                         }
         }
     
@@ -292,6 +292,7 @@ type ClientMsg =
     | OpTask_SetUrl of string
     | OpTask_MarkDirty of bool
     | OpTask_Load
+    | OpTask_LoadSample of OpTask
     | OpTask_Loaded of OpTask option
     | OpTask_Save
     | OpTask_Saved of OpTask option

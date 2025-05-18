@@ -8,6 +8,7 @@ open Elmish
 open FSharp.Control
 open Avalonia.FuncUI.Hosts
 open FsOpCore
+open Avalonia.Threading
 
 module Update =
 
@@ -88,6 +89,8 @@ module Update =
             }
 
     let startTextLoop model = 
+        if isEmpty model.opTask.textModeInstructions then failwith "No instructions provided for text mode task"
+        if isEmpty model.opTask.url then failwith "No URL provided for text mode task" 
         let runState = {RunState.initForText model.mailbox model.opTask with cuaState = CUA_Loop}
         ComputerUse.startApiMessaging (runState.tokenSource.Token,runState.bus)
         ComputerUse.sendStartMessage runState.bus (model.opTask.textModeInstructions) |> Async.Start
@@ -106,6 +109,7 @@ module Update =
         | _ -> model, Cmd.none //ignore any other state
 
     let startVoiceLoop model = 
+        if isEmpty model.opTask.url then failwith "No URL provided for voice mode task" 
         let runState = {RunState.initForVoice model.mailbox model.opTask with cuaState = CUA_Loop}
         ComputerUse.startApiMessaging (runState.tokenSource.Token, runState.bus)
         VoiceMachine.startVoiceMachine runState |> Async.Start
@@ -257,11 +261,13 @@ module Update =
                 None
 
     let setUrl model (origUrl:string) =
+        let prevUrl = model.opTask.url
         match checkUrl origUrl with
         | Some url -> 
             let m = {model with opTask = OpTask.setUrl url model.opTask;  browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
             browserPostUrl m
-            m, Cmd.ofMsg (OpTask_MarkDirty true)
+            let isDirty = prevUrl <> m.opTask.url
+            m, if isDirty then Cmd.ofMsg (OpTask_MarkDirty true) else Cmd.none
         | None -> model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'")
 
     let setTitle (win:HostWindow) model =
@@ -269,14 +275,14 @@ module Update =
         let title = $"{C.WIN_TITLE} - {model.opTask.id}{dirty}"
         win.Title <- title
 
-    let loadTask (win:HostWindow) = 
-        async {
-            match! Dialogs.openFileDialog win  with 
-            | Some file -> 
-                let opTask = System.Text.Json.JsonSerializer.Deserialize<OpTask>(file)
-                let opTask = OpTask.setId file opTask
-                return Some opTask
-            | None -> return None
+    let promptSave win =
+        task {
+            return!
+                Dispatcher.UIThread.InvokeAsync<bool>(fun _ ->
+                    task {
+                        let dlg = YesNoDialog("Save current task before continuing?")
+                        return! dlg.ShowDialogAsync(win)
+                    })
         }
 
     let saveTask (win:HostWindow, opTask:OpTask) = 
@@ -291,6 +297,46 @@ module Update =
                     Some opTask
                 | None -> None
             return rslt
+        }
+
+    let loadDlg win = async {
+        match! Dialogs.openFileDialog win  with 
+        | Some file -> 
+            let opTask = 
+                let t =  System.Text.Json.JsonSerializer.Deserialize<OpTask>(file)
+                t
+                |> OpTask.setId file
+                |> OpTask.setVoicePrompt (fixEmpty t.voiceAsstInstructions)
+            return Some opTask
+        | None -> return None
+    }
+      
+    let loadTask (win:HostWindow,model) = 
+        async {
+            if model.isDirty then 
+                let! doSave = promptSave win |> Async.AwaitTask
+                if doSave then                     
+                    let! saveRsult = saveTask (win,model.opTask)
+                    match saveRsult with
+                    | None -> return None
+                    | Some _ -> return! (loadDlg win)
+                else return! (loadDlg win)
+            else
+                return! (loadDlg win)
+        }    
+
+    let checkLoadSample (win,model,sample) =
+        async {
+            if model.isDirty then 
+                let! doSave = promptSave win |> Async.AwaitTask
+                if doSave then                     
+                    let! saveRsult = saveTask (win,model.opTask)
+                    match saveRsult with
+                    | None -> return None
+                    | Some _ -> return (Some sample)
+                else return (Some sample)
+            else
+                return (Some sample)
         }
           
     let update (win:HostWindow) msg (model:Model) =
@@ -307,18 +353,18 @@ module Update =
             | Browser_Emb_Started (Some bst) ->  {model with browserMode = BrowserMode.setEmbAppState bst model.browserMode}, Cmd.none
             | Browser_Emb_UrlSet url -> {model with browserMode = BrowserMode.setEmbState BST_Ready model.browserMode}, Cmd.none
 
-            | OpTask_SetTextInstructions txt -> {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty true)
-            | OpTask_Update instr -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty true)
+            | OpTask_SetTextInstructions txt -> let isDirty = txt <> model.opTask.textModeInstructions in {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
+            | OpTask_Update instr -> let isDirty = instr <> model.opTask in {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
             | OpTask_MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
             | OpTask_SetUrl txt -> setUrl model txt
-            | OpTask_Load when (RunState.cuaMode model.runState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask win OpTask_Loaded Error
+            | OpTask_Load when (RunState.cuaMode model.runState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
             | OpTask_Load -> model,Cmd.none
-            | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.batch [Cmd.ofMsg (OpTask_MarkDirty false); Cmd.ofMsg (OpTask_SetUrl instr.url)]
             | OpTask_Loaded None -> model, Cmd.none
+            | OpTask_LoadSample sample -> model, Cmd.OfAsync.either checkLoadSample (win,model,sample) OpTask_Loaded Error
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
             | OpTask_Saved (Some t) -> {model with opTask=t}, Cmd.ofMsg (OpTask_MarkDirty false)
             | OpTask_Saved None -> model, Cmd.none
-
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
             | Action_Flash isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) Action_Flash else Cmd.none

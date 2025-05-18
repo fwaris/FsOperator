@@ -1,5 +1,6 @@
 ﻿namespace FsOperator
 open System
+open FsOpCore
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
@@ -92,7 +93,7 @@ type MainView =
     static member instructionEdit model dispatch = 
         let cache = Cache.opTaskTexts
         Grid.create [
-            Grid.rowDefinitions "*,*,*,*,*"
+            Grid.rowDefinitions "*,*,*,*"
             Grid.columnDefinitions "100,*"
             Grid.width 400.
             Grid.maxHeight 700.
@@ -138,7 +139,7 @@ type MainView =
                     TextBox.init (fun x -> cache.[2].Value <- x)
                     Grid.row 2
                     Grid.column 1
-                    Control.margin 2
+                    TextBox.margin 3
                     TextBox.acceptsReturn true
                     TextBox.multiline true
                     TextBox.minHeight 150.
@@ -160,7 +161,7 @@ type MainView =
                     TextBox.init (fun x -> cache.[3].Value <- x)
                     Grid.row 3
                     Grid.column 1
-                    Control.margin 2
+                    TextBox.margin 3
                     TextBox.minHeight 150.
                     TextBox.text model.opTask.voiceAsstInstructions
                     TextBox.watermark "Leave blank to use default voice asst. instructions"
@@ -168,8 +169,10 @@ type MainView =
                     TextBox.multiline true
                 ]
                 Button.create [
-                    Grid.row 4
+                    Grid.row 3
                     Grid.column 0
+                    Button.verticalAlignment VerticalAlignment.Bottom
+                    Button.horizontalAlignment HorizontalAlignment.Left
                     Grid.columnSpan 2
                     Control.margin 2
                     Button.content "Apply"
@@ -178,7 +181,7 @@ type MainView =
                         let description = cache.[1].Value.Text
                         let url = cache.[2].Value.Text
                         let textPrompt = cache.[3].Value.Text
-                        let voicePrompt = cache.[4].Value.Text
+                        let voicePrompt = cache.[4].Value.Text |> fixEmpty                        
                         match Update.checkUrl url with 
                         | Some url -> 
                             { id = id
@@ -199,6 +202,7 @@ type MainView =
             Border.create [
                 Border.borderThickness 1.
                 Border.padding 5.
+                Border.cornerRadius 1.
                 Border.borderBrush Brushes.LightBlue
                 Border.background Brushes.Transparent
                 Border.clipToBounds true
@@ -215,17 +219,25 @@ type MainView =
                     MenuItem.create [                           
                         MenuItem.header "☰"
                         MenuItem.viewItems [
-                            Menu.create [
-                                MenuItem.viewItems [
-                                    MenuItem.create [
-                                        MenuItem.header "Load Task"
-                                        MenuItem.onClick (fun _ -> dispatch OpTask_Load)
-                                    ]
-                                    MenuItem.create [
-                                        MenuItem.header "Save Task"
-                                        MenuItem.onClick (fun _ -> dispatch OpTask_Save)
-                                    ]
-                                ]
+                            MenuItem.create [
+                                MenuItem.header "Load Task"
+                                MenuItem.onClick (fun _ -> dispatch OpTask_Load)
+                            ]
+                            MenuItem.create [
+                                MenuItem.header "Save Task"
+                                MenuItem.onClick (fun _ -> dispatch OpTask_Save)
+                            ]
+                            MenuItem.create [
+                                MenuItem.header "Load Sample"
+                                MenuItem.viewItems (
+                                    OpTask.Samples.allSamples 
+                                    |> List.map (fun t -> 
+                                        MenuItem.create [
+                                            MenuItem.header $"{t.id}: {t.description}"
+                                            MenuItem.onClick (fun _ -> dispatch (OpTask_LoadSample t))
+                                        ]
+                                    )
+                                )
                             ]
                         ]
                     ] 

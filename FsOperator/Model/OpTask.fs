@@ -1,4 +1,5 @@
 ﻿namespace FsOperator
+open FsOpCore
 
 type OpTask = {
     id : string
@@ -19,7 +20,7 @@ module OpTask =
     let setTextPrompt text opTask = {opTask with textModeInstructions = text}
     let setVoicePrompt text opTask = {opTask with voiceAsstInstructions = text}
     let setUrl url opTask = {opTask with url = url}
-    let setId id opTask = {opTask with id = id}
+    let setId id opTask = {opTask with OpTask.id = id}
 
     let defaultVoicePrompt = """You are to collaborate with a user to help complete a task.
 The task is actually performed by a separate 'assistant'. 
@@ -30,56 +31,61 @@ Again, converse with the user before generating the next instruction for the ass
 Always confirm with the user first before sending the instructions to the assistant.
 """
 
+    let voicePromptOrDefault (instr:string) = if isEmpty instr then defaultVoicePrompt else instr
+
     let empty = 
         {
             id="blank"
             description=""
             url=""
-            voiceAsstInstructions=defaultVoicePrompt
-            textModeInstructions = ""
-        }
-
-    let sample  = 
-        {
-            id="amazon"
-            description="look for a cell phone case"
-            url="https://www.amazon.com" 
-            voiceAsstInstructions= ""
-            textModeInstructions = """On Amazon, find me an iphone 16 pro max case that has 
-**built in screen protector**. 
-Find me the top rated case regardless of price.
-**Ignore any sign-in pages and continue without signing in**
-I just want to search for products not purchase them yet."""
-        }
-
-
-    let sampleNetflix  = 
-        {
-            id="netflix"
-            description="scifi movies"
-            url="https://www.netflix.com" 
             voiceAsstInstructions=""
-            textModeInstructions = """On netflix.com search for well rated scifi movies 
-and give me a list."""
+            textModeInstructions=""
         }
 
-    let sampleTwitter  = 
-        {
-            id="twitter"
-            description="summarize recent gen ai posts"
-            url="https://twitter.com" 
-            voiceAsstInstructions=""
-            textModeInstructions = """on twitter find out if anyone has posted about 
-generative AI in the recent past and 
-summarize the postings"""
-        }
+    module Samples = 
 
-    let sampleLinked  = 
-        {
-            id="linkedin"
-            description="summarize latest posts"
-            url="https://linkedin.com" 
-            voiceAsstInstructions=""
-            textModeInstructions = """Summarize what my connections have posted today
-on LinkedIn."""
-        }
+        let sampleAmazon  = 
+            {
+                id="amazon"
+                description="look for a cell phone case"
+                url="https://www.amazon.com" 
+                voiceAsstInstructions= ""
+                textModeInstructions = """On Amazon, find me an iphone 16 pro max case that has 
+    **built in screen protector**. 
+    Find me the top rated case regardless of price.
+    **Ignore any sign-in pages and continue without signing in**
+    I just want to search for products not purchase them yet."""
+            }
+
+
+        let sampleNetflix  = 
+            {
+                id="netflix"
+                description="Godzilla and Kong movies"
+                url="https://www.netflix.com" 
+                voiceAsstInstructions=""
+                textModeInstructions = """What movies are available on Netflix featuring both Godzilla and King Kong"""
+            }
+
+        let sampleTwitter  = 
+            {
+                id="twitter"
+                description="summarize recent gen ai posts"
+                url="https://twitter.com" 
+                voiceAsstInstructions=""
+                textModeInstructions = """on twitter find out if anyone has posted about 
+    generative AI in the recent past and 
+    summarize the postings"""
+            }
+
+        let sampleLinked  = 
+            {
+                id="linkedin"
+                description="summarize latest posts"
+                url="https://linkedin.com" 
+                voiceAsstInstructions=""
+                textModeInstructions = """Summarize what my connections have posted today
+    on LinkedIn."""
+            }
+
+        let allSamples = [sampleAmazon; sampleNetflix; sampleTwitter; sampleLinked]

@@ -25,6 +25,10 @@ module Utility =
             let right = s.Substring(s.Length - n/2)
             left + " [\u2026] " + right
 
+    let isEmpty (s:string) = 
+        String.IsNullOrWhiteSpace s
+
+    let fixEmpty s = if isEmpty s then "" else s
     
     let newId() = 
         Guid.NewGuid().ToByteArray() 
