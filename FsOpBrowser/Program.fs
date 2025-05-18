@@ -18,7 +18,7 @@ type MainWindow() as this =
     inherit HostWindow()
 
     do
-        base.Title <- "CUA Browser (do not close)"
+        base.Title <- "FsOperator Browser (do not close)"
         base.Width <- 800.0
         base.Height <- 400.0
 

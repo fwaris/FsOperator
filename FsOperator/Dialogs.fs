@@ -32,12 +32,14 @@ module Dialogs =
                 |> Option.map _.TryGetLocalPath()                    
         }
 
-    let saveFileDialog (parent: Window) =
+    let saveFileDialog (parent: Window) proposedName =
         async {
             // Initialize the folder picker dialog options
             let options = FilePickerSaveOptions(
                 Title = "Save FsOperator Task",
-                FileTypeChoices = filters
+                FileTypeChoices = filters,
+                SuggestedFileName = (proposedName |> Option.defaultValue null),
+                DefaultExtension = ".optask"
             )
 
             let! file = parent.StorageProvider.SaveFilePickerAsync(options) |> Async.AwaitTask

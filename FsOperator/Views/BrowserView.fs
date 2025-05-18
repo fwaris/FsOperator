@@ -17,7 +17,10 @@ module Cache =
     let scrollViewText : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
     let scrollViewVoice : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
     let splitView : Ref<SplitView> = ref Unchecked.defaultof<_>
-    let instrEdits : Ref<TextBox> list = [for _ in 1 .. 5 -> (ref Unchecked.defaultof<_>)]
+
+    let opTaskTexts : Ref<TextBox> list = 
+        [for _ in 1 .. ((FSharp.Reflection.FSharpType.GetRecordFields typeof<OpTask>).Length - 1) -> //textboxes for all fields except id  
+            (ref Unchecked.defaultof<_>)]
 
 [<AbstractClass; Sealed>]
 type BrowserView =
@@ -43,6 +46,7 @@ type BrowserView =
                             TextBox.text (model.opTask.url)
                             TextBox.borderThickness 0.
                             TextBox.margin 5
+                            TextBox.watermark "Enter URL here"
                             TextBox.verticalAlignment VerticalAlignment.Center
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                             TextBox.onKeyDown (fun e -> 

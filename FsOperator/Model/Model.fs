@@ -294,7 +294,7 @@ type ClientMsg =
     | OpTask_Load
     | OpTask_Loaded of OpTask option
     | OpTask_Save
-    | OpTask_Saved of bool
+    | OpTask_Saved of OpTask option
 
     | Action_Set of string
     | Action_Flash of bool

@@ -46,6 +46,7 @@ type TextChatView =
                             TextBox.textAlignment TextAlignment.Left
                             TextBox.background Brushes.Transparent
                             TextBox.borderThickness 2.
+                            TextBox.watermark "Enter instructions here or load a task to start"
                             TextBox.margin (Thickness(leftMargin,40.,2.,2.))
                             TextBox.fontSize 14.
                             TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))

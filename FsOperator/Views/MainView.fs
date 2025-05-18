@@ -43,31 +43,62 @@ type MainView =
             )
         ]                            
 
+    static member defaultVoicePromptInfo = 
+        Button.create [
+            Button.horizontalAlignment HorizontalAlignment.Right
+            Button.tip "Default Voice Asst. Instructions"
+            Button.verticalAlignment VerticalAlignment.Top
+            Button.margin (Thickness(2.,30,2,2))
+            Button.content "\u2139"
+            Button.background Brushes.Transparent
+            Button.flyout (
+                Flyout.create [
+                    Flyout.showMode FlyoutShowMode.Standard
+                    Flyout.content(
+                        Grid.create [
+                            Grid.maxWidth 300.
+                            Grid.maxHeight 300.
+                            Grid.rowDefinitions "25,*"
+                            Grid.children [
+                                TextBlock.create [
+                                    Grid.row 0
+                                    TextBlock.text "Default Voice Asst. Instructions"
+                                    TextBlock.fontSize 11
+                                    Control.margin 2
+                                    TextBlock.fontWeight FontWeight.Bold
+                                ]
+                                ScrollViewer.create [
+                                    Grid.row 1
+                                    ScrollViewer.maxHeight 350.
+                                    ScrollViewer.maxWidth 350.
+                                    ScrollViewer.content (
+                                        SelectableTextBlock.create [
+                                            TextBlock.padding 2.
+                                            TextBlock.background Brushes.SlateBlue
+                                            TextBlock.multiline true
+                                            TextBlock.margin 2
+                                            TextBlock.textWrapping TextWrapping.Wrap
+                                            TextBlock.text OpTask.defaultVoicePrompt
+                                        ]
+                                    )
+                                ]
+                            ]
+                        ]
+                    )
+                ]
+            )           
+        ]
+
     static member instructionEdit model dispatch = 
-        let cache = Cache.instrEdits
+        let cache = Cache.opTaskTexts
         Grid.create [
-            Grid.rowDefinitions "*,*,*,*,*,*"
+            Grid.rowDefinitions "*,*,*,*,*"
             Grid.columnDefinitions "100,*"
-            Grid.maxWidth 400.
+            Grid.width 400.
             Grid.maxHeight 700.
             Grid.children [
-                TextBlock.create [                    
-                    Grid.row 0
-                    Grid.column 0
-                    TextBlock.text "Id"
-                    Control.horizontalAlignment HorizontalAlignment.Right
-                    Control.verticalAlignment VerticalAlignment.Center
-                    Control.margin 2
-                ]
-                TextBox.create [
-                    TextBox.init (fun x -> cache.[0].Value <- x)
-                    Grid.row 0
-                    Grid.column 1
-                    Control.margin 2
-                    TextBox.text model.opTask.id
-                ]
                 TextBlock.create [
-                    Grid.row 1
+                    Grid.row 0
                     Grid.column 0
                     TextBlock.text "Description"
                     Control.margin 2
@@ -75,61 +106,69 @@ type MainView =
                     Control.horizontalAlignment HorizontalAlignment.Right
                 ]
                 TextBox.create [
-                    TextBox.init (fun x -> cache.[1].Value <- x)
-                    Grid.row 1
+                    TextBox.init (fun x -> cache.[0].Value <- x)
+                    Grid.row 0
                     Grid.column 1
                     TextBox.text model.opTask.description
                     Control.margin 2
                 ]
                 TextBlock.create [
-                    Grid.row 2
+                    Grid.row 1
                     Grid.column 0
-                    TextBlock.text "Start URL"
+                    TextBlock.text "URL"
                     Control.verticalAlignment VerticalAlignment.Center
                     Control.horizontalAlignment HorizontalAlignment.Right
                     Control.margin 2
                 ]
                 TextBox.create [
-                    TextBox.init (fun x -> cache.[2].Value <- x)
-                    Grid.row 2
+                    TextBox.init (fun x -> cache.[1].Value <- x)
+                    Grid.row 1
                     Grid.column 1
                     Control.margin 2
                     TextBox.text model.opTask.url
                 ]
                 TextBlock.create [
-                    Grid.row 3
+                    Grid.row 2
                     Grid.column 0
                     TextBlock.text "Text Prompt"                    
                     Control.margin 2
                     Control.horizontalAlignment HorizontalAlignment.Right
                 ]
                 TextBox.create [
+                    TextBox.init (fun x -> cache.[2].Value <- x)
+                    Grid.row 2
+                    Grid.column 1
+                    Control.margin 2
+                    TextBox.acceptsReturn true
+                    TextBox.multiline true
+                    TextBox.minHeight 150.
+                    TextBox.text model.opTask.textModeInstructions
+                ]
+                Panel.create [
+                    Grid.row 3
+                    Grid.column 0
+                    Panel.children [
+                        MainView.defaultVoicePromptInfo
+                        TextBlock.create [
+                            TextBlock.text "Voice Prompt"
+                            Control.margin 2
+                            Control.horizontalAlignment HorizontalAlignment.Right                    
+                        ]
+                    ]
+                ]
+                TextBox.create [
                     TextBox.init (fun x -> cache.[3].Value <- x)
                     Grid.row 3
                     Grid.column 1
                     Control.margin 2
-                    TextBox.acceptsReturn true
-                    TextBox.multiline true
-                    TextBox.text model.opTask.textModeInstructions
-                ]
-                TextBlock.create [
-                    Grid.row 4
-                    Grid.column 0
-                    TextBlock.text "Voice Prompt"
-                    Control.margin 2
-                    Control.horizontalAlignment HorizontalAlignment.Right
-                ]
-                TextBox.create [
-                    TextBox.init (fun x -> cache.[4].Value <- x)
-                    Grid.row 4
-                    Grid.column 1
-                    Control.margin 2
+                    TextBox.minHeight 150.
                     TextBox.text model.opTask.voiceAsstInstructions
+                    TextBox.watermark "Leave blank to use default voice asst. instructions"
                     TextBox.acceptsReturn true
                     TextBox.multiline true
                 ]
                 Button.create [
-                    Grid.row 5
+                    Grid.row 4
                     Grid.column 0
                     Grid.columnSpan 2
                     Control.margin 2
@@ -156,6 +195,16 @@ type MainView =
                 ]
             ]
         ]
+        |> fun g -> 
+            Border.create [
+                Border.borderThickness 1.
+                Border.padding 5.
+                Border.borderBrush Brushes.LightBlue
+                Border.background Brushes.Transparent
+                Border.clipToBounds true
+                Border.child g
+            ]
+
     
     static member mainMenu model dispatch = 
             Menu.create [
@@ -170,11 +219,11 @@ type MainView =
                                 MenuItem.viewItems [
                                     MenuItem.create [
                                         MenuItem.header "Load Task"
-                                        ///MenuItem.onClick (fun _ -> "#e74c3c" |> SetColor |> dispatch)
+                                        MenuItem.onClick (fun _ -> dispatch OpTask_Load)
                                     ]
                                     MenuItem.create [
                                         MenuItem.header "Save Task"
-                                        ///MenuItem.onClick (fun _ -> "#e74c3c" |> SetColor |> dispatch)
+                                        MenuItem.onClick (fun _ -> dispatch OpTask_Save)
                                     ]
                                 ]
                             ]
@@ -222,17 +271,16 @@ type MainView =
             ]
         ]    
 
-    static member main model dispatch =
-        DockPanel.create [               
-            DockPanel.children [
-                MainView.statusBar model dispatch
-                Expander.create [
-                    Expander.margin (Thickness(1.))
-                    Expander.dock Dock.Right
-                    Expander.expandDirection ExpandDirection.Left
-                    Expander.verticalAlignment VerticalAlignment.Stretch
-                    Expander.horizontalAlignment HorizontalAlignment.Right
-                    Expander.content (
+    static member logPanel model dispatch =
+        Expander.create [
+            Expander.margin (Thickness(1.))
+            Expander.dock Dock.Right
+            Expander.expandDirection ExpandDirection.Left
+            Expander.verticalAlignment VerticalAlignment.Stretch
+            Expander.horizontalAlignment HorizontalAlignment.Right
+            Expander.content (
+                Panel.create [          
+                    Panel.children [
                         ListBox.create [
                             ListBox.width 300.
                             ListBox.margin (Thickness(5.,5.,5.,5.))
@@ -250,8 +298,25 @@ type MainView =
                                     ]
                             ))
                         ]
-                    )
+                        Button.create [
+                            Button.content "Clear"
+                            Button.fontSize 11.
+                            Button.background Brushes.Transparent
+                            Button.onClick (fun _ -> dispatch Log_Clear)
+                            Button.horizontalAlignment HorizontalAlignment.Right
+                            Button.verticalAlignment VerticalAlignment.Top
+                            Button.margin 2
+                        ]
+                    ]
                 ]
+            )
+        ]
+
+    static member main model dispatch =
+        DockPanel.create [               
+            DockPanel.children [
+                MainView.logPanel model dispatch
+                MainView.statusBar model dispatch
                 Grid.create [
                     Grid.rowDefinitions "50,*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch

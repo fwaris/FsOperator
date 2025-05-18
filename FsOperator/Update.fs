@@ -36,36 +36,25 @@ module Update =
         ]
 
     let testSomething (model:Model) =
-        async {
-            try
-                //do! Preview.drawArrow 100 500 50 0. 2000
-                do! Preview.drawClick 100 500 2000
-                //do! Preview.drawDragArrow (100,500) (300,600) 2000
-                debug "Test something"
-            with ex ->
-                debug $"Error in testSomething: {ex.Message}"
-        }
-        |> Async.Start
+        Log.info "testSomething clicked"
+        //async {
+        //    try
+        //        //do! Preview.drawArrow 100 500 50 0. 2000
+        //        do! Preview.drawClick 100 500 2000
+        //        //do! Preview.drawDragArrow (100,500) (300,600) 2000
+        //        debug "Test something"
+        //    with ex ->
+        //        debug $"Error in testSomething: {ex.Message}"
+        //}
+        //|> Async.Start
         model,Cmd.none
-
-    let testSomething_ (model:Model) =
-        let testChat =
-            [
-                Assistant {id = "1"; content = model.opTask.textModeInstructions}
-                User "The quick brown fox jumped over the lazy dog"
-                Assistant {id = "2"; content = "How can I help you?"}
-            ]
-        let runState = RunState.Create model.mailbox model.opTask
-        let runState = {runState with chatMode = CM_Text {Chat.Default with messages=testChat} ; cuaState = CUAState.CUA_Pause}
-        {model with runState =  Some runState}, Cmd.none
-
 
     let init _   =
         //FsResponses.debug_logging <- true
         //let sample = Instructions.sampleNetflix
-        let sample = OpTask.sample
+        //let sample = OpTask.sample
         let model = {
-            opTask = sample
+            opTask = OpTask.empty
             isDirty = false
             runState = None
             mailbox = Channel.CreateBounded(10)
@@ -283,20 +272,24 @@ module Update =
     let loadTask (win:HostWindow) = 
         async {
             match! Dialogs.openFileDialog win  with 
-            | Some file -> return(System.Text.Json.JsonSerializer.Deserialize<OpTask>(file) |> Some)
+            | Some file -> 
+                let opTask = System.Text.Json.JsonSerializer.Deserialize<OpTask>(file)
+                let opTask = OpTask.setId file opTask
+                return Some opTask
             | None -> return None
         }
 
     let saveTask (win:HostWindow, opTask:OpTask) = 
         async {
-            let! file = Dialogs.saveFileDialog win
+            let! file = Dialogs.saveFileDialog win (Some opTask.id) 
             let rslt = 
                 match file with
                 | Some file -> 
                     use strw = System.IO.File.Create file
+                    let opTask = OpTask.setId file opTask
                     do (System.Text.Json.JsonSerializer.Serialize<OpTask>(strw,opTask))
-                    true
-                | None -> false
+                    Some opTask
+                | None -> None
             return rslt
         }
           
@@ -323,8 +316,8 @@ module Update =
             | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty false)
             | OpTask_Loaded None -> model, Cmd.none
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
-            | OpTask_Saved true -> model, Cmd.ofMsg (OpTask_MarkDirty false)
-            | OpTask_Saved false -> model, Cmd.none
+            | OpTask_Saved (Some t) -> {model with opTask=t}, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Saved None -> model, Cmd.none
 
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)

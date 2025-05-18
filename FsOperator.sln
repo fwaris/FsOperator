@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOperator", "FsOperator\FsOperator.fsproj", "{D43CC30F-7769-4CB8-A88D-2A9230A51417}"
+	ProjectSection(ProjectDependencies) = postProject
+		{18D017FA-1D20-4554-BD22-0AA0B7312586} = {18D017FA-1D20-4554-BD22-0AA0B7312586}
+	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponses", "FsResponses\FsResponses.fsproj", "{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}"
 EndProject
