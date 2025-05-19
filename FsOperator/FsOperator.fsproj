@@ -7,6 +7,7 @@
 		<TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<PublishAot>false</PublishAot>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(IsWindows)">

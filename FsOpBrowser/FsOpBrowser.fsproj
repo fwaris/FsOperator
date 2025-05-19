@@ -10,6 +10,7 @@
 -->
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<PublishAot>false</PublishAot>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$(IsWindows)">
