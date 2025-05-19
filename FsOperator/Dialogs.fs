@@ -7,11 +7,12 @@ open System.Threading.Tasks
 open Avalonia.FuncUI
 open Avalonia.Controls
 open Avalonia.Platform.Storage
+open Avalonia.Media
 
 module Dialogs =
 
     let filters= [|
-                    FilePickerFileType("FsOperator Task", Patterns = [| ".optask"; ".json" |])
+                    FilePickerFileType("FsOperator Task", Patterns = [| "*.optask"; "*.json"|])
                  |]
 
     let openFileDialog (parent: Window) =
@@ -54,8 +55,9 @@ type YesNoDialog(message: string) as this =
         base.Title <- "Confirmation"
         base.Width <- 400.0
         base.Height <- 150.0
+        base.SystemDecorations <- SystemDecorations.BorderOnly
 
-        let content =            
+        let content =                        
             DockPanel.create [
                 DockPanel.children [
                     TextBlock.create [
@@ -88,6 +90,13 @@ type YesNoDialog(message: string) as this =
                     ] 
                 ]
                 DockPanel.dock Dock.Bottom
+            ]
+            |> fun g -> Border.create [
+                Border.child g
+                Border.borderThickness 1.0
+                Border.padding 5.0
+                Border.cornerRadius (CornerRadius(5.0))
+                Border.borderBrush Brushes.LightBlue
             ]
 
         this.Content <- Component(fun ctx -> content)

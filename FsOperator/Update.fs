@@ -303,7 +303,8 @@ module Update =
         match! Dialogs.openFileDialog win  with 
         | Some file -> 
             let opTask = 
-                let t =  System.Text.Json.JsonSerializer.Deserialize<OpTask>(file)
+                use str = System.IO.File.OpenRead file
+                let t =  System.Text.Json.JsonSerializer.Deserialize<OpTask>(str)
                 t
                 |> OpTask.setId file
                 |> OpTask.setVoicePrompt (fixEmpty t.voiceAsstInstructions)
