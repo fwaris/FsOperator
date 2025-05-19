@@ -248,7 +248,7 @@ module Update =
             return! startP2pServer model
         }
 
-    let browserPostUrl model = BrowserMode.postUrl model.opTask.url model.browserMode
+    let browserPostUrl model = Browser.postUrl model.opTask.url model.browserMode
 
     let checkUrl (url:string) =
         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then

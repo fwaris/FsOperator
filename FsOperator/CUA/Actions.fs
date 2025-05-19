@@ -43,7 +43,7 @@ module Actions =
         | "back" | "Back"       -> Back
         | "forward" | "Forward" -> Forward
         | "wheel"   | "Wheel"   -> Wheel
-        | x -> debug $"cannot use '{x}' button"; Unknown
+        | x -> Log.info $"cannot use '{x}' button"; Unknown
 
     let pressKeys (page:IPage) (keys:string list) = 
         task {
@@ -63,9 +63,10 @@ module Actions =
             match action with 
             | Click p -> 
                 match mouseButton p.button with
-                | Btn btn -> 
+                | Btn btn when btn = MouseButton.Left -> 
                     let opts = ClickOptions(Button = btn)
                     do! page.Mouse.ClickAsync(p.x,p.y, opts) |> Async.AwaitTask
+                | Btn btn -> Log.info $"Did not use {btn} button (as it may cause issues on web pages)"
                 | Back -> do! page.GoBackAsync() |> Async.AwaitTask |> Async.Ignore
                 | Forward -> do! page.GoForwardAsync() |> Async.AwaitTask |> Async.Ignore
                 | Wheel -> do! page.Mouse.WheelAsync(p.x,p.y) |> Async.AwaitTask
@@ -104,9 +105,7 @@ module Actions =
                 do! page.Mouse.DownAsync() |> Async.AwaitTask
                 do! page.Mouse.MoveAsync(t.x,t.y,MoveOptions(Steps=10)) |> Async.AwaitTask
                 do! page.Mouse.UpAsync() |> Async.AwaitTask
-                //do! page.Mouse.ClickAsync(s.x,s.y, ClickOptions(Count=1)) |> Async.AwaitTask
-//                    do! page.Mouse.DragAndDropAsync(s.x,s.y,t.x,t.y, delay=500) |> Async.AwaitTask
-                debug $"done drag"
+                Log.info $"Drag and drop from {s} to{t}"
             do! page.WaitForNetworkIdleAsync() |> Async.AwaitTask
         }
 
@@ -116,10 +115,10 @@ module Actions =
                 do! perform action
             with ex -> 
                 do! Browser.closeConnection()
-                debug $"Error in doAction: %s{ex.Message}"
+                Log.exn (ex,"Error in doAction")
                 do! Async.Sleep(500)
                 if retryCount < 2 then 
                     return! doAction (retryCount + 1) action
                 else
-                    debug "Unable to perform action"
+                    Log.warn "Unable to perform action after retrying"
         }

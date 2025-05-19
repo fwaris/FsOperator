@@ -36,7 +36,7 @@ type VoiceChatView =
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
-                        TextBlock.create [
+                        SelectableTextBlock.create [
                             TextBlock.text (RunState.voiceSysMsg model.runState)
                             TextBlock.textWrapping TextWrapping.Wrap
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch

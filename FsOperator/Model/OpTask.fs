@@ -73,9 +73,9 @@ Always confirm with the user first before sending the instructions to the assist
                 description="summarize recent gen ai posts"
                 url="https://twitter.com" 
                 voiceAsstInstructions=""
-                textModeInstructions = """on twitter find out if anyone has posted about 
-    generative AI in the recent past and 
-    summarize the postings"""
+                textModeInstructions = """Scroll through my Twitter feed and summarize the latest posts
+about generative AI.
+                """
             }
 
         let sampleLinked  = 
@@ -84,8 +84,8 @@ Always confirm with the user first before sending the instructions to the assist
                 description="summarize latest posts"
                 url="https://linkedin.com" 
                 voiceAsstInstructions=""
-                textModeInstructions = """Summarize what my connections have posted today
-    on LinkedIn."""
+                textModeInstructions = """Scroll through my LinkedIn feed and summarize the latest posts
+about generative AI."""
             }
 
         let allSamples = [sampleAmazon; sampleNetflix; sampleTwitter; sampleLinked]

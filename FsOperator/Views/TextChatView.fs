@@ -80,7 +80,7 @@ type TextChatView =
                         match model.runState with 
                         | Some rs when rs.cuaState.IsCUA_Pause && rs.chatMode.IsCM_Text -> 
                             Panel.create [
-                                DockPanel.dock Dock.Bottom
+                                DockPanel.dock Dock.Top
                                 Panel.margin 2
                                 Panel.children [
                                     TextBox.create [

@@ -27,6 +27,12 @@ type BrowserView =
 
     static member navigationBar model dispatch = 
         let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let actionBg = 
+            if model.isFlashing 
+            then Brushes.DarkOrange 
+            elif (RunState.cuaMode model.runState).IsCUA_Pause 
+            then  Brushes.DarkRed
+            else Brushes.DarkSlateBlue
         Border.create [
             Grid.row 0
             Border.borderThickness 1.0
@@ -62,7 +68,7 @@ type BrowserView =
                                 Grid.column 1
                                 TextBlock.verticalAlignment VerticalAlignment.Center
                                 TextBlock.horizontalAlignment HorizontalAlignment.Stretch
-                                TextBlock.background (if model.isFlashing then Brushes.DarkOrange else Brushes.DarkSlateBlue)
+                                TextBlock.background actionBg
                                 TextBlock.text model.action
                                 TextBlock.margin (Thickness(1,1,5,1))
                                 TextBlock.padding 3

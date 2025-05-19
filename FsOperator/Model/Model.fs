@@ -62,47 +62,6 @@ with static member Create mailbox instructions =
 
 
 
-type BST = BST_Init | BST_Ready | BST_AwaitAck
-type BrowserAppState = {
-    port        : int
-    tokenSource : System.Threading.CancellationTokenSource
-    outChannel  : Channel<P2PFromServer>
-    pid         : int option
-    listener    : TcpListener option
-    state       : BST
-
-}
-with static member Create() =
-            {
-                port = P2p.defaultPort
-                tokenSource = new System.Threading.CancellationTokenSource()
-                outChannel = Channel.CreateBounded(10)
-                pid = None
-                listener = None
-                state = BST_Init
-            }
-
-
-type BrowserMode = External of {|pid:int option|} | Embedded of BrowserAppState
-
-module BrowserMode =
-    let isEmbedded = function | Embedded _ -> true | _ -> false
-    let isExternal = function | External _ -> true | _ -> false
-    let pid = function | External p -> p.pid | Embedded b -> b.pid
-    let port = function | External p -> P2p.defaultPort | Embedded b -> b.port
-    let setPid pid = function | External p -> External {|pid = Some pid|} | Embedded b -> Embedded {b with pid= Some pid}
-    let setEmbState state = function | External p -> External p | Embedded b -> Embedded {b with state=state}
-    let setEmbAppState bst = function | External p -> External p | Embedded b -> Embedded bst
-
-    let postUrl url = function
-        | External p -> Browser.goToPage url |> Async.Start
-        | Embedded b -> b.outChannel.Writer.TryWrite (P2PFromServer.Server_SetUrl url ) |> ignore
-
-    let isReady browserMode =
-        match browserMode with
-        | External p -> p.pid.IsSome
-        | Embedded b -> b.state = BST_Ready
-
 
 //convenice functions to manage RunState
 module RunState =

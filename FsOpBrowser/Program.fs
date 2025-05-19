@@ -69,8 +69,11 @@ module Program =
         //WebViewControl.WebView.Settings.LogFile <- @"e:\\s\\log.txt"
         WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-debugging-port", string C.DEBUG_PORT)
         WebViewControl.WebView.Settings.AddCommandLineSwitch("remote-allow-origins", $"http://localhost:{C.DEBUG_PORT}")
+        WebViewControl.WebView.Settings.AddCommandLineSwitch("enable-media-stream", "")
+        
         //WebViewControl.WebView.Settings.AddCommandLineSwitch("auto-open-devtools-for-tabs","")
         WebViewControl.WebView.Settings.AddCommandLineSwitch("no-sandbox", "")
+        WebViewControl.WebView.Settings.CachePath <- System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FsOpBrowser", "CEFCache")
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()

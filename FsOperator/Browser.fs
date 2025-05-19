@@ -7,6 +7,47 @@ open System.IO
 open PuppeteerSharp
 open FsOpCore
 open SkiaSharp
+open System.Threading.Channels
+open System.Net.Sockets
+
+type BST = BST_Init | BST_Ready | BST_AwaitAck
+type BrowserAppState = {
+    port        : int
+    tokenSource : System.Threading.CancellationTokenSource
+    outChannel  : Channel<P2PFromServer>
+    pid         : int option
+    listener    : TcpListener option
+    state       : BST
+
+}
+with static member Create() =
+            {
+                port = P2p.defaultPort
+                tokenSource = new System.Threading.CancellationTokenSource()
+                outChannel = Channel.CreateBounded(10)
+                pid = None
+                listener = None
+                state = BST_Init
+            }
+
+
+type BrowserMode = External of {|pid:int option|} | Embedded of BrowserAppState
+
+module BrowserMode =
+    let isEmbedded = function | Embedded _ -> true | _ -> false
+    let isExternal = function | External _ -> true | _ -> false
+    let pid = function | External p -> p.pid | Embedded b -> b.pid
+    let port = function | External p -> P2p.defaultPort | Embedded b -> b.port
+    let setPid pid = function | External p -> External {|pid = Some pid|} | Embedded b -> Embedded {b with pid= Some pid}
+    let setEmbState state = function | External p -> External p | Embedded b -> Embedded {b with state=state}
+    let setEmbAppState bst = function | External p -> External p | Embedded b -> Embedded bst
+
+
+    let isReady browserMode =
+        match browserMode with
+        | External p -> p.pid.IsSome
+        | Embedded b -> b.state = BST_Ready
+
 
 module Browser =
 
@@ -71,6 +112,44 @@ module Browser =
             | None -> ()
         }
 
+    let launchExternal ()  = 
+        async {
+            let! dnldRstl  = (new BrowserFetcher()).DownloadAsync(BrowserTag.Stable)  |> Async.AwaitTask
+            dnldRstl.BuildId |> printfn "Chromium downloaded: %s"
+            let opts = LaunchOptions()
+            opts.Headless <- false
+            opts.Channel <- BrowserData.ChromeReleaseChannel.Stable
+            opts.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
+            //opts.Args <-  
+            //    [| 
+            //        $"--remote-debugging-port={C.DEBUG_PORT}" 
+            //        $"--remote-allow-origins=http://localhost:{C.DEBUG_PORT}"
+            //    |]
+            // Launch browser; PuppeteerSharp will handle Chromium download automatically
+            let! browser = Puppeteer.LaunchAsync(opts) |> Async.AwaitTask
+            _connection.Value <- Some browser
+            return {| pid=browser.Process.Id|}
+        }
+
+    let reconnectExternal pid =
+        let isRunning pid = 
+            try
+                let proc = System.Diagnostics.Process.GetProcessById(pid)
+                proc.HasExited |> not
+            with ex -> false
+        async {
+            match pid with 
+            | Some pid when isRunning pid ->
+                let opts = LaunchOptions()
+                opts.Headless <- false
+                opts.Channel <- BrowserData.ChromeReleaseChannel.Stable
+                opts.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
+                let! browser = Puppeteer.LaunchAsync(opts) |> Async.AwaitTask
+                _connection.Value <- Some browser
+                return {| pid=pid|}
+            | None -> return! launchExternal()
+        }
+
     let rec private _reconnect count =
         async {
             try 
@@ -95,36 +174,31 @@ module Browser =
                 _manualRestEvent.Reset() |> ignore
         }
 
-
-    let connection () = 
+(*
+    let connection browserMode = 
         async {
             let! w = Async.AwaitWaitHandle(_manualRestEvent,2000) 
+            match browserMode with
+            | External p ->
+                match p.pid with
+                | Some pid when pid > 0 -> return! connectToBrowser C.DEBUG_PORT
+                | _ -> return! launchExternal() |> Async.AwaitTask
+            | Embedded b ->
+                match _connection.Value with
+                | None -> return! reconnect 2
+                | Some conn when conn.IsClosed || not conn.IsConnected -> return! reconnect 2
+                | Some conn -> return conn
+        }
+*)
+
+    let connection () = 
+        async {        
             match _connection.Value with
             | None -> return! reconnect 2
             | Some conn when conn.IsClosed || not conn.IsConnected -> return! reconnect 2
             | Some conn -> return conn
         }
-
-    let launchExternal ()  = 
-        async {
-            let! dnldRstl  = (new BrowserFetcher()).DownloadAsync(BrowserTag.Stable)  |> Async.AwaitTask
-            dnldRstl.BuildId |> printfn "Chromium downloaded: %s"
-            let opts = LaunchOptions()
-            opts.Headless <- false
-            opts.Channel <- BrowserData.ChromeReleaseChannel.Stable
-            opts.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
-            //opts.Args <-  
-            //    [| 
-            //        $"--remote-debugging-port={C.DEBUG_PORT}" 
-            //        $"--remote-allow-origins=http://localhost:{C.DEBUG_PORT}"
-            //    |]
-            // Launch browser; PuppeteerSharp will handle Chromium download automatically
-            let! browser = Puppeteer.LaunchAsync(opts) |> Async.AwaitTask
-            _connection.Value <- Some browser
-            return {| pid=browser.Process.Id|}
-        }
-        
-
+     
     let page () = 
         async {
             let! browser = connection() 
@@ -161,3 +235,8 @@ module Browser =
             let! _ = page.GoToAsync(urls) |> Async.AwaitTask
             return ()
         }
+
+    let postUrl url = function
+        | External p -> goToPage url |> Async.Start
+        | Embedded b -> b.outChannel.Writer.TryWrite (P2PFromServer.Server_SetUrl url ) |> ignore
+
