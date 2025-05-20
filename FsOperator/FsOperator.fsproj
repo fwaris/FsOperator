@@ -52,7 +52,7 @@
 		<PackageReference Include="System.Text.Json" Version="9.0.4" />
 		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.2.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
-		<PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.1" />
+		<PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.1" />
 
 	</ItemGroup>
 	

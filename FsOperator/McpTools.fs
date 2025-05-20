@@ -36,7 +36,7 @@ type JiraTools() =
         (
             client: HttpClient,
             [<Description("Jira Task Name")>] taskName: string,
-            [<Description("Jira Task Description")>] description: double
+            [<Description("Jira Task Description")>] description: string
         ) : Task<string> =
         task {
             let jiraTask  = 

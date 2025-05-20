@@ -48,7 +48,7 @@ type WeatherTools() =
         (
             //client: HttpClient,
             [<Description("Jira Task Name")>] taskName: string,
-            [<Description("Jira Task Description")>] description: string
+            [<Description("Jira Task Description")>] description: string 
         ) : Task<string> =
         task {
             printfn $"name {taskName}"
