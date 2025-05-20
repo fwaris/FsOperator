@@ -202,22 +202,6 @@ module Update =
         | P2PFromClient.Client_Disconnect -> Browser_Emb_SocketDisconnected
         | P2PFromClient.Client_UrlSet url -> Browser_Emb_UrlSet url
 
-    let launchBrowser (model:Model) =        
-        let dllPath = System.IO.Path.Combine(Environment.CurrentDirectory,@"..\..\..\..\FsOpBrowser\bin\Debug\net9.0\FsOpBrowser.dll")
-        let dllPath = System.IO.Path.GetFullPath(dllPath)
-        let si = System.Diagnostics.ProcessStartInfo() 
-        si.FileName <- "dotnet"
-        si.Arguments <- $""" "{dllPath}" {BrowserMode.port model.browserMode}"""
-        let pd = new System.Diagnostics.Process()
-        pd.StartInfo <- si
-        pd.EnableRaisingEvents <- true
-        pd.Exited.Add(fun _ -> 
-            let msg = $"Browser process exited with code {pd.ExitCode}"
-            Log.info msg           
-            pd.Dispose()
-            model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore)           
-        pd.Start()
-
     let startP2pServer (model:Model) =
         async {
             let bst = match model.browserMode with Embedded bst -> bst | _ -> failwith "startP2pServer called without embedded browser mode"
@@ -228,17 +212,19 @@ module Update =
         
     let startBrowser model =
         async {
-            let started = launchBrowser model
+            let fnExit ()  = model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore
+            let started = Browser.launchBrowser model.browserMode fnExit
             if not started then
                 return failwith "Failed to start browser"
             return! startP2pServer model
         }
         
     let restartBrowser model   =
-        async {        
+        async {
+            let fnExit ()  = model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore
             let bst = match model.browserMode with Embedded bst -> bst | _ -> failwith "startP2pServer called without embedded browser mode"
             bst.listener |> Option.iter (fun l -> l.Dispose())
-            let started = launchBrowser model
+            let started = Browser.launchBrowser model.browserMode fnExit
             if not started then
                 return failwith "Failed to start browser"
             bst.tokenSource.Cancel()

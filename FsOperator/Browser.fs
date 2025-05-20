@@ -1,4 +1,5 @@
 ﻿namespace FsOperator
+open System
 open System.Threading
 open System.Threading.Tasks
 open System.Net.Http
@@ -239,4 +240,24 @@ module Browser =
     let postUrl url = function
         | External p -> goToPage url |> Async.Start
         | Embedded b -> b.outChannel.Writer.TryWrite (P2PFromServer.Server_SetUrl url ) |> ignore
+        
+    let dllPath = lazy(
+        Environment.CurrentDirectory
+        @@ ".." @@ ".." @@ ".." @@ ".."
+        @@ "FsOpBrowser" @@ "bin" @@ "Debug" @@ "net9.0" @@ "FsOpBrowser.dll"
+     )
 
+    let launchBrowser (browserMode) fnExit =        
+        let dllPath = System.IO.Path.GetFullPath(dllPath.Value)
+        let si = System.Diagnostics.ProcessStartInfo() 
+        si.FileName <- "dotnet"
+        si.Arguments <- $""" "{dllPath}" {BrowserMode.port browserMode}"""
+        let pd = new System.Diagnostics.Process()
+        pd.StartInfo <- si
+        pd.EnableRaisingEvents <- true
+        pd.Exited.Add(fun _ -> 
+            let msg = $"Browser process exited with code {pd.ExitCode}"
+            Log.info msg           
+            pd.Dispose()
+            fnExit())
+        pd.Start()
