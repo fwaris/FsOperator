@@ -9,9 +9,12 @@ open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Hosts
 open System
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
 open Avalonia.Input
 open Avalonia.Markup.Xaml.Styling
 open Avalonia.Logging
+open Microsoft.Extensions.Hosting
 
 
 type MainWindow() as this =
@@ -47,12 +50,27 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) ->                 
+                Update.mailbox.Writer.TryComplete() |> ignore
                 Async.RunSynchronously(Browser.shutdown(),1000))
         | _ -> ()
 
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
+        let builder = Host.CreateApplicationBuilder(args)
+
+        builder.Services
+            .AddMcpServer()
+            .WithStdioServerTransport()
+            .WithTools<McpTools.JiraTools>() 
+        |> ignore
+
+        builder.Logging.AddConsole(fun options ->
+            options.LogToStandardErrorThreshold <- LogLevel.Trace
+        ) |> ignore
+
+        builder.Build().RunAsync() |> ignore // |> Async.AwaitTask |> Async.RunSynchronously
+
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         AppBuilder
             .Configure<App>()

@@ -46,11 +46,13 @@ type WeatherTools() =
     [<Description("Add Jira Task")>]
     static member AddJiraTask
         (
-            client: HttpClient,
+            //client: HttpClient,
             [<Description("Jira Task Name")>] taskName: string,
-            [<Description("Jira Task Description")>] description: double
+            [<Description("Jira Task Description")>] description: string
         ) : Task<string> =
         task {
+            printfn $"name {taskName}"
+            printfn $"desc {description}"
             return "Done"
         }
 

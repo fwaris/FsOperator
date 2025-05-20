@@ -11,6 +11,7 @@ open FsOpCore
 open Avalonia.Threading
 
 module Update =
+    let mailbox = Channel.CreateBounded<ClientMsg>(10)
 
     let subscribeBackground (model:Model) =
         let backgroundEvent dispatch =
@@ -58,7 +59,7 @@ module Update =
             opTask = OpTask.empty
             isDirty = false
             runState = None
-            mailbox = Channel.CreateBounded(10)
+            mailbox = mailbox
             log = []
             action = ""
             statusMsg = None,""

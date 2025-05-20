@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "DotnetDll": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+      "commandLineArgs": "$(TargetPath)"
+    }
+  }
+}
