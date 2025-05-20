@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open System
+open System.IO
 
 [<AutoOpen>]
 module Utility =
@@ -38,3 +39,4 @@ module Utility =
         |> Seq.toArray 
         |> String
 
+    let (@@) (a:string) (b:string) = Path.Combine(a,b)
