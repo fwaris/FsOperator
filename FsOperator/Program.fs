@@ -1,4 +1,12 @@
 ﻿namespace FsOperator
+open System
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
+open Avalonia.Input
+open System.Net.Http
+open System.Net.Http.Headers
+open Microsoft.AspNetCore.Builder
 open FsOpCore
 open Elmish
 open Avalonia
@@ -7,15 +15,6 @@ open Avalonia.Themes.Fluent
 open Avalonia.FuncUI
 open Avalonia.FuncUI.Elmish
 open Avalonia.FuncUI.Hosts
-open System
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
-open Microsoft.Extensions.Logging
-open Avalonia.Input
-open Avalonia.Markup.Xaml.Styling
-open Avalonia.Logging
-open Microsoft.Extensions.Hosting
-
 
 type MainWindow() as this =
     inherit HostWindow()
@@ -57,19 +56,28 @@ type App() =
 module Program =
     [<EntryPoint; STAThread>]
     let main(args: string[]) =
-        let builder = Host.CreateApplicationBuilder(args)
-
+        let builder = WebApplication.CreateBuilder()
         builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
-            .WithTools<McpTools.JiraTools>() 
-        |> ignore
+                .AddMcpServer()
+                .WithHttpTransport()
+                .WithTools<McpTools.JiraTools>()
+                |> ignore
 
         builder.Logging.AddConsole(fun options ->
             options.LogToStandardErrorThreshold <- LogLevel.Trace
         ) |> ignore
 
-        builder.Build().RunAsync() |> ignore // |> Async.AwaitTask |> Async.RunSynchronously
+        builder.Services.AddSingleton<HttpClient>(fun _ ->
+            let client = new HttpClient(BaseAddress = Uri("https://api.weather.gov"))
+            client.DefaultRequestHeaders.UserAgent.Add(ProductInfoHeaderValue("weather-tool", "1.0"))
+            client
+        ) |> ignore
+
+
+        let app = builder.Build()
+        app.UseHttpsRedirection() |> ignore
+        app.MapMcp() |> ignore
+        app.RunAsync() |> ignore // |> Async.AwaitTask |> Async.RunSynchronously
 
         System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
         AppBuilder
