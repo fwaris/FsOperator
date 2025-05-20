@@ -29,6 +29,16 @@ type Reasoning = {
   summary : string option    
   generate_summary : string option
 }
+with 
+    static member Default = {
+        effort = None
+        summary = None
+        generate_summary = None
+    }
+    static member Medium = "medium"
+    static member High = "high"
+    static member Low = "low"
+
 
 type TextOutputFormat = 
     | [<JsonName "text" >] Text

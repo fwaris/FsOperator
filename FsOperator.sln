@@ -4,9 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOperator", "FsOperator\FsOperator.fsproj", "{D43CC30F-7769-4CB8-A88D-2A9230A51417}"
-	ProjectSection(ProjectDependencies) = postProject
-		{18D017FA-1D20-4554-BD22-0AA0B7312586} = {18D017FA-1D20-4554-BD22-0AA0B7312586}
-	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponses", "FsResponses\FsResponses.fsproj", "{0CF6F063-17EC-46B0-B9BE-6FCE71F9EE00}"
 EndProject
@@ -19,6 +16,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCore", "FsOpCore\FsOpCore.fsproj", "{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpRecorderSample", "FsOpRecorderSample\FsOpRecorderSample.fsproj", "{8FF2BC66-5D1F-40C5-8243-9B7CFA86EEBF}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpMCPServer", "FsOpMCPServer\FsOpMCPServer.fsproj", "{16BA1E12-BF1C-409F-9396-77F2B31BDAC7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -54,6 +53,10 @@ Global
 		{8FF2BC66-5D1F-40C5-8243-9B7CFA86EEBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8FF2BC66-5D1F-40C5-8243-9B7CFA86EEBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8FF2BC66-5D1F-40C5-8243-9B7CFA86EEBF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16BA1E12-BF1C-409F-9396-77F2B31BDAC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16BA1E12-BF1C-409F-9396-77F2B31BDAC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16BA1E12-BF1C-409F-9396-77F2B31BDAC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16BA1E12-BF1C-409F-9396-77F2B31BDAC7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
