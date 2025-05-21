@@ -12,13 +12,14 @@ module Browser =
         async {
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
-                let browserOptions = BrowserTypeLaunchOptions(Headless = false)   
+                let browserOptions = BrowserTypeLaunchOptions(Headless = false)
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                       
                 //let contextOptions = BrowserNewContextOptions()
                 //contextOptions.ViewportSize <- ViewportSize(Width=1280, Height=768)
                 //let! context = browser.NewContextAsync(contextOptions) |> Async.AwaitTask
                 let! page = browser.NewPageAsync() |> Async.AwaitTask
                 do! page.SetViewportSizeAsync(1280, 768) |> Async.AwaitTask
+                page.SetDefaultTimeout(10000f)
                 //let! r =  context.Pages.[0].GotoAsync("https://www.google.com") |> Async.AwaitTask
                 _connection.Value <- Some browser
                 launchHandle.Set() |> ignore
