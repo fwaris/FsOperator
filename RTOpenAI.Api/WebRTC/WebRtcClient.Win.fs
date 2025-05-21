@@ -96,10 +96,10 @@ type WebRtcClientWin() =
     member this.SendOffer(ephemeralKey:string,url:string) =
         task {
             let offer = peerConnection.createOffer()
-            //Log.info $"Offer SDP:\r\n{offer.sdp}"
+            Log.info $"Offer SDP:\r\n{offer.sdp}"
             do! peerConnection.setLocalDescription(offer)
             let! answer = Utils.getAnswerSdp ephemeralKey url offer.sdp
-            //Log.info $"Answer SDP:\r\n{answer}"
+            Log.info $"Answer SDP:\r\n{answer}"
             let r = peerConnection.setRemoteDescription(RTCSessionDescriptionInit(
                                                         sdp=answer, ``type`` = RTCSdpType.answer))
             if r = SetDescriptionResultEnum.OK then 
