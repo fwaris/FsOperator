@@ -45,16 +45,7 @@ module Actions =
         | "wheel"   | "Wheel"   -> Wheel
         | x -> Log.info $"cannot use '{x}' button"; Unknown
 
-    let pressKeys (page:IPage) (keys:string list) = 
-        task {
-            let keys = List.rev keys
-            let key,modifiers =  keys.Head, List.rev keys.Tail
-            for m in modifiers do 
-                do! page.Keyboard.DownAsync(m)
-            do! page.Keyboard.PressAsync(key)
-            for m in modifiers do 
-                do! page.Keyboard.UpAsync(m)
-        }
+
 
     let perform (action:Action)  =
         async {
@@ -64,19 +55,15 @@ module Actions =
             | Click p -> 
                 match mouseButton p.button with
                 | Btn btn when btn = MouseButton.Left -> 
-                    let opts = ClickOptions(Button = btn)
-                    do! page.Mouse.ClickAsync(p.x,p.y, opts) |> Async.AwaitTask
+                    do! Browser.click(p.x, int p.y,FsOperator.MouseButton.Left)                    
                 | Btn btn -> Log.info $"Did not use {btn} button (as it may cause issues on web pages)"
                 | Back -> do! page.GoBackAsync() |> Async.AwaitTask |> Async.Ignore
                 | Forward -> do! page.GoForwardAsync() |> Async.AwaitTask |> Async.Ignore
-                | Wheel -> do! page.Mouse.WheelAsync(p.x,p.y) |> Async.AwaitTask
+                | Wheel -> do! Browser.wheel(p.x,p.y) 
                 | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
             | Scroll p ->
-                do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask                    
-                //let! _ = page.EvaluateFunctionAsync($"() => window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
-                let! _ = page.EvaluateFunctionAsync("function(x, y) { window.scrollBy(x, y); }", p.scroll_x, p.scroll_y) |> Async.AwaitTask
-
-                ()
+                do! Browser.move(p.x,p.y) 
+                do! Browser.scroll(p.scroll_x,p.scroll_y)
             | Keypress p -> 
                 let mappeKeys = 
                     p.keys 
@@ -93,22 +80,18 @@ module Actions =
                         elif k =*= "ArrowUp" then "ArrowUp"
                         elif k =*= "ArrowDown" then "ArrowDown"
                         else k)
-                do! pressKeys page mappeKeys |> Async.AwaitTask
+                do! Browser.pressKeys mappeKeys
             | Type p ->
                 do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
             | Wait  ->  do! Async.Sleep(2000)
             | Screenshot -> ()
-            | Move p -> do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask
-            | Double_click p -> do! page.Mouse.ClickAsync(p.x,p.y, ClickOptions(Count=2)) |> Async.AwaitTask
-            | Drag p ->                     
+            | Move p -> do! Browser.move(p.x,p.y)
+            | Double_click p -> do! Browser.doubleClick(p.x,p.y)
+            | Drag p -> 
                 let s = p.path.Head
                 let t = List.last p.path 
-                do! page.Mouse.MoveAsync(s.x,s.y) |> Async.AwaitTask
-                do! page.Mouse.DownAsync() |> Async.AwaitTask
-                do! page.Mouse.MoveAsync(t.x,t.y,MoveOptions(Steps=10)) |> Async.AwaitTask
-                do! page.Mouse.UpAsync() |> Async.AwaitTask
+                do! Browser.dragDrop (s.x,s.y) (t.x,t.y)
                 Log.info $"Drag and drop from {s} to{t}"
-            do! page.WaitForNetworkIdleAsync() |> Async.AwaitTask
         }
 
     let rec doAction retryCount (action:Action) = 

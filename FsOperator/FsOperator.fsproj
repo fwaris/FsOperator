@@ -18,7 +18,9 @@
 		<AvaloniaResource Include="Assets\**" />
 		<None Include="Assets\typing dot.json" />
 		<None Include="app.manifest" />
+		<Compile Include="BrowserTypes.fs" />
 		<Compile Include="Browser.fs" />
+		<Compile Include="EmbBrowser.fs" />
 	</ItemGroup>
 
 	<ItemGroup>

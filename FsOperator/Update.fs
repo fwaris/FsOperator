@@ -66,9 +66,9 @@ module Update =
             browserMode = Embedded (BrowserAppState.Create())
             isFlashing = false
         }        
-        model,Cmd.ofMsg Initialize
+        //model,Cmd.ofMsg Initialize
         //model,Cmd.ofMsg InitializeDevMode
-        //model,Cmd.ofMsg InitializeExternalBrowser
+        model,Cmd.ofMsg InitializeExternalBrowser
 
     let shouldClearStatus (inComingDT:DateTime option) messageDT =
         match inComingDT,messageDT with
@@ -214,7 +214,7 @@ module Update =
     let startBrowser model =
         async {
             let fnExit ()  = model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore
-            let started = Browser.launchBrowser model.browserMode fnExit
+            let started = EmbBrowser.launchBrowser model.browserMode fnExit
             if not started then
                 return failwith "Failed to start browser"
             return! startP2pServer model
@@ -225,7 +225,7 @@ module Update =
             let fnExit ()  = model.mailbox.Writer.TryWrite(Browser_Emb_ProcessExited) |> ignore
             let bst = match model.browserMode with Embedded bst -> bst | _ -> failwith "startP2pServer called without embedded browser mode"
             bst.listener |> Option.iter (fun l -> l.Dispose())
-            let started = Browser.launchBrowser model.browserMode fnExit
+            let started = EmbBrowser.launchBrowser model.browserMode fnExit
             if not started then
                 return failwith "Failed to start browser"
             bst.tokenSource.Cancel()
@@ -235,7 +235,7 @@ module Update =
             return! startP2pServer model
         }
 
-    let browserPostUrl model = Browser.postUrl model.opTask.url model.browserMode
+    let browserPostUrl model = Browser.postUrl model.opTask.url |> Async.Start //model.browserMode
 
     let checkUrl (url:string) =
         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
@@ -251,7 +251,8 @@ module Update =
         let prevUrl = model.opTask.url
         match checkUrl origUrl with
         | Some url -> 
-            let m = {model with opTask = OpTask.setUrl url model.opTask;  browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
+            let m = {model with opTask = OpTask.setUrl url model.opTask}
+            //let m = {model with opTask = OpTask.setUrl url model.opTask;  browserMode = BrowserMode.setEmbState BST_AwaitAck model.browserMode}
             browserPostUrl m
             let isDirty = prevUrl <> m.opTask.url
             m, if isDirty then Cmd.ofMsg (OpTask_MarkDirty true) else Cmd.none
@@ -334,7 +335,8 @@ module Update =
             | InitializeDevMode -> setTitle win model; model, Cmd.OfAsync.either startP2pServer model Browser_Emb_Started Error
             | InitializeExternalBrowser ->setTitle win model; {model with browserMode = External {|pid=None|}}, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
 
-            | Browser_Connected c  -> browserPostUrl model;  {model with browserMode = model.browserMode |>  BrowserMode.setPid c.pid |> BrowserMode.setEmbState BST_AwaitAck}, Cmd.none
+            | Browser_Connected c  -> browserPostUrl model;  {model with browserMode = model.browserMode |>  BrowserMode.setPid c.pid |> BrowserMode.setEmbState BST_Ready}, Cmd.none
+            //| Browser_Connected c  -> browserPostUrl model;  {model with browserMode = model.browserMode |>  BrowserMode.setPid c.pid |> BrowserMode.setEmbState BST_AwaitAck}, Cmd.none
             | Browser_Emb_ProcessExited -> model, Cmd.OfAsync.either restartBrowser model Browser_Emb_Started Error
             | Browser_Emb_SocketDisconnected -> model, Cmd.none //browser exited signal seems to be stronger so just handle that
             | Browser_Emb_Started None -> model, Cmd.none
