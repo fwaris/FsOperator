@@ -54,4 +54,8 @@
 	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
 	</ItemGroup>
 
+	<!--<Target Name="CustomPostBuild" AfterTargets="Build">
+		<Exec Command="dotnet publish &quot;$(ProjectPath)&quot; -c Release -f net9.0 -o &quot;$(ProjectDir)\..\FsOperator\bin\Release\net9.0\FsOpBrowser&quot;" />
+	</Target>-->
+
 </Project>

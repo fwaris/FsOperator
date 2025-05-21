@@ -45,24 +45,30 @@ type JiraTools() =
                     description="Add task to jira"
                     url="https://jirasw.t-mobile.com/secure/RapidBoard.jspa?rapidView=23224&quickFilter=101511#" 
                     voiceAsstInstructions= ""
-                    textModeInstructions = $"""Your goal is to create OR update a jira sub-task.
+                    textModeInstructions = $"""Instruction: Create a sub-task under the story AGAP-7498 using only the designated method. Do not make any other changes.
 
-Sub Task info:
-- name: '{taskName}'
-- description '{description}'.
+Constraints:
+Only use the "Create sub-task" action available on the parent story's page.
 
-Here are the steps to follow:
-1. Locaate parent story 'AGAP-7498'
-2. See if the sub-task already exits under this story
-3. If story exits, update the description otherwise create a new sub-task
-4.  If the sub-task is assigned, assign it to 'Faisal Waris'
+Do not modify any other data or perform unrelated actions.
 
-Helpful Notes and Hints:
--  Use the JQL query : parent = AGAP-xxxx to find the existing sub-tasks
-- Use search box to find jira 'issues' (stories, sub-tasks, etc).
-- The sub-task can only be added from the story detail page
-- You can get to the detail page of an issue by clicking on the 'AGAP' link.
-- ** Use the "More" menu on the AGAP-7498 story to create a new sub-task; Scroll down on the menu find the create option**
+Steps to Follow:
+1. Search for and open the parent story AGAP-7498.
+Use the search box to locate and navigate to the main page of this story.
+
+2. Access the available actions menu.
+** On the parent story page, click on the **"More"** menu to open the list of actions. **
+** On the parent story page, click on the **"More"** menu to open the list of actions. **
+
+3. Scroll to find the correct action.
+In the "More" dropdown, scroll to the bottom and select the "Create sub-task" action.
+
+Fill in the following details when prompted:
+
+|Field|Value|
+|-----|------|
+|Summary | {taskName} |
+| Description | {description} |
 
 """
                 }
