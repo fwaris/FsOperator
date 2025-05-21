@@ -73,7 +73,9 @@ module Actions =
                 | Unknown -> do! Async.Sleep(500) //model is trying to use a button that is not supported
             | Scroll p ->
                 do! page.Mouse.MoveAsync(p.x,p.y) |> Async.AwaitTask                    
-                let! _ = page.EvaluateFunctionAsync($"() => window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
+                //let! _ = page.EvaluateFunctionAsync($"() => window.scrollBy({p.scroll_x}, {p.scroll_y})")  |> Async.AwaitTask                                          
+                let! _ = page.EvaluateFunctionAsync("function(x, y) { window.scrollBy(x, y); }", p.scroll_x, p.scroll_y) |> Async.AwaitTask
+
                 ()
             | Keypress p -> 
                 let mappeKeys = 

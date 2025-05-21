@@ -83,7 +83,7 @@ module Browser =
             let! wsUrl = getWebSocketDebuggerUrl C.DEBUG_PORT
             let options = ConnectOptions(BrowserWSEndpoint = wsUrl)
             options.DefaultViewport <- ViewPortOptions(Width = 1280, Height = 720)
-            options.ProtocolTimeout <- 10000
+            options.ProtocolTimeout <- 3000
             let! temp = Puppeteer.ConnectAsync(options)    
             let! _  = temp.CloseAsync() |> Async.AwaitTask //clear any hanging sessions
             let! browser = Puppeteer.ConnectAsync(options) |> Async.AwaitTask
@@ -203,8 +203,12 @@ module Browser =
     let page () = 
         async {
             let! browser = connection() 
+            Log.info $"Browser connected: {browser.IsConnected}"
             let! pages = browser.PagesAsync() |> Async.AwaitTask     
+            Log.info "got pages; waiting for network idle ..."
             let page = pages |> Seq.toList |> Seq.head
+            do! page.WaitForNetworkIdleAsync() |> Async.AwaitTask
+            Log.info "wait for idle completed"
             //do! page.BringToFrontAsync() |> Async.AwaitTask
             //for f in page.Frames do 
             //    debug $"frame: {f.Url} isMain {page.MainFrame.Url = f.Url}"
@@ -219,11 +223,12 @@ module Browser =
     let snapshot() = 
         async {                   
             let! page = page()
-  
+            Log.info $"taking screenshot of {page.Url}"
             let opts = ScreenshotOptions()
             opts.BurstMode <- true
-            let! image = page.ScreenshotDataAsync() |> Async.AwaitTask
+            let! image = page.ScreenshotDataAsync(opts) |> Async.AwaitTask
             do! page.SetBurstModeOffAsync() |> Async.AwaitTask
+            Log.info $"done snapshot"
             let bmp = SKBitmap.Decode(image)
             let imgUrl = FsResponses.RUtils.toImageUri image
             File.WriteAllBytes(Path.Combine(homePath.Value, @"screenshot.png"), image)
