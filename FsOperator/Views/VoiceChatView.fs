@@ -1,24 +1,17 @@
 ﻿namespace FsOperator
-open System
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open Avalonia.FuncUI
-open Avalonia.Labs.Lottie
-open Avalonia.Labs.Lottie.Ext
-open Avalonia.Styling
-open Avalonia.Platform
-
 
 [<AbstractClass; Sealed>]
 type VoiceChatView =    
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         Grid.create [
             Grid.column 1
@@ -37,7 +30,7 @@ type VoiceChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         SelectableTextBlock.create [
-                            TextBlock.text (RunState.voiceSysMsg model.runState)
+                            TextBlock.text (TaskState.voiceSysMsg model.taskState)
                             TextBlock.textWrapping TextWrapping.Wrap
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Stretch
@@ -48,7 +41,7 @@ type VoiceChatView =
                             TextBlock.fontSize 14.
                         ]
                         Button.create [
-                            Button.isEnabled (BrowserMode.isReady model.browserMode  
+                            Button.isEnabled (model.browserMode.IsBM_Ready
                                               && (csMode.IsCM_Init 
                                                   || csMode.IsCM_Voice
                                                   || csState.IsCUA_Init))
@@ -71,7 +64,7 @@ type VoiceChatView =
                         ChatHistoryView.chatHistory 
                             leftMargin 
                             model 
-                            (RunState.voiceChatMessages model.runState)
+                            (TaskState.voiceChatMessages model.taskState)
                             dispatch)                            
                 ]
                 GridSplitter.create [

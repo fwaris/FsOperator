@@ -17,8 +17,8 @@ type ChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         TabControl.create [
             TabControl.horizontalAlignment HorizontalAlignment.Stretch

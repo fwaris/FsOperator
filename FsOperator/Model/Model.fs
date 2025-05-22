@@ -2,7 +2,6 @@
 open System
 open System.Threading.Channels
 open FsOpCore
-open System.Net.Sockets
 
 type CUAState = CUA_Init | CUA_Loop | CUA_Pause
 
@@ -36,9 +35,8 @@ module Bus =
     let postWarning bus warning = postMessage bus (StatusMsg_Set warning)
     let postToCua bus req = bus.toCua.Writer.TryWrite(req) |> ignore
 
-
-//State needed for the duration of a task
-type RunState = {
+///State needed for the duration of a running task
+type TaskState = {
     bus : Bus
     lastCuaResponse : Ref<FsResponses.Response option>
     question : string
@@ -60,14 +58,11 @@ with static member Create mailbox instructions =
                 lastFunctionCallId = ref None
             }
 
+//convenice functions to manage task state
+module TaskState =
 
-
-
-//convenice functions to manage RunState
-module RunState =
-
-    let appendChatMsg msg (runState:RunState option) =
-        runState
+    let appendChatMsg msg (taskState:TaskState option) =
+        taskState
         |> Option.map (fun runState -> 
             let chatMode = 
                 match runState.chatMode with
@@ -76,25 +71,25 @@ module RunState =
                 | CM_Init -> CM_Init
             {runState with chatMode = chatMode})
 
-    let setVoiceConnecton conn (rs:RunState option) = 
-        rs 
+    let setVoiceConnecton conn (taskState:TaskState option) = 
+        taskState 
         |> Option.map (fun rs ->
             match rs.chatMode with 
             | CM_Voice v -> CM_Voice {v with connection = conn}
             | x -> x 
             |> fun chatMode -> {rs with chatMode = chatMode})
 
-    let chatMode = function | Some (rs:RunState) -> rs.chatMode | _ -> CM_Init
-    let cuaMode = function | Some (rs:RunState) -> rs.cuaState | _ -> CUA_Init
-    let setMode mode (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with chatMode=mode})
-    let setState state (runState:RunState option)  = runState |> Option.map (fun rs -> {rs with cuaState=state})
-    let lastFunctionCallId (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastFunctionCallId.Value)
-    let setQuestion question = function | Some (rs:RunState) -> Some {rs with question=question} | _ -> None
-    let question (runState:RunState option)  = runState |> Option.map _.question |> Option.defaultValue ""
-    let lastCuaResponse (runState:RunState option)  = runState |> Option.bind (fun rs -> rs.lastCuaResponse.Value)
+    let chatMode = function | Some (taskState:TaskState) -> taskState.chatMode | _ -> CM_Init
+    let cuaMode = function | Some (taskState:TaskState) -> taskState.cuaState | _ -> CUA_Init
+    let setMode mode (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with chatMode=mode})
+    let setState state (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with cuaState=state})
+    let lastFunctionCallId (taskState:TaskState option)  = taskState |> Option.bind (fun ts -> ts.lastFunctionCallId.Value)
+    let setQuestion question = function | Some (rs:TaskState) -> Some {rs with question=question} | _ -> None
+    let question (taskState:TaskState option)  = taskState |> Option.map _.question |> Option.defaultValue ""
+    let lastCuaResponse (taskState:TaskState option)  = taskState |> Option.bind (fun rs -> rs.lastCuaResponse.Value)
 
-    let messages (runState:RunState option)  = 
-        runState 
+    let messages (taskState:TaskState option)  = 
+        taskState 
         |> Option.map (fun rs -> 
             match rs.chatMode with
             | CM_Text c -> c.messages
@@ -102,63 +97,62 @@ module RunState =
             | CM_Init -> [])
         |> Option.defaultValue []
 
-    let textChatMessages (runState:RunState option)  = 
-        runState 
+    let textChatMessages (taskState:TaskState option)  = 
+        taskState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Text c -> Some c.messages
             | _ -> None)
         |> Option.defaultValue []
 
-    let voiceChatMessages (runState:RunState option)  = 
-        runState 
-        |> Option.bind (fun rs -> 
-            match rs.chatMode with
+    let voiceChatMessages (taskState:TaskState option)  = 
+        taskState 
+        |> Option.bind (fun ts -> 
+            match ts.chatMode with
             | CM_Voice v -> Some v.chat.messages
             | _ -> None)
         |> Option.defaultValue []
 
 
-    let lastAssistantMessage (runState:RunState option)  = 
-        runState
+    let lastAssistantMessage (taskState:TaskState option)  = 
+        taskState
         |> messages
         |> List.tryLast
         |> Option.bind (function | Assistant m -> Some m | _ -> None)
         
-    let voiceConnection (runState:RunState option)  = 
-        runState 
-        |> Option.bind (fun rs -> 
+    let voiceConnection (taskState:TaskState option)  = 
+        taskState 
+        |> Option.map (fun rs -> 
             match rs.chatMode with
-            | CM_Voice v when v.connection.Value.IsSome  -> v.connection.Value
-            | CM_Voice v -> failwith "no voice connection set"
+            | CM_Voice v  -> v.connection
             | _ -> failwith "not a voice connection")
 
     let initForText mailbox opTask = 
-        {RunState.Create mailbox opTask with 
+        {TaskState.Create mailbox opTask with 
             chatMode = CM_Text {Chat.Default with systemMessage = Some opTask.textModeInstructions}
             cuaState = CUA_Init
         }
 
     let initForVoice mailbox instructions = 
-        {RunState.Create mailbox instructions with             
+        {TaskState.Create mailbox instructions with             
             chatMode = CM_Voice 
                         {
-                         connection = ref (RTOpenAI.Api.Connection.create() |> Some)
+                         connection = ref None
                          chat = Chat.Default
                          voiceAsstInstructions = OpTask.voicePromptOrDefault instructions.voiceAsstInstructions
                         }
         }
     
-    let voiceAsstInstructions (runState:RunState option) = 
-        runState 
+    let voiceAsstInstructions (taskState:TaskState option) = 
+        taskState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Voice v -> Some v.voiceAsstInstructions
             | _ -> None)
         |> Option.defaultValue ""
 
-    let setVoiceAsstInstructions text (runState:RunState option) = 
-        runState 
+    let setVoiceAsstInstructions text (taskState:TaskState option) = 
+        taskState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Voice v -> 
@@ -166,16 +160,16 @@ module RunState =
                 Some {rs with chatMode = mode}
             | _ -> None)
 
-    let voiceSysMsg (runState:RunState option) = 
-        runState 
+    let voiceSysMsg (taskState:TaskState option) = 
+        taskState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Voice v -> v.chat.systemMessage
             | _ -> None)
         |> Option.defaultValue ""
 
-    let setVoiceSysMsg text (runState:RunState option) = 
-        runState 
+    let setVoiceSysMsg text (taskState:TaskState option) = 
+        taskState 
         |> Option.bind (fun rs -> 
             match rs.chatMode with
             | CM_Voice v -> 
@@ -183,32 +177,32 @@ module RunState =
                 Some {rs with chatMode = mode}
             | _ -> None)                
 
-    let appendVoiceMessage text (runState:RunState option) =
-        match runState with 
+    let appendVoiceMessage text (taskState:TaskState option) =
+        match taskState with 
         | Some rs -> 
             match rs.chatMode with 
             | CM_Voice v -> 
                 if v.chat.systemMessage.IsNone then 
                    Some {rs with chatMode = CM_Voice {v with chat.systemMessage = Some text}}
                 else 
-                    RunState.appendChatMsg (User text) runState 
-            | _ -> runState
+                    TaskState.appendChatMsg (User text) taskState 
+            | _ -> taskState
         | None -> None
 
-    let lastResponseComputerCall (runState:RunState option) = 
-        runState 
+    let lastResponseComputerCall (taskState:TaskState option) = 
+        taskState 
         |> Option.bind (fun rs -> 
             rs.lastCuaResponse.Value
             |> Option.bind (fun r -> 
                 r.output |> List.tryPick (function FsResponses.Computer_call cb -> Some cb | _ -> None)))
         
-    let stop (runState:RunState option ) =
-        match runState with
-        | Some runState -> 
-            runState.tokenSource.Cancel()
-            runState.bus.fromCua.Writer.TryComplete() |> ignore
-            runState.bus.toCua.Writer.TryComplete()   |> ignore
-            Some {runState with cuaState = CUA_Init}
+    let stop (taskState:TaskState option ) =
+        match taskState with
+        | Some ts -> 
+            ts.tokenSource.Cancel()
+            ts.bus.fromCua.Writer.TryComplete() |> ignore
+            ts.bus.toCua.Writer.TryComplete()   |> ignore
+            Some {ts with cuaState = CUA_Init}
         | None -> None
  
 //request to get the ephemeral key    
@@ -223,8 +217,10 @@ with static member Default = {
         instructions = "You are a friendly assistant"
     }        
 
+type BrowserMode = BM_Init | BM_Ready
+
 type Model = {
-    runState : RunState option
+    taskState : TaskState option
     opTask: OpTask
     isDirty : bool
     mailbox : Channel<ClientMsg>
@@ -236,15 +232,8 @@ type Model = {
 }
 
 type ClientMsg =
-    | Initialize
-    | InitializeDevMode
     | InitializeExternalBrowser
-
-    | Browser_Connected of {|pid:int|}
-    | Browser_Emb_Started of BrowserAppState option
-    | Browser_Emb_SocketDisconnected 
-    | Browser_Emb_ProcessExited
-    | Browser_Emb_UrlSet of string
+    | Browser_Connected of unit
 
     | OpTask_SetTextInstructions of string
     | OpTask_Update of OpTask
@@ -266,6 +255,7 @@ type ClientMsg =
     | StatusMsg_Clear of DateTime option
     | Error of exn
     | Abort of (exn option*string)
+    | Nop of unit
     | TestSomething
 
     | Chat_CUATurnEnd

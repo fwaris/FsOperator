@@ -96,8 +96,8 @@ module ComputerUse =
                 Log.exn (ex,"Error in sendTextResponse")
         }
 
-    let getResponseIdsAndChecks (runState:RunState) = 
-        runState.lastCuaResponse.Value
+    let getResponseIdsAndChecks (taskState:TaskState) = 
+        taskState.lastCuaResponse.Value
         |> Option.bind (fun r -> 
             let safetyChecks = r.output |> List.choose (function Computer_call cb -> Some cb.pending_safety_checks | _ -> None) |> List.concat
             r.output
@@ -109,13 +109,13 @@ module ComputerUse =
             |> Option.map (fun cbId -> r.id, cbId, safetyChecks) //return the response id and the computer call id)
         )
 
-    let computerCallResponse (runState:RunState) =
+    let computerCallResponse (taskState:TaskState) =
         async {            
             let! page = Browser.page()
-            match getResponseIdsAndChecks runState with
+            match getResponseIdsAndChecks taskState with
             | None -> 
-                runState.bus.mailbox.Writer.TryWrite(Log_Append "turn end") |> ignore
-                runState.bus.mailbox.Writer.TryWrite(Chat_CUATurnEnd) |> ignore
+                taskState.bus.mailbox.Writer.TryWrite(Log_Append "turn end") |> ignore
+                taskState.bus.mailbox.Writer.TryWrite(Chat_CUATurnEnd) |> ignore
                 return ()
             | Some (prevId, lastCallId, safetyChecks) -> 
                 let! imgUrl,(w,h) = Browser.snapshot()
@@ -136,38 +136,38 @@ module ComputerUse =
                                 truncation = Some Truncation.auto
                           }
 
-                do! runState.bus.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
+                do! taskState.bus.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
 
                         
-    let startCuaLoop (runState:RunState) = 
+    let startCuaLoop (taskState:TaskState) = 
         let rec loop retryCount = 
             async {  
                 try 
-                    let! response = runState.bus.fromCua.Reader.ReadAsync(runState.tokenSource.Token).AsTask() |> Async.AwaitTask 
-                    if runState.tokenSource.IsCancellationRequested |> not then 
-                        runState.lastCuaResponse.Value <- Some response
+                    let! response = taskState.bus.fromCua.Reader.ReadAsync(taskState.tokenSource.Token).AsTask() |> Async.AwaitTask 
+                    if taskState.tokenSource.IsCancellationRequested |> not then 
+                        taskState.lastCuaResponse.Value <- Some response
                         let mutable hasComputerCall = false
                         for o in response.output do
                             match o with
                             | Computer_call cb -> 
                                 hasComputerCall <- true
-                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning runState.bus
-                                cb.action |> Actions.actionToString |> Bus.postAction runState.bus
+                                cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning taskState.bus
+                                cb.action |> Actions.actionToString |> Bus.postAction taskState.bus
                                 //do! Async.Sleep 100
                                 do! Actions.doAction 2 cb.action 
                                 //do! Async.Sleep 1000
-                                do! computerCallResponse runState
+                                do! computerCallResponse taskState
                             | Message m -> 
                                 let outputText = RUtils.outputText response
                                 let msg = Assistant {id = response.id; content = outputText}
-                                Chat_Append msg |> Bus.postMessage runState.bus 
+                                Chat_Append msg |> Bus.postMessage taskState.bus 
                             | _  -> ()
-                        if runState.tokenSource.IsCancellationRequested |> not then 
+                        if taskState.tokenSource.IsCancellationRequested |> not then 
                             if hasComputerCall then 
                                 return! loop 0
                             else
-                                Chat_CUATurnEnd |> Bus.postMessage runState.bus
+                                Chat_CUATurnEnd |> Bus.postMessage taskState.bus
                 with ex -> 
                     debug $"Error in loop: %s{ex.Message}"
                     do! Browser.closeConnection()
@@ -176,9 +176,9 @@ module ComputerUse =
                         return! loop(retryCount + 1)                   
                     else
                         Log.exn (ex,"Error in loop")
-                        Abort (Some ex,$"Error in loop: %s{ex.Message}") |> Bus.postMessage runState.bus 
+                        Abort (Some ex,$"Error in loop: %s{ex.Message}") |> Bus.postMessage taskState.bus 
             }
-        Async.Start(loop 0,runState.tokenSource.Token)
+        Async.Start(loop 0,taskState.tokenSource.Token)
         
         
 

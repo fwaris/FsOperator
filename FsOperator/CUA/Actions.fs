@@ -9,7 +9,7 @@ open PuppeteerSharp.Input
 
 
 module Actions = 
-    let private (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
+
 
     let actionToString action = 
         try
@@ -65,22 +65,8 @@ module Actions =
                 do! Browser.move(p.x,p.y) 
                 do! Browser.scroll(p.scroll_x,p.scroll_y)
             | Keypress p -> 
-                let mappeKeys = 
-                    p.keys 
-                    |> List.map (fun k -> 
-                        if k =*= "Enter" then "Enter"                             //Playwright does not support Enter key
-                        elif k =*= "space" then " "
-                        elif k =*= "backspace" then "Backspace"
-                        elif k =*= "ESC" then "Escape"
-                        elif k =*= "SHIFT" then "Shift"
-                        elif k =*= "CTRL" then "Control"
-                        elif k =*= "TAB" then "Tab"
-                        elif k =*= "ArrowLeft" then "ArrowLeft"
-                        elif k =*= "ArrowRight" then "ArrowRight"
-                        elif k =*= "ArrowUp" then "ArrowUp"
-                        elif k =*= "ArrowDown" then "ArrowDown"
-                        else k)
-                do! Browser.pressKeys mappeKeys
+                let mappedKeys = Browser.mapKeys p.keys
+                do! Browser.pressKeys mappedKeys
             | Type p ->
                 do! page.Keyboard.TypeAsync(p.text) |> Async.AwaitTask
             | Wait  ->  do! Async.Sleep(2000)

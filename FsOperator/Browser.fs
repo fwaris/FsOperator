@@ -7,6 +7,7 @@ open System.Threading
 module Browser =
     let _connection : Ref<IBrowser option> = ref None
     let _waitHandle : Ref<ManualResetEvent option> = ref None
+    let _prevUrl : Ref<string option> = ref None
     
     let launch (handle:WaitHandle) (launchHandle:ManualResetEvent) = 
         async {
@@ -14,32 +15,45 @@ module Browser =
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
                 let browserOptions = BrowserTypeLaunchOptions(Headless = false)
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                       
-                //let contextOptions = BrowserNewContextOptions()
-                //contextOptions.ViewportSize <- ViewportSize(Width=1280, Height=768)
-                //let! context = browser.NewContextAsync(contextOptions) |> Async.AwaitTask
                 let! page = browser.NewPageAsync() |> Async.AwaitTask
-                do! page.SetViewportSizeAsync(1280, 768) |> Async.AwaitTask
-                page.SetDefaultTimeout(10000f)
-                //let! r =  context.Pages.[0].GotoAsync("https://www.google.com") |> Async.AwaitTask
-                _connection.Value <- Some browser
+                do! page.SetViewportSizeAsync(1280, 768) |> Async.AwaitTask //for OpenAI CUA 1280x768 is needed
+                page.SetDefaultTimeout(30000f)
                 launchHandle.Set() |> ignore
-                let! r = Async.AwaitWaitHandle handle
+                _connection.Value <- Some browser
+                match _prevUrl.Value with 
+                | Some url -> do! page.GotoAsync(url) |> Async.AwaitTask |> Async.Ignore
+                | None -> ()
+                let! r = Async.AwaitWaitHandle handle //need to wait on launch thread otherwise the browser closes.
                 ()
             with ex -> 
                 Log.exn (ex,"Error in launch")
                 return raise ex
         }
 
+    let shutdown() = 
+        async {
+            try 
+                try
+                    match _waitHandle.Value with  Some w -> w.Set() |> ignore | None -> ()
+                    match _connection.Value with Some conn -> conn.CloseAsync() |> ignore| None -> ()   
+                with ex -> 
+                    Log.exn ( ex,"Error in shutdown")
+            finally 
+                _waitHandle.Value <- None
+                _connection.Value <- None
+        }
 
     let connection () = 
         async {
             match _connection.Value with
             | Some conn when conn.IsConnected -> return conn
             | _ -> 
+                let! c = Async.StartChild(shutdown(),1000) 
+                do! c
                 _waitHandle.Value <- Some (new ManualResetEvent(false))           
                 use whLaunch = new ManualResetEvent(false)
                 do Async.Start(launch _waitHandle.Value.Value whLaunch)
-                let! r = Async.AwaitWaitHandle(whLaunch, 5000)
+                let! r = Async.AwaitWaitHandle(whLaunch, 30000)
                 if r then 
                     Log.info "browser launched"
                     return _connection.Value.Value
@@ -47,26 +61,23 @@ module Browser =
                     Log.info "browser launch failed"
                     return failwith "browser launch failed"
         }
+
+    let waitForIdle (page:IPage) = 
+        async {
+            let loadState = LoadState.NetworkIdle
+            let opts = PageWaitForLoadStateOptions()
+            opts.Timeout <- 5000.f
+            do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask            
+        }
      
     let page () = 
         async {            
             let! browser = connection() 
-            Log.info $"Browser connected: {browser.IsConnected}"
             let page = browser.Contexts.[0].Pages |> Seq.last
             Log.info "got pages; waiting for network idle ..."
-            let loadState = LoadState.NetworkIdle
-            let opts = PageWaitForLoadStateOptions()
-            opts.Timeout <- 1000.f
-            do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask            
-            Log.info "wait for idle completed"
-            //do! page.BringToFrontAsync() |> Async.AwaitTask
-            //for f in page.Frames do 
-            //    debug $"frame: {f.Url} isMain {page.MainFrame.Url = f.Url}"
-            //debug "----"
-            //let opts = WaitForNetworkIdleOptions()
-            //opts.Timeout <- 1000
-            //opts.IdleTime <- 200
-            //do! page.WaitForNetworkIdleAsync() |> Async.AwaitTask           
+            let! c = Async.StartChild(waitForIdle page, 5000)
+            try do! c with ex -> Log.info $"waitForIdle failed"
+            _prevUrl.Value <- Some page.Url
             return page
         }
     
@@ -85,6 +96,7 @@ module Browser =
         let! page = page()
         do! page.Mouse.DblClickAsync(float32 x, float32 y) |> Async.AwaitTask
     }
+
     let wheel(x:int,y:int) = async{
         let! page = page()
         do! page.Mouse.WheelAsync(float32 x, float32 y) |> Async.AwaitTask
@@ -101,6 +113,31 @@ module Browser =
         let! _ = page.EvaluateAsync("function(x, y) { window.scrollBy(x, y); }",parms) |> Async.AwaitTask
         ()
     }
+
+    let mapKeys keys = 
+        keys
+        |> List.map (fun k -> 
+            if k =*= "Enter" then "Enter"
+            elif k =*= "space" then " "
+            elif k =*= "backspace" then "Backspace"
+            elif k =*= "ESC" then "Escape"
+            elif k =*= "SHIFT" then "Shift"
+            elif k =*= "CTRL" then "Control"
+            elif k =*= "TAB" then "Tab"
+            elif k =*= "ArrowLeft" then "ArrowLeft"
+            elif k =*= "ArrowRight" then "ArrowRight"
+            elif k =*= "ArrowUp" then "ArrowUp"
+            elif k =*= "ArrowDown" then "ArrowDown"
+            elif k =*= "ALT" then "Alt"
+            elif k =*= "ALTGR" then "AltGraph"
+            elif k =*= "META" then "Meta"
+            elif k =*= "PAGEUP" then "PageUp"
+            elif k =*= "PAGEDOWN" then "PageDown"
+            elif k =*= "HOME" then "Home"
+            elif k =*= "END" then "End"
+            elif k =*= "INSERT" then "Insert"
+            elif k =*= "DELETE" then "Delete"
+            else k)
 
     let pressKeys (keys:string list) = 
         async {
@@ -146,6 +183,7 @@ module Browser =
             let! page = page()
             Log.info $"taking snapshot of {page.Url}"
             let opts = PageScreenshotOptions()
+            opts.Animations <- ScreenshotAnimations.Disabled
             let! image = page.ScreenshotAsync() |> Async.AwaitTask
             Log.info $"done snapshot"
             let bmp = SKBitmap.Decode(image)
@@ -155,19 +193,8 @@ module Browser =
         }
 
 
-    let shutdown() = 
-        async {
-            try
-                match _waitHandle.Value with  Some w -> w.Set() | None -> ()
-                match _connection.Value with Some conn -> conn.CloseAsync() |> ignore| None -> ()                
-            with ex -> 
-                Log.exn ( ex,"Error in shutdown")
-                _connection.Value <- None
-        }
-
     let launchExternal() = 
             async {
             let! browser = connection() 
-            let r = {|pid = 0|}
-            return r
+            return ()
         }

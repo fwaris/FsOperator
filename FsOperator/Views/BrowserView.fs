@@ -26,11 +26,11 @@ module Cache =
 type BrowserView =
 
     static member navigationBar model dispatch = 
-        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
         let actionBg = 
             if model.isFlashing 
             then Brushes.DarkOrange 
-            elif (RunState.cuaMode model.runState).IsCUA_Pause 
+            elif (TaskState.cuaMode model.taskState).IsCUA_Pause 
             then  Brushes.DarkRed
             else Brushes.DarkSlateBlue
         Border.create [

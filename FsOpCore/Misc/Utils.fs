@@ -40,3 +40,6 @@ module Utility =
         |> String
 
     let (@@) (a:string) (b:string) = Path.Combine(a,b)
+    
+    /// String comparison that ignores case
+    let (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)

@@ -17,8 +17,8 @@ type TextChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = model.runState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let csMode = model.runState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let csMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         Grid.create [
             Grid.column 1
@@ -52,7 +52,7 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (BrowserMode.isReady model.browserMode  
+                            Button.isEnabled (model.browserMode.IsBM_Ready 
                                               && (csMode.IsCM_Init 
                                                   || csMode.IsCM_Text
                                                   || csState.IsCUA_Init))
@@ -77,7 +77,7 @@ type TextChatView =
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
-                        match model.runState with 
+                        match model.taskState with 
                         | Some rs when rs.cuaState.IsCUA_Pause && rs.chatMode.IsCM_Text -> 
                             Panel.create [
                                 DockPanel.dock Dock.Top
@@ -115,7 +115,7 @@ type TextChatView =
                                 ChatHistoryView.chatHistory 
                                     leftMargin 
                                     model 
-                                    (RunState.textChatMessages model.runState)
+                                    (TaskState.textChatMessages model.taskState)
                                     dispatch)                            
                         ]
                     ]
