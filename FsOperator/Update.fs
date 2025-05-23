@@ -327,7 +327,7 @@ module Update =
             | OpTask_LoadSample sample -> model, Cmd.OfAsync.either checkLoadSample (win,model,sample) OpTask_Loaded Error
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
             | OpTask_SaveAs -> model, Cmd.OfAsync.either saveTaskAs (win,model.opTask) OpTask_Saved Error
-            | OpTask_Saved (Some t) -> {model with opTask=t}, Cmd.ofMsg (OpTask_MarkDirty false)
+            | OpTask_Saved (Some t) -> {model with opTask=t},Cmd.batch[ Cmd.ofMsg (OpTask_MarkDirty false); Cmd.ofMsg (StatusMsg_Set $"saved {t.id}")]
             | OpTask_Saved None -> model, Cmd.none
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
