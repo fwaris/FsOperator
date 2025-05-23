@@ -73,7 +73,7 @@ module Update =
                 return isOn
             }
 
-    let startTextLoop model = 
+    let startTextChat model = 
         if isEmpty model.opTask.textModeInstructions then failwith "No instructions provided for text mode task"
         if isEmpty model.opTask.url then failwith "No URL provided for text mode task" 
         let runState = {TaskState.initForText model.mailbox model.opTask with cuaState = CUA_Loop}
@@ -82,7 +82,7 @@ module Update =
         ComputerUse.startCuaLoop runState 
         {model with taskState =  Some runState}, Cmd.none
 
-    let stopTextLoop model = 
+    let stopTextChat model = 
         {model with taskState = TaskState.stop model.taskState}, Cmd.none
 
     ///start or stop text mode task
@@ -90,28 +90,28 @@ module Update =
         let cuaMode = TaskState.cuaMode model.taskState
         let cmMode = TaskState.chatMode model.taskState
         match cuaMode, cmMode with 
-        | CUA_Init,  _ -> startTextLoop model
-        | _ , CM_Text _ -> stopTextLoop model
+        | CUA_Init,  _ -> startTextChat model
+        | _ , CM_Text _ -> stopTextChat model
         | _,_ -> model, Cmd.none
 
     let stopVoiceChat (model:Model) = 
-        TaskState.voiceConnection model.taskState |> Option.iter VoiceMachine.stopVoiceMachine
+        TaskState.voiceConnection model.taskState |> VoiceMachine.stopVoiceMachine
         {model with taskState = TaskState.stop model.taskState}, Cmd.none
 
        ///start or stop voice mode task
     let startVoiceChat (model:Model) = 
-        let runState = {TaskState.initForVoice model.mailbox model.opTask with cuaState = CUA_Loop}
-        let model = {model with taskState = Some runState}
-        match TaskState.voiceConnection model.taskState with
-        | Some conn -> model, Cmd.OfAsync.either VoiceMachine.startVoiceMachine conn Nop Error
-        | None -> model,Cmd.none        
+        let ts = {TaskState.initForVoice model.mailbox model.opTask with cuaState = CUA_Loop}
+        let model = {model with taskState = Some ts}
+        ComputerUse.startApiMessaging (ts.tokenSource.Token,ts.bus)
+        ComputerUse.startCuaLoop ts
+        model, Cmd.OfAsync.either VoiceMachine.startVoiceMachine ts Nop Error
 
     let startStopVoiceChat (model:Model) = 
         let cuaMode = TaskState.cuaMode model.taskState
         let cmMode = TaskState.chatMode model.taskState
         match cuaMode, cmMode with 
-        | _, CM_Voice _ -> stopVoiceChat model
         | CUA_Init, _ -> startVoiceChat model
+        | _, CM_Voice _ -> stopVoiceChat model
         | _,_ -> model, Cmd.none
 
     ///cua assistant loop has stopped and we need to respond to the assistant's last message (and chatHistory)
@@ -121,17 +121,16 @@ module Update =
         let model = {model with taskState = TaskState.setState CUA_Pause model.taskState}
         match model.taskState with 
         | Some r when r.chatMode.IsCM_Voice -> 
-            let callId = TaskState.lastFunctionCallId model.taskState
+            let callId = TaskState.functionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
             let asstMsg = TaskState.lastAssistantMessage model.taskState
             let conn = TaskState.voiceConnection model.taskState
-            match conn,asstMsg,callId with
-            | Some cnn, Some m, Some callId -> 
-                r.lastFunctionCallId.Value <- None
-                let cnn = match cnn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no voice connection"
-                VoiceAsst.sendFunctionResponse cnn callId m.content
-            | None,_,_ ->  failwith "no voice connection"
-            | _,None,_ -> failwith  "no assistant message as the last message of chat"
-            | _,_,None -> failwith "no function call id found to respond to voice assistant"
+            match asstMsg,callId with
+            |Some m, Some callId -> 
+                let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send"
+                TaskState.removeFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
+                VoiceAsst.sendFunctionResponse conn callId m.content
+            | None,_ -> failwith  "no assistant message as the last message of chat"
+            | _,None -> failwith "no function call id found to respond to voice assistant"
             model, Cmd.none
         | _ -> model,Cmd.none                 
         
@@ -162,7 +161,7 @@ module Update =
     let startOrResumeVoiceCuaLoop (model:Model) instrFromVoiceAsst funcCallId =
         match model.taskState with 
         | Some rs when rs.chatMode.IsCM_Voice -> 
-            rs.lastFunctionCallId.Value <- Some funcCallId 
+            TaskState.setFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION funcCallId rs
             let prevVoiceState = TaskState.chatMode model.taskState |> function | CM_Voice v -> v | _ -> failwith "resumeVoiceChat: not a voice chat mode"
             let voiceState = 
                 match prevVoiceState.chat.messages with 
@@ -174,7 +173,6 @@ module Update =
                         model.taskState 
                         |> TaskState.setMode (CM_Voice voiceState)
                         |> TaskState.setState CUA_Loop}
-
             match prevVoiceState.chat.messages with 
             | [] -> ComputerUse.sendStartMessage rs.bus instrFromVoiceAsst |> Async.Start   // for first instruction from voice assistant treat as the instructions to start the CUA loop
             | _  -> //otherwise resume the chat 
@@ -294,7 +292,7 @@ module Update =
         match ex with Some ex -> Log.exn(ex,msg) | None -> Log.error msg
         let model,stopCmd = 
             match TaskState.chatMode model.taskState with
-            | CM_Text _ -> stopTextLoop model
+            | CM_Text _ -> stopTextChat model
             | CM_Voice _ -> stopVoiceChat model 
             | _ -> model,Cmd.none
         let statusCmd = Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
@@ -309,6 +307,11 @@ module Update =
     let setInstructions model txt =
         let isDirty = txt <> model.opTask.textModeInstructions
         {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
+
+    let clearAll model =
+         stopTextChat model |> ignore
+         stopVoiceChat model |> ignore
+         {model with opTask=OpTask.empty; taskState=None}, Cmd.ofMsg (StatusMsg_Set "cleared")
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -329,6 +332,7 @@ module Update =
             | OpTask_SaveAs -> model, Cmd.OfAsync.either saveTaskAs (win,model.opTask) OpTask_Saved Error
             | OpTask_Saved (Some t) -> {model with opTask=t},Cmd.batch[ Cmd.ofMsg (OpTask_MarkDirty false); Cmd.ofMsg (StatusMsg_Set $"saved {t.id}")]
             | OpTask_Saved None -> model, Cmd.none
+            | OpTask_Clear -> clearAll model
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
             | Action_Flash isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) Action_Flash else Cmd.none
@@ -350,7 +354,7 @@ module Update =
             | Chat_Resume ->  resumeTextCuaLoop model             
 
             | TextChat_StartStopTask -> startStopTextChat model
-            | VoicChat_StartStop -> startStopVoiceChat model
+            | VoiceChat_StartStop -> startStopVoiceChat model
             | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
             //| _ -> model, Cmd.none
         with ex -> 

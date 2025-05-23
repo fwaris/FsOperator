@@ -48,7 +48,7 @@ type VoiceChatView =
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.fontSize 11.
                             Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
-                            Button.onClick (fun _ -> dispatch VoicChat_StartStop) 
+                            Button.onClick (fun _ -> dispatch VoiceChat_StartStop) 
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]

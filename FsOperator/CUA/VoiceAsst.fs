@@ -53,11 +53,26 @@ module VoiceAsst =
                 Bus.postLog taskState.bus $"<-- voice instr. {instructions}"
             with ex ->
                 Bus.postWarning taskState.bus ex.Message
-                RTOpenAI.Api.Log.error $"Error in runInstructions: {ex.Message}"
+                Log.error $"Error in sendInstructions: {ex.Message}"
         }        
+
+    let rec setGotoUrl (taskState:TaskState) (ev:ResponseOutputItemDoneEvent) =
+        async {
+            try                                                 
+                let url = ev.item.arguments |> Option.map (getArg "url") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
+                Bus.postMessage taskState.bus (ClientMsg.OpTask_SetUrl (url))
+                Bus.postLog taskState.bus $"<-- goto url {url}"
+                let conn = TaskState.voiceConnection (Some taskState)
+                let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send responseCreate"
+                sendFunctionResponse conn ev.item.call_id $"set url to {url}"
+            with ex ->
+                Bus.postWarning taskState.bus ex.Message
+                Log.error $"Error in setGotoUrl: {ex.Message}"
+        }    
 
 module VoiceMachine =    
     let ASST_INSTRUCTIONS_FUNCTION = "assistantInstructions"
+    let GOTO_URL_FUNCTION = "gotoUrl"
     let M_AUDIO = "audio"
     let M_TEXT = "text"
     let FUNCTION_CALL = "function_call"
@@ -90,7 +105,18 @@ module VoiceMachine =
                         {
                             ``type`` = "object"
                             properties = Map.ofList ["instructions", {``type``= "string"; description= Some "detailed steps in English"}] 
-                            required = []                            
+                            required = ["instructions"]                            
+                        }
+                }
+                {
+                    ``type`` = "function"
+                    name = GOTO_URL_FUNCTION
+                    description = "Accepts a valid URL (e.g. https://www.microsoft.com), which will be used by the assistant to go to that web page"
+                    parameters =
+                        {
+                            ``type`` = "object"
+                            properties = Map.ofList ["url", {``type``= "string"; description= Some "valid web url"}] 
+                            required = ["url"]                            
                         }
                 }
             ]                
@@ -116,14 +142,20 @@ module VoiceMachine =
             ev.item.arguments
         else
             Some "no instructions found"
-      
-        //if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then
-        //     ev.item.arguments |> Option.defaultValue "no instructions found"
-        //else
-        //    "no instructions: incorrect response type"
-             
-    let  isInstructionsResult (ev:ResponseOutputItemDoneEvent) =
-        ev.item.``type`` = FUNCTION_CALL_OUTPUT && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
+
+    let  isGotoUrlCall (ev:ResponseOutputItemDoneEvent) =
+        ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some GOTO_URL_FUNCTION
+        
+    let  getUrl (ev:ResponseOutputItemDoneEvent) =
+        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some GOTO_URL_FUNCTION then  
+            ev.item.arguments
+        else
+            Some "no instructions found"
+                   
+    let  isFunctionCallResult (ev:ResponseOutputItemDoneEvent) =
+        ev.item.``type`` = FUNCTION_CALL_OUTPUT && 
+            (ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
+            || ev.item.name = Some GOTO_URL_FUNCTION)
                        
     // accepts old state and next event - returns new state
     let update (taskState:TaskState) conn (st:State) ev =
@@ -134,12 +166,19 @@ module VoiceMachine =
             | SessionUpdated s -> VoiceAsst.sendInitResp conn; return {st with currentSession = s.session }
             | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
                 Log.info $"<-- function call {ev.item.name}"
-                if taskState.lastFunctionCallId.Value.IsSome then 
-                    debug $"Ignoring function call {ev.item.name} as we are already processing a function call"
+                if (TaskState.functionId ASST_INSTRUCTIONS_FUNCTION taskState).IsSome then 
+                    Log.info $"Ignoring function call {ev.item.name} as we are already processing a {ASST_INSTRUCTIONS_FUNCTION} function call"
                 else
                     VoiceAsst.sendInstructions taskState ev |> Async.Start
                 return st
-            | ResponseOutputItemDone ev when isInstructionsResult ev  -> return  st            
+            | ResponseOutputItemDone ev when isGotoUrlCall ev  -> 
+                Log.info $"<-- function call {ev.item.name}"
+                if (TaskState.functionId GOTO_URL_FUNCTION taskState).IsSome then 
+                    Log.info $"Ignoring function call {ev.item.name} as we are already processing {GOTO_URL_FUNCTION} function call"
+                else                    
+                    VoiceAsst.setGotoUrl taskState ev |> Async.Start
+                return st
+            | ResponseOutputItemDone ev when isFunctionCallResult ev  -> return  st            
             | ResponseTextDelta ev -> Bus.postLog taskState.bus $"text delta {ev}"; return st
             | ResponseAudioDelta _
             | ResponseAudioTranscriptDelta _
@@ -169,12 +208,14 @@ module VoiceMachine =
             connection.Value <- None
         | None -> ()
             
-    let startVoiceMachine (connection:Ref<Api.Connection option>) =
+    let startVoiceMachine (taskState:TaskState) =
         async {
+            let connection = TaskState.voiceConnection (Some taskState)            
             stopVoiceMachine connection
             let conn = RTOpenAI.Api.Connection.create()
             let keyReq = {Api.Exts.KeyReq.Default with model = C.OPENAI_RT_MODEL_GPT4O}
             let! ephemeralKey = Api.Exts.getOpenAIEphemKey (getApiKey()) keyReq |> Async.AwaitTask
             do! RTOpenAI.Api.Connection.connect ephemeralKey conn |> Async.AwaitTask
+            startReader taskState conn
             connection.Value <- Some conn
         }

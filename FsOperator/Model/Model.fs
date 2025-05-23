@@ -44,7 +44,7 @@ type TaskState = {
     instructions : OpTask
     cuaState : CUAState
     chatMode : ChatMode
-    lastFunctionCallId : Ref<string option> 
+    lastFunctionIdMap : Ref<Map<string,string>>
 }
 with static member Create mailbox instructions =
             {
@@ -55,11 +55,22 @@ with static member Create mailbox instructions =
                 instructions = instructions
                 cuaState = CUA_Init
                 chatMode = CM_Text Chat.Default
-                lastFunctionCallId = ref None
+                lastFunctionIdMap = ref Map.empty
             }
 
 //convenice functions to manage task state
 module TaskState =
+
+    let functionId (key:string) (taskState:TaskState) = 
+        taskState.lastFunctionIdMap.Value |> Map.tryFind key
+
+    let setFunctionId (key:string) (id:string) (ts:TaskState) = 
+        let m = ts.lastFunctionIdMap.Value |> Map.add key id
+        ts.lastFunctionIdMap.Value <- m
+
+    let removeFunctionId (key:string) (ts:TaskState) = 
+        let m = ts.lastFunctionIdMap.Value |> Map.remove key
+        ts.lastFunctionIdMap.Value <- m
 
     let appendChatMsg msg (taskState:TaskState option) =
         taskState
@@ -83,7 +94,6 @@ module TaskState =
     let cuaMode = function | Some (taskState:TaskState) -> taskState.cuaState | _ -> CUA_Init
     let setMode mode (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with chatMode=mode})
     let setState state (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with cuaState=state})
-    let lastFunctionCallId (taskState:TaskState option)  = taskState |> Option.bind (fun ts -> ts.lastFunctionCallId.Value)
     let setQuestion question = function | Some (rs:TaskState) -> Some {rs with question=question} | _ -> None
     let question (taskState:TaskState option)  = taskState |> Option.map _.question |> Option.defaultValue ""
     let lastCuaResponse (taskState:TaskState option)  = taskState |> Option.bind (fun rs -> rs.lastCuaResponse.Value)
@@ -122,10 +132,11 @@ module TaskState =
         
     let voiceConnection (taskState:TaskState option)  = 
         taskState 
-        |> Option.map (fun rs -> 
+        |> Option.bind (fun rs -> 
             match rs.chatMode with
-            | CM_Voice v  -> v.connection
-            | _ -> failwith "not a voice connection")
+            | CM_Voice v  -> Some v.connection
+            | _ -> None)
+        |> Option.defaultWith (fun _ -> failwith "not a voice connection")
 
     let initForText mailbox opTask = 
         {TaskState.Create mailbox opTask with 
@@ -244,6 +255,7 @@ type ClientMsg =
     | OpTask_Loaded of OpTask option
     | OpTask_Save
     | OpTask_SaveAs
+    | OpTask_Clear
     | OpTask_Saved of OpTask option
 
     | Action_Set of string
@@ -266,7 +278,7 @@ type ClientMsg =
     | Chat_Resume
 
     | TextChat_StartStopTask
-    | VoicChat_StartStop
+    | VoiceChat_StartStop
     | VoiceChat_RunInstructions of (string*string)
 
 

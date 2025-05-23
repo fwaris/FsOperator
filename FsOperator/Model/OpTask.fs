@@ -25,6 +25,10 @@ module OpTask =
     let defaultVoicePrompt = """You are to collaborate with a user to help complete a task.
 The task is actually performed by a separate 'assistant'. 
 The assistant has the capability to perform computer actions if instructed.
+**YOU CAN ASK THE assitant TO GOTO WEB PAGES AND PERFORM ACTIONS ON THEM.**
+**Use the function 'gotoUrl' to ask the assistant to go to a specific URL.**
+For example, the assistant can open web pages and browse through them to get infomation.
+Use the supplied tools and functions to instruct the assistant to perform actions.
 You job is to converse with the human user to generate and sumbit the instructions to the assistant.
 The assistant will carry out the task and return with a response - which may be a question or a clarification.
 Again, converse with the user before generating the next instruction for the assistant.

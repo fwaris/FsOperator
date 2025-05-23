@@ -16,14 +16,17 @@ Below is a demonstration an Amazon search session to find a specific type of cel
 
 > *At the current level of technology, human supervision is required—though the future looks very promising.*
 
+> CUA model's instruction following ability seems to be somewhat limited so it need to be paired with another model for better reasoning and instruction following. This is a planned future enhancement.
 ---
 
 ### 🚀 Application Usage
 
-- Ensure **.NET 9.x runtime** is installed. (May require Chromium components to be installed also)
+- Ensure **.NET 9.x runtime or SDK** is installed
+- Set the `OPENAI_API_KEY` environment variable to provide your OpenAI API key. The key should have access to the OpenAI CUA model.
+- Install Playwright Chromium browser component. Typically you need to install [*node.js*](https://nodejs.org) and then  use the command ```npx install playwright```
+
 - Text chat mode has been tested successfully on Windows and MacOS.
 - *Voice chat mode currently works on Windows only (the WebRTC library for MacOS is yet to be included)*
-- Set the `OPENAI_API_KEY` environment variable to provide your OpenAI API key.
 
 #### Steps:
 
@@ -35,7 +38,7 @@ Below is a demonstration an Amazon search session to find a specific type of cel
 6. **Observe computer actions** issued by the model on right end of the address bar. Any warnings, status or error messages are shown at the bottom.
 7. **See log messages** by expanding the panel on the right. It shows all API messages that are sent and received.
 
-> Note: the screen shakes when Puppeteer takes a screenshot. It seems to be coming from Chromium itself - not sure if there is a fix available.
+> Note: the browser screen shakes when a snapshot it taken. This seems to be coming from Chromium itself - not sure if there is a fix available.
 
 The model may issue **security warnings** that ideally should be acknowledged by a human. Currently, the app implicitly acknowledges these warnings to allow the process to continue uninterrupted. They are shown in the status bar.
 
@@ -48,17 +51,4 @@ The model may issue **security warnings** that ideally should be acknowledged by
 
 ---
 
-### 🛠️ Technical Overview
-
-- The embedded browser control is used to simulate real-world web interactions.
-  - On Windows, this requires **Chromium**.
-- The embedded browser comes from [WebViewControl-Avalonia](https://www.nuget.org/packages/WebViewControl-Avalonia)
-- Internally uses [PuppeteerSharp](https://www.nuget.org/packages/PuppeteerSharp) to drive browser automation and take screenshots.
-  - Note: In the code you can switch to the external browser as an option.
-- The UI is built using the versatile [Avalonia.FuncUI](https://github.com/fsprojects/Avalonia.FuncUI), a functional UI framework for Avalonia.
-
-
-Internally, Puppeteer makes a WebSocket connection to the embedded browser via CDP (Chrome DevTools Protocol). This connection is used to take screenshots to send to the CUA model and also to execute the commands issued by the model.
-
----
 

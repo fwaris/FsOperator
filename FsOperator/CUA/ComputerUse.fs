@@ -138,7 +138,6 @@ module ComputerUse =
 
                 do! taskState.bus.toCua.Writer.WriteAsync(req).AsTask() |> Async.AwaitTask                    
         }
-
                         
     let startCuaLoop (taskState:TaskState) = 
         let rec loop retryCount = 
@@ -180,6 +179,4 @@ module ComputerUse =
             }
         Async.Start(loop 0,taskState.tokenSource.Token)
         
-        
-
     

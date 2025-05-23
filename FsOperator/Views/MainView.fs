@@ -227,6 +227,10 @@ type MainView =
                                 MenuItem.onClick (fun _ -> dispatch OpTask_SaveAs)
                             ]
                             MenuItem.create [
+                                MenuItem.header "Clear Task"
+                                MenuItem.onClick (fun _ -> dispatch OpTask_Clear)
+                            ]
+                            MenuItem.create [
                                 MenuItem.header "Load Sample"
                                 MenuItem.viewItems (
                                     OpTask.Samples.allSamples 
