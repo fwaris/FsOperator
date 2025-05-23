@@ -127,6 +127,7 @@ module Browser =
         let! page = page()
         do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
         let js = $"() => window.scrollBy({scrollX}, {scrollY});"
+        
         let! r = page.EvaluateAsync(js) |> Async.AwaitTask
         let i = 1
         ()
