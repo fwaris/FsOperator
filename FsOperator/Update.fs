@@ -35,6 +35,8 @@ module Update =
         ]
 
     let testSomething (model:Model) =
+        Browser.scroll (100,100) (0,-300) |> Async.Start
+        //Browser.pressKeys ["PageDown"] |> Async.Start       
         Log.info "testSomething clicked"
         model,Cmd.none
 

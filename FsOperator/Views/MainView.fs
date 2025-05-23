@@ -295,7 +295,7 @@ type MainView =
                     Panel.children [
                         ListBox.create [
                             ListBox.width 300.
-                            ListBox.margin (Thickness(5.,5.,5.,5.))
+                            ListBox.margin (Thickness(5,12.,5.,5.))
                             ListBox.dataItems model.log
                             ListBox.itemTemplate (
                                 DataTemplateView<string>.create (fun (logEntry:string) -> 

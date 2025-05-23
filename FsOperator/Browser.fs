@@ -64,9 +64,10 @@ module Browser =
 
     let waitForIdle (page:IPage) = 
         async {
-            let loadState = LoadState.NetworkIdle
+            //let loadState = LoadState.NetworkIdle
+            let loadState = LoadState.DOMContentLoaded
             let opts = PageWaitForLoadStateOptions()
-            opts.Timeout <- 5000.f
+            opts.Timeout <- 1000.f
             do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask            
         }
      
@@ -75,11 +76,18 @@ module Browser =
             let! browser = connection() 
             let page = browser.Contexts.[0].Pages |> Seq.last
             Log.info "got pages; waiting for network idle ..."
-            let! c = Async.StartChild(waitForIdle page, 5000)
+            let! c = Async.StartChild(waitForIdle page, 1500)
             try do! c with ex -> Log.info $"waitForIdle failed"
             _prevUrl.Value <- Some page.Url
             return page
         }
+
+    let pageDown() = async {
+        let! page = page()
+        let! _ =  page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)") |> Async.AwaitTask
+        return ()
+    }
+
     
     let click(x:int,y:int, btn:FsOperator.MouseButton) = async{
         let! page = page()
@@ -107,10 +115,20 @@ module Browser =
         do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
     }
 
-    let scroll(x:int,y:int) = async{
+    let scroll2 (x,y) (scrollX:int,scrollY:int) = async{
         let! page = page()
-        let parms = [|x :> obj; y|]
+        do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
+        let parms = [|scrollX :> obj; scrollY|]
         let! _ = page.EvaluateAsync("function(x, y) { window.scrollBy(x, y); }",parms) |> Async.AwaitTask
+        ()
+    }
+
+    let scroll (x,y) (scrollX:int,scrollY:int) = async{
+        let! page = page()
+        do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
+        let js = $"() => window.scrollBy({scrollX}, {scrollY});"
+        let! r = page.EvaluateAsync(js) |> Async.AwaitTask
+        let i = 1
         ()
     }
 
