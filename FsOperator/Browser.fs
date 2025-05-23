@@ -115,14 +115,6 @@ module Browser =
         do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
     }
 
-    let scroll2 (x,y) (scrollX:int,scrollY:int) = async{
-        let! page = page()
-        do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask
-        let parms = [|scrollX :> obj; scrollY|]
-        let! _ = page.EvaluateAsync("function(x, y) { window.scrollBy(x, y); }",parms) |> Async.AwaitTask
-        ()
-    }
-
     let scroll (x,y) (scrollX:int,scrollY:int) = async{
         let! page = page()
         do! page.Mouse.MoveAsync(float32 x, float32 y) |> Async.AwaitTask

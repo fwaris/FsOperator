@@ -74,7 +74,7 @@ Always confirm with the user first before sending the instructions to the assist
                 url="https://twitter.com" 
                 voiceAsstInstructions=""
                 textModeInstructions = """Scroll through my Twitter feed and summarize the latest posts
-about generative AI.
+about "Generative AI".
                 """
             }
 
@@ -85,7 +85,8 @@ about generative AI.
                 url="https://linkedin.com" 
                 voiceAsstInstructions=""
                 textModeInstructions = """Scroll through my LinkedIn feed and summarize the latest posts
-about generative AI."""
+about "Generative AI" 
+"""
             }
 
         let allSamples = [sampleAmazon; sampleNetflix; sampleTwitter; sampleLinked]

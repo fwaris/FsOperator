@@ -15,7 +15,7 @@ module Actions =
         try
             match action with
             | Click p -> $"click({p.x},{p.y},{p.button})"
-            | Scroll p -> $"scroll{p.scroll_x},{p.scroll_y}@{p.x},{p.y})"
+            | Scroll p -> $"scroll {p.scroll_x},{p.scroll_y}@{p.x},{p.y}"
             | Double_click p -> $"dbl_click({p.x},{p.y})"
             | Keypress p -> $"keys {p.keys}"
             | Move p -> $"move({p.x},{p.y})"

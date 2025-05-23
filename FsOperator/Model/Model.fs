@@ -243,6 +243,7 @@ type ClientMsg =
     | OpTask_LoadSample of OpTask
     | OpTask_Loaded of OpTask option
     | OpTask_Save
+    | OpTask_SaveAs
     | OpTask_Saved of OpTask option
 
     | Action_Set of string

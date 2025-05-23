@@ -208,7 +208,6 @@ type MainView =
                 Border.clipToBounds true
                 Border.child g
             ]
-
     
     static member mainMenu model dispatch = 
             Menu.create [
@@ -224,8 +223,8 @@ type MainView =
                                 MenuItem.onClick (fun _ -> dispatch OpTask_Load)
                             ]
                             MenuItem.create [
-                                MenuItem.header "Save Task"
-                                MenuItem.onClick (fun _ -> dispatch OpTask_Save)
+                                MenuItem.header "Save Task As"
+                                MenuItem.onClick (fun _ -> dispatch OpTask_SaveAs)
                             ]
                             MenuItem.create [
                                 MenuItem.header "Load Sample"
@@ -252,6 +251,7 @@ type MainView =
             StackPanel.horizontalAlignment HorizontalAlignment.Right
             StackPanel.verticalAlignment VerticalAlignment.Top
             StackPanel.children [
+                //edit flyout button
                 Button.create [
                     Button.content "\u270f"
                     Button.tip "Edit Instruction"
@@ -264,6 +264,20 @@ type MainView =
                         ]
                     )
                 ]
+                Button.create [
+                    Button.content (
+                        Image.create [
+                            Image.width 24
+                            Image.height 24
+                            Image.source Cache.floppyIcon.Value
+                        ]
+                    )
+                    Button.tip "Save task [Ctrl+S]"
+                    Button.background Brushes.Transparent
+                    Button.hotKey (Input.KeyGesture(Input.Key.S, modifiers=Input.KeyModifiers.Control))
+                    Button.onClick (fun _ -> dispatch OpTask_Save)
+                ]
+                //rest of the toolbar buttons
                 MainView.mainMenu model dispatch
             ]
         ]

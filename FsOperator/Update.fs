@@ -223,18 +223,30 @@ module Update =
                     })
         }
 
-    let saveTask (win:HostWindow, opTask:OpTask) = 
+    let serializeTask (file:string) (opTask:OpTask) = 
+        use strw = System.IO.File.Create file
+        let opTask = OpTask.setId file opTask
+        (System.Text.Json.JsonSerializer.Serialize<OpTask>(strw,opTask))
+        opTask
+
+    let saveTaskAs (win:HostWindow, opTask:OpTask) = 
         async {
             let! file = Dialogs.saveFileDialog win (Some opTask.id) 
             let rslt = 
                 match file with
-                | Some file -> 
-                    use strw = System.IO.File.Create file
-                    let opTask = OpTask.setId file opTask
-                    do (System.Text.Json.JsonSerializer.Serialize<OpTask>(strw,opTask))
-                    Some opTask
+                | Some file -> Some (serializeTask file opTask)                    
                 | None -> None
             return rslt
+        }
+
+    let saveTask (win:HostWindow, opTask:OpTask) = 
+        async {
+            if IO.File.Exists opTask.id then 
+                let rslt = Some (serializeTask opTask.id opTask) 
+                return rslt
+            else
+                let! rslt = saveTaskAs (win,opTask)
+                return rslt            
         }
 
     let loadDlg win = async {
@@ -280,14 +292,23 @@ module Update =
 
     let abort (model:Model) (ex:exn option) msg =
         match ex with Some ex -> Log.exn(ex,msg) | None -> Log.error msg
-        let stopCmd = 
+        let model,stopCmd = 
             match TaskState.chatMode model.taskState with
-            | CM_Text _ -> Cmd.ofMsg TextChat_StartStopTask
-            | CM_Voice _ -> Cmd.ofMsg VoicChat_StartStop
-            | _ -> Cmd.none
+            | CM_Text _ -> stopTextLoop model
+            | CM_Voice _ -> stopVoiceChat model 
+            | _ -> model,Cmd.none
         let statusCmd = Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
         let msgs = Cmd.batch [stopCmd; statusCmd]
         model,msgs
+
+    let updateTask model (instr:OpTask) =
+        let isDirty = instr <> model.opTask
+        let m = {model with opTask=instr}
+        m, Cmd.ofMsg (OpTask_MarkDirty isDirty)
+
+    let setInstructions model txt =
+        let isDirty = txt <> model.opTask.textModeInstructions
+        {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -295,8 +316,8 @@ module Update =
             | InitializeExternalBrowser -> model, Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error
             | Browser_Connected _  -> browserPostUrl model;  {model with browserMode = BM_Ready}, Cmd.none
 
-            | OpTask_SetTextInstructions txt -> let isDirty = txt <> model.opTask.textModeInstructions in {model with opTask=OpTask.setTextPrompt txt model.opTask}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
-            | OpTask_Update instr -> let isDirty = instr <> model.opTask in {model with opTask=instr}, Cmd.ofMsg (OpTask_MarkDirty isDirty)
+            | OpTask_SetTextInstructions txt -> setInstructions model txt
+            | OpTask_Update instr -> updateTask model instr 
             | OpTask_MarkDirty isDirty -> let m = {model with isDirty = isDirty} in setTitle win m; m, Cmd.none
             | OpTask_SetUrl txt -> setUrl model txt
             | OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
@@ -305,6 +326,7 @@ module Update =
             | OpTask_Loaded None -> model, Cmd.none
             | OpTask_LoadSample sample -> model, Cmd.OfAsync.either checkLoadSample (win,model,sample) OpTask_Loaded Error
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
+            | OpTask_SaveAs -> model, Cmd.OfAsync.either saveTaskAs (win,model.opTask) OpTask_Saved Error
             | OpTask_Saved (Some t) -> {model with opTask=t}, Cmd.ofMsg (OpTask_MarkDirty false)
             | OpTask_Saved None -> model, Cmd.none
 
@@ -319,6 +341,7 @@ module Update =
             | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
             | Abort (ex,msg) -> abort model ex msg
             | TestSomething -> testSomething model
+            | Nop _ -> model, Cmd.none
 
             | Chat_CUATurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
             | Chat_UpdateQuestion txt -> {model with taskState = TaskState.setQuestion txt model.taskState}, Cmd.none            
