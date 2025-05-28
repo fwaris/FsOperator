@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFrameworks>net9.0</TargetFrameworks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Include="Misc\Constants.fs" />
+		<Compile Include="Misc\Log.fs" />
+		<Compile Include="Misc\Utils.fs" />
+		<Compile Include="Misc\P2p.fs" />
+		<Compile Include="Controls\Lottie.fs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="FSharp.Control.AsyncSeq" Version="3.2.1" />
+		<PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
+		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="System.Text.Json" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.3.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
+	</ItemGroup>
+
+</Project>

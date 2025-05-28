@@ -1,0 +1,73 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
+		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
+		<OutputType>Exe</OutputType>
+		<TargetFrameworks></TargetFrameworks>
+		<TargetFrameworks Condition="$(IsOSX)">net9.0;$(TargetFrameworks)</TargetFrameworks>
+		<TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<PublishAot>false</PublishAot>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$(IsWindows)">
+		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>		
+	</PropertyGroup>		
+
+	<ItemGroup>
+		<None Include="Assets\save.png" />
+		<None Include="Assets\typing dot.json" />
+		<AvaloniaResource Include="Assets\**\*" />
+		<None Include="app.manifest" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Include="BrowserTypes.fs" />
+		<Compile Include="Browser.fs" />
+		<Compile Include="Model\Chat.fs" />
+		<Compile Include="Model\OpTask.fs" />
+		<Compile Include="Model\Model.fs" />
+		<Compile Include="CUA\Scripts.fs" />
+		<Compile Include="CUA\Preview.fs" />
+		<Compile Include="CUA\Actions.fs" />
+		<Compile Include="CUA\ComputerUse.fs" />
+		<Compile Include="CUA\VoiceAsst.fs" />
+		<Compile Include="Dialogs.fs" />
+		<Compile Include="Update.fs" />
+		<Compile Include="Views\BrowserView.fs" />
+		<Compile Include="Views\ChatHistoryView.fs" />
+		<Compile Include="Views\VoiceChatView.fs" />
+		<Compile Include="Views\TextChatView.fs" />
+		<Compile Include="Views\ChatView.fs" />
+		<Compile Include="Views\MainView.fs" />
+		<Compile Include="McpTools.fs" />
+		<Compile Include="Program.fs" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.0" />
+		<PackageReference Include="Avalonia.Svg.Skia" Version="11.3.0" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
+		<PackageReference Include="PuppeteerSharp" Version="20.1.3" />
+		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
+		<PackageReference Include="System.Text.Json" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.3.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.4.25258.110" />
+		<PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.1" />
+	</ItemGroup>
+	
+	
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
+	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
+	</ItemGroup>
+		
+</Project>
