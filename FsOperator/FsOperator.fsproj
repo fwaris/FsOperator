@@ -26,6 +26,7 @@
 		<Compile Include="BrowserTypes.fs" />
 		<Compile Include="Browser.fs" />
 		<Compile Include="Model\Chat.fs" />
+		<Compile Include="Model\Plan.fs" />
 		<Compile Include="Model\OpTask.fs" />
 		<Compile Include="Model\Model.fs" />
 		<Compile Include="CUA\Scripts.fs" />
