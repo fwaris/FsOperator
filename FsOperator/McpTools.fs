@@ -35,6 +35,7 @@ type JiraTools() =
     static member AddJiraTask
         (
             client: HttpClient,
+            [<Description("Parent Task Id")>] parentTaskId: string,
             [<Description("Jira Task Name")>] taskName: string,
             [<Description("Jira Task Description")>] description: string
         ) : Task<string> =
@@ -45,30 +46,26 @@ type JiraTools() =
                     description="Add task to jira"
                     url="https://jirasw.t-mobile.com/secure/RapidBoard.jspa?rapidView=23224&quickFilter=101511#" 
                     voiceAsstInstructions= ""
-                    textModeInstructions = $"""Instruction: Create a sub-task under the story AGAP-7498 using only the designated method. Do not make any other changes.
+                    textModeInstructions = $"""Goal: Create a sub-task under the story {parentTaskId}.
 
-Constraints:
-Only use the "Create sub-task" action available on the parent story's page.
-
-Do not modify any other data or perform unrelated actions.
+**Just create the sub-task. Do not modify any other data or perform unrelated actions.**
 
 Steps to Follow:
-1. Search for and open the parent story AGAP-7498.
+1. Search for and open the parent story {parentTaskId}.
 Use the search box to locate and navigate to the main page of this story.
 
-2. Access the available actions menu.
-** On the parent story page, click on the **"More"** menu to open the list of actions. **
-** On the parent story page, click on the **"More"** menu to open the list of actions. **
+2. Option action menu.
+** On the parent story page, click on the **"More"** (...) menu to open the list of actions. **
+** On the parent story page, click on the **"More"** (...) menu to open the list of actions. **
 
 3. Scroll to find the correct action.
 In the "More" dropdown, scroll to the bottom and select the "Create sub-task" action.
 
-Fill in the following details when prompted:
+4. On the "Create sub-task" page, fill the following fields with the given values:
 
-|Field|Value|
-|-----|------|
-|Summary | {taskName} |
-| Description | {description} |
+* Summary *:  ```{taskName}```
+* Description*:  ```{description}```
+
 
 """
                 }
@@ -77,5 +74,3 @@ Fill in the following details when prompted:
             Update.mailbox.Writer.TryWrite (ClientMsg.OpTask_Loaded (Some jiraTask))  |> ignore
             return "Done"
         }
-
-

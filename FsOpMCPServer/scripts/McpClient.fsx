@@ -17,8 +17,9 @@ let mcpAddTask () = task {
 
     //tool call
     let parms = readOnlyDict [
-        "taskName",    "CUA Demo Prep"  :> obj
-        "description", "Finish MCP integration"
+        "parentTaskId", "AGAP-7855" :> obj
+        "taskName",    "Create plan of tasks"
+        "description", "Added by MCP"
     ]    
     let! result = client.CallToolAsync("AddJiraTask", parms)
 
