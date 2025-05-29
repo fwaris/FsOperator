@@ -9,6 +9,7 @@ open FsOperator
 open FsOpCore
 
 module ComputerUse =    
+    let temperature = 0.0f
 
     let rec sendWithRetry count bus (req:Request) =
         async {
@@ -57,6 +58,7 @@ module ComputerUse =
                                 instructions = Some instructions
                                 previous_response_id = None                    
                                 store = true
+                                temperature = temperature
                                 reasoning = Some {Reasoning.Default with effort=Some Reasoning.Medium}
                                 model=Models.computer_use_preview
                                 truncation = Some Truncation.auto
@@ -92,6 +94,7 @@ module ComputerUse =
                                 previous_response_id = None
                                 instructions = instructions
                                 store = true
+                                temperature = temperature
                                 reasoning = Some {Reasoning.Default with effort=Some Reasoning.Medium}
                                 model=Models.computer_use_preview
                                 truncation = Some Truncation.auto
