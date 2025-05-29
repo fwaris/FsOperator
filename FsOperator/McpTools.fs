@@ -44,28 +44,19 @@ type JiraTools() =
                 {
                     id="mcp jira task"
                     description="Add task to jira"
-                    url="https://jirasw.t-mobile.com/secure/RapidBoard.jspa?rapidView=23224&quickFilter=101511#" 
+                    url = $"https://jirasw.t-mobile.com/browse/{parentTaskId.Trim()}" 
                     voiceAsstInstructions= ""
                     textModeInstructions = $"""Goal: Create a sub-task under the story {parentTaskId}.
 
-**Just create the sub-task. Do not modify any other data or perform unrelated actions.**
+**JUST CREATE SUB-TASK**
 
-Steps to Follow:
-1. Search for and open the parent story {parentTaskId}.
-Use the search box to locate and navigate to the main page of this story.
+2. Scroll page down 2 times - use PAGEDOWN/ PAGEUP to scroll
 
-2. Option action menu.
-** On the parent story page, click on the **"More"** (...) menu to open the list of actions. **
-** On the parent story page, click on the **"More"** (...) menu to open the list of actions. **
+3. Click '+' next to sub-tasks
 
-3. Scroll to find the correct action.
-In the "More" dropdown, scroll to the bottom and select the "Create sub-task" action.
+4. In 'Summary'  put "{taskName}"
 
-4. On the "Create sub-task" page, fill the following fields with the given values:
-
-* Summary *:  ```{taskName}```
-* Description*:  ```{description}```
-
+5. In 'Description' put "{description}"
 
 """
                 }
