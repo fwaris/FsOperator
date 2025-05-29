@@ -93,7 +93,7 @@ let connect() =
 
 [<EntryPoint>]
 let main argv =
-    ConfigEnv.setEnv()
+    //ConfigEnv.setEnv()
     printfn "Starting OpenAI Realtime Client... enter to continue"
     Console.ReadLine() |> ignore
     let client = connect() |> Async.RunSynchronously

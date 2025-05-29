@@ -15,6 +15,37 @@ type OpTask = {
 
     //guardrails : string option //to be added later
 }
+    
+type TaskNode = {
+    id : string
+    description : string
+    url : string option
+    cuaInstructions : string
+    reasonerInstructions : string option
+    transition: string option
+    children : TaskNode list
+}
+
+type Plan = {
+    file : string option
+    root : TaskNode
+}
+
+type TaskStatus = Init | Running | Done | Failed of string (*reason*)
+
+type TaskRunState = {
+    taskId : string
+    status : TaskStatus
+    history :  FsResponses.InputOutputItem list list
+
+}
+
+type PlanExecution = {
+    plan : Plan
+    execution : TaskStatus list
+}
+
+
 
 module OpTask =
     let setTextPrompt text opTask = {opTask with textModeInstructions = text}
