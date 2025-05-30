@@ -220,11 +220,11 @@ module Update =
         | None -> model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'")
 
     let syncUrl model = 
-        match model.taskState with 
-        | Some _ -> () //only update browserif there no task running
-        | None  -> browserPostUrl model
-        model,Cmd.none
-
+        match TaskState.cuaMode model.taskState, TaskState.chatMode model.taskState with
+        | CUA_Init, CM_Init -> browserPostUrl model; model, Cmd.none
+        | _, CM_Voice _ -> browserPostUrl model; model, Cmd.none
+        | CUA_Loop, CM_Text _ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot sync url to browser in current state")
+        | _,_ -> model,Cmd.none
 
     let setTitle (win:HostWindow) model =
         let dirty = if model.isDirty then "*" else ""

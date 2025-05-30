@@ -13,7 +13,7 @@ module VoiceAsst =
     let sendInitResp conn = 
         (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
                                         event_id = Api.Utils.newId()
-                                        response.instructions = Some "Announce that you will me accomplish tasks via the 'computer use assistant'"
+                                        response.instructions = Some "Announce that you will me accomplish tasks via the 'computer assistant'"
                                         //response.modalities = Some [M_AUDIO; M_TEXT]
                                         })
         |> Api.Connection.sendClientEvent conn
