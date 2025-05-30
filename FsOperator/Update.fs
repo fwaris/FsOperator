@@ -357,6 +357,17 @@ module Update =
         model, Cmd.batch [
             Cmd.ofMsg (StatusMsg_Set "Staring browser..." ); 
             Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error]
+
+    let stopAndSummarize model =
+        {model with taskState = TaskState.setState CUA_Loop_Closing model.taskState},
+        Cmd.OfAsync.either ComputerUse.summarizeProgress (model.taskState.Value) Chat_GotSummary Error
+
+    let reportAndStop model (id,cntnt)= 
+         let m = {model with taskState = TaskState.appendChatMsg (Assistant {id=id; content=cntnt}) model.taskState}
+         match TaskState.chatMode m.taskState with 
+         | CM_Text _ -> stopTextChat m
+         | CM_Voice _ -> stopVoiceChat m
+         | _          -> m,Cmd.none
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -400,6 +411,8 @@ module Update =
             | Chat_Append msg -> {model with taskState = TaskState.appendChatMsg msg model.taskState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Resume ->  resumeTextCuaLoop model             
+            | Chat_StopAndSummarize -> stopAndSummarize model
+            | Chat_GotSummary (id,cntnt) -> reportAndStop model (id,cntnt)
 
             | TextChat_StartStopTask -> startStopTextChat model
             | VoiceChat_StartStop -> startStopVoiceChat model

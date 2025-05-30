@@ -35,6 +35,7 @@
 		<Compile Include="CUA\VoiceAsst.fs" />
 		<Compile Include="Dialogs.fs" />
 		<Compile Include="Update.fs" />
+		<Compile Include="Views\ViewCommon.fs" />
 		<Compile Include="Views\BrowserView.fs" />
 		<Compile Include="Views\ChatHistoryView.fs" />
 		<Compile Include="Views\VoiceChatView.fs" />

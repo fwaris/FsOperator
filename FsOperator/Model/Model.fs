@@ -3,7 +3,16 @@ open System
 open System.Threading.Channels
 open FsOpCore
 
-type CUAState = CUA_Init | CUA_Loop | CUA_Pause
+///computer use assistant states
+type CUAState = 
+    ///initial (or ready start)
+    | CUA_Init    
+    ///cua model is requestion computer actions
+    | CUA_Loop 
+    ///the cua model has been asked to stop computer actions and produce the results
+    | CUA_Loop_Closing 
+    //the cua model is waiting for new input
+    | CUA_Pause
 
 type VoiceChatState = {
     connection: Ref<RTOpenAI.Api.Connection option>
@@ -291,6 +300,8 @@ type ClientMsg =
     | Chat_UpdateQuestion of string
     | Chat_HandleTurnEnd
     | Chat_Resume
+    | Chat_StopAndSummarize
+    | Chat_GotSummary of (string*string)
 
     | TextChat_StartStopTask
     | VoiceChat_StartStop

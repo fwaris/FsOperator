@@ -117,6 +117,44 @@ module ComputerUse =
             |> Option.map (fun cbId -> r.id, cbId, safetyChecks) //return the response id and the computer call id)
         )
 
+    let summarizeProgress (taskState:TaskState) =
+        async {
+            try 
+                let! page = Browser.page()
+                match getResponseIdsAndChecks taskState with
+                | None -> 
+                    return failwith "Not enough context to summarize"
+                | Some (prevId, lastCallId, safetyChecks) -> 
+                    let! imgUrl,(w,h) = Browser.snapshot()
+                    TaskState.appendScreenshot imgUrl (Some taskState)
+                    let! imgUrl,(w,h) = Browser.snapshot()
+                    let images = TaskState.screenshots (Some taskState)
+                    //let contImgs = images |> List.map (fun imgUrl -> Content.Input_image {|image_url = imgUrl|}) //use the same image url as before
+                    let txt = Content.Input_text {|text = "Summarize and report the current results"|}
+                    let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
+                    let msg = {Message.Default with content = txt::[]}//contImgs} 
+                    let msgInput = InputOutputItem.Message msg
+                    let cc_out = {
+                        call_id = lastCallId
+                        acknowledged_safety_checks = safetyChecks                                 //these should come from human acknowlegedgement
+                        output = Computer_creenshot {|image_url = imgUrl |}
+                        current_url = Some page.Url
+                    }
+                    let req = {Request.Default with 
+                                        input = [Computer_call_output cc_out; msgInput]; tools=[tool]
+                                        store = false
+                                        previous_response_id = Some prevId
+                                        model=Models.computer_use_preview
+                                        truncation = Some Truncation.auto
+                                  }
+                    let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask
+                    let txt = RUtils.outputText resp
+                    return (resp.id,txt)
+                with ex ->
+                    Log.exn(ex,"summarizeProgress")
+                    return raise ex
+        }
+
     let computerCallResponse (taskState:TaskState) =
         async {            
             let! page = Browser.page()
@@ -128,7 +166,6 @@ module ComputerUse =
             | Some (prevId, lastCallId, safetyChecks) -> 
                 let! imgUrl,(w,h) = Browser.snapshot()
                 TaskState.appendScreenshot imgUrl (Some taskState)
-                let contImg = Input_image {|image_url = imgUrl|} //use the same image url as before
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 debug $"snapshot dims : {w}, {h}"
                 let cc_out = {

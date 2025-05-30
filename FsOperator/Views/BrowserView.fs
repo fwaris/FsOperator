@@ -15,18 +15,6 @@ open Avalonia.Labs.Lottie.Ext
 open FsOpCore
 open Avalonia.Platform
 
-module Cache =
-    let nav : Ref<TextBox> = ref Unchecked.defaultof<_>
-    let scrollViewText : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
-    let scrollViewVoice : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
-    let splitView : Ref<SplitView> = ref Unchecked.defaultof<_>
-    let saveIcon = lazy new Bitmap(AssetLoader.Open(Uri("avares://FsOperator/Assets/save.png")))
-    let floppyIcon = lazy SvgImage(Source = SvgSource.Load("avares://FsOperator/Assets/floppy.svg", null))
-
-    let opTaskTexts : Ref<TextBox> list = 
-        [for _ in 1 .. ((FSharp.Reflection.FSharpType.GetRecordFields typeof<OpTask>).Length - 1) -> //textboxes for all fields except id  
-            (ref Unchecked.defaultof<_>)]
-
 [<AbstractClass; Sealed>]
 type BrowserView =
 
