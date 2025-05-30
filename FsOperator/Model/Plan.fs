@@ -64,17 +64,35 @@ module TaskNode =
 
     let rec remove id parent = {parent with children = parent.children |> List.filter (fun c -> c.id <> id)}
 
+    (*
+    *)
     let allIds root = 
-        let rec loop acc xs =
-            match xs with 
+        let rec loop acc p =
+            let acc = p.id::acc
+            match p.children  with 
             | [] -> List.rev acc
             | x::rest -> 
-                let acc = x.id::acc
+                let acc = x.id::acc 
+                let acc = (acc,x.children) ||> List.fold loop
+                (acc,rest) ||> List.fold loop
+        loop [] root
 
-
-
+    ///// Detects cycles in the TaskNode tree. Throws an exception if a cycle is found.
+    //let detectCycle (root: TaskNode) =
+    //    let rec dfs visited path node =
+    //        if Set.contains node.id path then
+    //            failwith $"Cycle detected: TaskNode with id '{node.id}' is revisited in the path"
+    //        elif Set.contains node.id visited then
+    //            visited // already fully processed
+    //        else
+    //            let path = Set.add node.id path
+    //            let visited =
+    //                node.children
+    //                |> List.fold (dfs visited path) // recursively check children
+    //            Set.add node.id visited
+    //    ignore (dfs Set.empty Set.empty root)
 
 
 module Plan =
-    let validate plan = 
+    let validate plan = ()
 
