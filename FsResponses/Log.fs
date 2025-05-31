@@ -1,20 +1,19 @@
-namespace FsResponses.Logging
+namespace FsResponses
+open System
 open Microsoft.Extensions.Logging
 
-type FsResponsesLog() = class end
+type Log = class end
 
 module Log =
     let mutable debug_logging = false
-    
-    let getLogger() : ILogger<FsResponsesLog>  = 
-        LoggerFactory.Create(fun builder -> builder.AddConsole() |> ignore).CreateLogger<FsResponsesLog>()
-    
-    let private _log= lazy(getLogger())
-    let info  (msg:string) = if _log.Value <> Unchecked.defaultof<_> then _log.Value.LogInformation(msg)
-    let warn (msg:string) = if _log.Value <> Unchecked.defaultof<_> then _log.Value.LogWarning(msg)
-    let error (msg:string) = if _log.Value <> Unchecked.defaultof<_> then _log.Value.LogError(msg)
-    let exn (exn:exn,msg) = if _log.Value <> Unchecked.defaultof<_> then _log.Value.LogError(exn,msg)
-        
-        
-        
+    let mutable private _log : ILogger<Log> = LoggerFactory.Create(fun x -> x.AddConsole() |> ignore).CreateLogger<Log>()
+    let info  (msg:string) = _log.LogInformation(msg)
+    let warn (msg:string) = _log.LogWarning(msg)
+    let error (msg:string) = _log.LogError(msg)
+    let exn (exn:exn,msg) = _log.LogError(exn,msg)
+
+    let init (sp:IServiceProvider) =
+        match sp.GetService(typeof<ILoggerFactory>) with 
+        | :? ILoggerFactory as l -> _log <- l.CreateLogger<Log>(); info "Initialized"
+        | _ -> printfn "Logging factory not configured"
 

@@ -38,7 +38,7 @@ module Update =
         Browser.scroll (100,100) (0,700) |> Async.Start
         //Browser.pressKeys ["PageDown"] |> Async.Start       
         Log.info "testSomething clicked"
-        FsResponses.Logging.Log.debug_logging <- not FsResponses.Logging.Log.debug_logging
+        FsResponses.Log.debug_logging <- not FsResponses.Log.debug_logging
         model,Cmd.none
 
     let init _   =

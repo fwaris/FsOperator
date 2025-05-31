@@ -1,11 +1,8 @@
 ﻿namespace FsOperator
 open System
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Avalonia.Input
-open System.Net.Http
-open System.Net.Http.Headers
 open Microsoft.AspNetCore.Builder
 open FsOpCore
 open Elmish
@@ -54,8 +51,8 @@ type App() =
         | _ -> ()
 
 module Program =
-    [<EntryPoint; STAThread>]
-    let main(args: string[]) =
+
+    let startHost() = 
         let builder = WebApplication.CreateBuilder()
         builder.Services
                 .AddMcpServer()
@@ -67,19 +64,32 @@ module Program =
             options.LogToStandardErrorThreshold <- LogLevel.Trace
         ) |> ignore
 
-        builder.Services.AddSingleton<HttpClient>(fun _ ->
-            let client = new HttpClient(BaseAddress = Uri("https://api.weather.gov"))
-            client.DefaultRequestHeaders.UserAgent.Add(ProductInfoHeaderValue("weather-tool", "1.0"))
-            client
-        ) |> ignore
+        builder.Logging.SetMinimumLevel (LogLevel.Information) |> ignore
 
+        builder.Logging.AddFile(fun ctx ->             
+            ctx.MaxFileSize <- 10485760
+            ctx.BasePath <- "Logs"
+            ctx.CounterFormat <- "000"                       
+            ctx.Files <- [|
+                Karambolo.Extensions.Logging.File.LogFileOptions(
+                    Path="default-<counter>.log")
+            |]
+        )
+        |> ignore
 
         let app = builder.Build()
-        app.UseHttpsRedirection() |> ignore
+        app.UseHttpsRedirection() |> ignore        
         app.MapMcp() |> ignore
+
+        //configure logging for the various modules
+        FsOpCore.Log.init app.Services
+        FsResponses.Log.init app.Services
+        RTOpenAI.Api.Log.init app.Services
+
         app.RunAsync() |> ignore // |> Async.AwaitTask |> Async.RunSynchronously
 
-        System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
+
+    let startApp(args) = 
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
@@ -88,3 +98,9 @@ module Program =
 #endif
             .StartWithClassicDesktopLifetime(args)
             
+
+    [<EntryPoint; STAThread>]
+    let main(args: string[]) =      
+        System.Environment.SetEnvironmentVariable("PW_CHROMIUM_ATTACH_TO_OTHER","1")
+        startHost()
+        startApp(args)

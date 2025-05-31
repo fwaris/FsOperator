@@ -87,7 +87,7 @@ module Pgm =
         builder.Services
                 .AddMcpServer()
                 .WithHttpTransport()
-                .WithTools<WeatherTools>()
+                .WithTools<JiraTools>()
                 |> ignore
 
         builder.Logging.AddConsole(fun options ->

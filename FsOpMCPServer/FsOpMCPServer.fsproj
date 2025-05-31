@@ -9,7 +9,7 @@
     <None Include="scripts\McpClient.fsx" />
     <Content Include="Properties\launchSettings.json" />
     <Compile Include="HttpClientExt.fs" />
-    <Compile Include="QuickStartWeatherTools.fs" />
+    <Compile Include="JiraTools.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 	
@@ -19,10 +19,11 @@
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.5" />
 	</ItemGroup>
 
 	<ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
     <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.1" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.1" />
 	

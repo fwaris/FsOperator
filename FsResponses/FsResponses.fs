@@ -7,7 +7,6 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open System.Text.Json.Nodes
 open System.Net.Http
-open FsResponses.Logging
 
 type ResponseError = {
     code : string

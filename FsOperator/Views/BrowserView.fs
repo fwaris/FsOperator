@@ -7,7 +7,6 @@ open Avalonia.Layout
 open Avalonia.Media
 open Avalonia.Media.Imaging
 open Avalonia
-open Avalonia.Svg.Skia
 open Avalonia.Controls.Shapes
 open Avalonia.FuncUI
 open Avalonia.Labs.Lottie
