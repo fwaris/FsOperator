@@ -122,51 +122,58 @@ module Update =
     ///For voice mode we send the cua assistant's last message to the voice assistant
     ///For text, no action required (for now until reasoning is enabled) the user can see the message and respond 
     let handleTurnEnd model =
-        let model = {model with taskState = TaskState.setState CUA_Pause model.taskState}
-        match model.taskState with 
-        | Some r when r.chatMode.IsCM_Voice -> 
-            let callId = TaskState.functionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
-            let lastAsstMsg = TaskState.lastAssistantMessage model.taskState
-            let instrForVoice =
-                match lastAsstMsg with
-                | Some m -> m.content
-                | None -> "Assistant completed the task but did not generate a text response"                    
-            let conn = TaskState.voiceConnection model.taskState
-            match callId with
-            | Some callId -> 
-                let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send"
-                TaskState.removeFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
-                let image = TaskState.screenshots model.taskState |> List.tryHead
-                VoiceAsst.sendFunctionResponseWithImage conn callId instrForVoice image |> Async.Start
-            | None -> failwith "no function call id found to respond to voice assistant"
-            model, Cmd.none
+        match TaskState.cuaMode model.taskState with 
+        | CUA_Loop  -> 
+            let model = {model with taskState = TaskState.setCuaMode CUA_Pause model.taskState}
+            match model.taskState with 
+            | Some r when r.chatMode.IsCM_Voice -> 
+                let callId = TaskState.functionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
+                let lastAsstMsg = TaskState.lastAssistantMessage model.taskState
+                let instrForVoice =
+                    match lastAsstMsg with
+                    | Some m -> m.content
+                    | None -> "Assistant completed the task but did not generate a text response"                    
+                let conn = TaskState.voiceConnection model.taskState
+                match callId with
+                | Some callId -> 
+                    let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send"
+                    TaskState.removeFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
+                    let image = TaskState.screenshots model.taskState |> List.tryHead
+                    VoiceAsst.sendFunctionResponseWithImage conn callId instrForVoice image |> Async.Start
+                | None -> failwith "no function call id found to respond to voice assistant"
+                model, Cmd.none
+            | _ -> model,Cmd.none
         | _ -> model,Cmd.none                 
         
-    ///Either the voice assistant, the reasoning model or the user has submitted a question (i.e. a response)
-    ///Send that to the CUA assitant to continue the task
+    ///User submitted a prompt in response to CUA text response - resume CUA after this
     let resumeTextCuaLoop (model:Model) = 
         let question = TaskState.question model.taskState
-        let model =
-            match model.taskState with
-            | Some rs when rs.chatMode.IsCM_Text -> 
+        match TaskState.cuaMode model.taskState with 
+        | CUA_Pause -> 
+            let model =
+                match model.taskState with
+                | Some rs when rs.chatMode.IsCM_Text -> 
                         
-                let model =
-                    {model with 
-                        taskState = 
-                            model.taskState 
-                            |> TaskState.appendChatMsg (User question)
-                            |> TaskState.setQuestion ""
-                            |> TaskState.setState CUA_Loop}
+                    let model =
+                        {model with 
+                            taskState = 
+                                model.taskState 
+                                |> TaskState.appendChatMsg (User question)
+                                |> TaskState.setQuestion ""
+                                |> TaskState.setCuaMode CUA_Loop}
 
-                let chatMode = TaskState.chatMode model.taskState
-                let instr,messages = ComputerUse.toChatHistory chatMode
-                let messages = ComputerUse.truncateHistory messages
-                ComputerUse.sendTextResponse rs.bus (instr,messages) |> Async.Start
-                ComputerUse.startCuaLoop model.taskState.Value 
-                model
-            | _ -> model
-        model,Cmd.none   
+                    let chatMode = TaskState.chatMode model.taskState
+                    let instr,messages = ComputerUse.toChatHistory chatMode
+                    let messages = ComputerUse.truncateHistory messages
+                    ComputerUse.sendTextResponse rs.bus (instr,messages) |> Async.Start
+                    ComputerUse.startCuaLoop model.taskState.Value 
+                    model
+                | _ -> model
 
+            model,Cmd.none   
+        |_ -> model,Cmd.none
+
+    ///User submitted a prompt in response to CUA text response - resume CUA after this
     let startOrResumeVoiceCuaLoop (model:Model) instrFromVoiceAsst funcCallId =
         match model.taskState with 
         | Some rs when rs.chatMode.IsCM_Voice -> 
@@ -181,7 +188,7 @@ module Update =
                     taskState = 
                         model.taskState 
                         |> TaskState.setMode (CM_Voice voiceState)
-                        |> TaskState.setState CUA_Loop}
+                        |> TaskState.setCuaMode CUA_Loop}
             match prevVoiceState.chat.messages with 
             | [] -> ComputerUse.sendStartMessage rs.bus instrFromVoiceAsst |> Async.Start   // for first instruction from voice assistant treat as the instructions to start the CUA loop
             | _  -> //otherwise resume the chat 
@@ -359,15 +366,24 @@ module Update =
             Cmd.OfAsync.either Browser.launchExternal () Browser_Connected Error]
 
     let stopAndSummarize model =
-        {model with taskState = TaskState.setState CUA_Loop_Closing model.taskState},
-        Cmd.OfAsync.either ComputerUse.summarizeProgress (model.taskState.Value) Chat_GotSummary Error
+        {model with taskState = TaskState.setCuaMode CUA_Loop_Closing model.taskState},
+        Cmd.OfAsync.either ComputerUse.summarizeProgressCua (model.taskState.Value) Chat_GotSummary_Cua Error
 
-    let reportAndStop model (id,cntnt)= 
-         let m = {model with taskState = TaskState.appendChatMsg (Assistant {id=id; content=cntnt}) model.taskState}
-         match TaskState.chatMode m.taskState with 
-         | CM_Text _ -> stopTextChat m
-         | CM_Voice _ -> stopVoiceChat m
-         | _          -> m,Cmd.none
+    let reportProgress model (id,cntnt,isCuaResp) = 
+        if isCuaResp then //(isCuaResp && isEmpty cntnt then                          //cua model did not generate a summary response, try alt model
+            let chatMode = TaskState.chatMode model.taskState
+            let instr,messages = ComputerUse.toChatHistory chatMode
+            let messages = ComputerUse.truncateHistory messages
+            let screenshots = TaskState.screenshots model.taskState
+            let cmd1 = Cmd.ofMsg (StatusMsg_Set "Generating report using alt. model ...")
+            let cmd2 = Cmd.OfAsync.either ComputerUse.summarizeProgressReasoner (instr,messages,screenshots) Chat_GotSummary_Alt Error
+            model, Cmd.batch [cmd1; cmd2]
+        else
+            let m = {model with taskState = TaskState.appendChatMsg (Assistant {id=id; content=cntnt}) model.taskState}
+            match TaskState.chatMode m.taskState with 
+            | CM_Text _ -> stopTextChat m
+            | CM_Voice _ -> stopVoiceChat m
+            | _          -> m,Cmd.none
           
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -412,7 +428,8 @@ module Update =
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Resume ->  resumeTextCuaLoop model             
             | Chat_StopAndSummarize -> stopAndSummarize model
-            | Chat_GotSummary (id,cntnt) -> reportAndStop model (id,cntnt)
+            | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
+            | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
             | TextChat_StartStopTask -> startStopTextChat model
             | VoiceChat_StartStop -> startStopVoiceChat model

@@ -8,6 +8,11 @@ open System.Threading.Tasks
 open ModelContextProtocol.Client
 open ModelContextProtocol.Protocol.Transport
 
+//let totMinutes = 300_000. * 6./20. 
+//let toMachines = totMinutes / (24.*60.)
+//62.0 * 300.0
+//24.0 * 60. 
+
 let mcpAddTask () = task {
     //transport and client
     let sseOptions = SseClientTransportOptions(Endpoint = Uri("http://localhost:5000/sse"),Name = "FSharpClient")

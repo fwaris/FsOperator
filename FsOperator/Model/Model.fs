@@ -104,7 +104,7 @@ module TaskState =
     let chatMode = function | Some (taskState:TaskState) -> taskState.chatMode | _ -> CM_Init
     let cuaMode = function | Some (taskState:TaskState) -> taskState.cuaState | _ -> CUA_Init
     let setMode mode (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with chatMode=mode})
-    let setState state (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with cuaState=state})
+    let setCuaMode state (taskState:TaskState option)  = taskState |> Option.map (fun ts -> {ts with cuaState=state})
     let setQuestion question = function | Some (rs:TaskState) -> Some {rs with question=question} | _ -> None
     let question (taskState:TaskState option)  = taskState |> Option.map _.question |> Option.defaultValue ""
     let lastCuaResponse (taskState:TaskState option)  = taskState |> Option.bind (fun rs -> rs.lastCuaResponse.Value)
@@ -301,7 +301,8 @@ type ClientMsg =
     | Chat_HandleTurnEnd
     | Chat_Resume
     | Chat_StopAndSummarize
-    | Chat_GotSummary of (string*string)
+    | Chat_GotSummary_Cua of (string*string)
+    | Chat_GotSummary_Alt of (string*string)
 
     | TextChat_StartStopTask
     | VoiceChat_StartStop

@@ -11,6 +11,22 @@ open FsOpCore
 module ComputerUse =    
     let temperature = 0.0f
 
+    let toMessages (chatMsgs:ChatMsg list) = 
+        chatMsgs
+        |> List.map (function 
+            | ChatMsg.User m -> {id = None; role="user"; content = [Input_text {| text = m |}]; status = None}
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Output_text {text = m.content; annotations=None}] ; status = None})                
+
+    let toChatHistory = function 
+        | CM_Text c -> c.systemMessage, toMessages c.messages
+        | CM_Voice c -> c.chat.systemMessage, toMessages c.chat.messages
+        | CM_Init -> failwith "toChatHistory: CM_Init not supported"
+
+    let truncateHistory messages =
+        List.rev messages
+        |> List.truncate C.MAX_MESSAGE_HISTORY
+        |> List.rev
+
     let rec sendWithRetry count bus (req:Request) =
         async {
             try
@@ -66,21 +82,6 @@ module ComputerUse =
                 req |> Bus.postToCua bus
         }
 
-    let toMessages (chatMsgs:ChatMsg list) = 
-        chatMsgs
-        |> List.map (function 
-            | ChatMsg.User m -> {id = None; role="user"; content = [Input_text {| text = m |}]; status = None}
-            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Output_text {text = m.content; annotations=None}] ; status = None})                
-
-    let toChatHistory = function 
-        | CM_Text c -> c.systemMessage, toMessages c.messages
-        | CM_Voice c -> c.chat.systemMessage, toMessages c.chat.messages
-        | CM_Init -> failwith "toChatHistory: CM_Init not supported"
-
-    let truncateHistory messages =
-        List.rev messages
-        |> List.truncate C.MAX_MESSAGE_HISTORY
-        |> List.rev
 
     let sendTextResponse bus (instructions: string option, messages:Message list) =
        async {
@@ -116,8 +117,44 @@ module ComputerUse =
             |> List.tryHead
             |> Option.map (fun cbId -> r.id, cbId, safetyChecks) //return the response id and the computer call id)
         )
+    
+    let summarizationPrompt taskInstructions = """The user has tasked an automated 'computer assistant'
+to accomplish a task as given in the TASK INSTRUCTIONS below. The computer
+assistant has operated the computer in pursuit of the task. Along the way it has 
+taken some screenshots. Give any available message history and the screenshots, summarize the content
+obtained thus far, in relation to the task instructions.
 
-    let summarizeProgress (taskState:TaskState) =
+# TASK INSTRUCTIONS
+{taskInstructions}
+"""
+
+    ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
+    let summarizeProgressReasoner (instructions: string option, messages:Message list, screenshots:string list) =
+        async {
+            try 
+                let txt = Content.Input_text {|text = "Summarize and report"|}
+                let imgs = screenshots |> List.map(fun i -> Content.Input_image {|image_url=i|})
+                let msg = {Message.Default with content = [txt] @ imgs}//contImgs}                
+                let chatHistory = messages |> List.map InputOutputItem.Message
+                let msgInput = InputOutputItem.Message msg
+                let req = {Request.Default with 
+                                    input = chatHistory @ [msgInput];
+                                    instructions = instructions |> Option.map summarizationPrompt
+                                    store = false
+                                    model=Models.gpt_41
+                                    truncation = Some Truncation.auto
+                                }
+                let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask                    
+                let txt = RUtils.outputText resp
+                return (resp.id,txt)
+            with ex ->
+                Log.exn(ex,"summarizeProgressReasoner")
+                return raise ex
+        }
+
+    ///early stop the CUA model interaction and ask the model summarize
+    ///the results thus far
+    let summarizeProgressCua (taskState:TaskState) =
         async {
             try 
                 let! page = Browser.page()
@@ -129,7 +166,6 @@ module ComputerUse =
                     TaskState.appendScreenshot imgUrl (Some taskState)
                     let! imgUrl,(w,h) = Browser.snapshot()
                     let images = TaskState.screenshots (Some taskState)
-                    //let contImgs = images |> List.map (fun imgUrl -> Content.Input_image {|image_url = imgUrl|}) //use the same image url as before
                     let txt = Content.Input_text {|text = "Summarize and report the current results"|}
                     let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                     let msg = {Message.Default with content = txt::[]}//contImgs} 
@@ -147,11 +183,11 @@ module ComputerUse =
                                         model=Models.computer_use_preview
                                         truncation = Some Truncation.auto
                                   }
-                    let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask
+                    let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask                    
                     let txt = RUtils.outputText resp
                     return (resp.id,txt)
                 with ex ->
-                    Log.exn(ex,"summarizeProgress")
+                    Log.exn(ex,"summarizeProgressCua")
                     return raise ex
         }
 
