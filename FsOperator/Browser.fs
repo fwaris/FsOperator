@@ -254,3 +254,52 @@ module Browser =
             let! browser = connection() 
             return ()
         }
+
+    let clickableObjScript = """() => {
+                const clickableSelectors = [
+                    'a[href]',
+                    'button',
+                    '[role="button"]',
+                    '[onclick]',
+                    '[tabindex]',
+                    '[type="button"]',
+                    '[type="submit"]'
+                ];
+
+                const elements = Array.from(document.querySelectorAll(clickableSelectors.join(',')));
+
+                return elements
+                    .filter(el => {
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return (
+                            style.pointerEvents !== 'none' &&
+                            style.visibility !== 'hidden' &&
+                            style.display !== 'none' &&
+                            rect.width > 0 &&
+                            rect.height > 0
+                        );
+                    })
+                    .map(el => {
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            tag: el.tagName,
+                            text: el.innerText.trim(),
+                            x: rect.x,
+                            y: rect.y,
+                            width: rect.width,
+                            height: rect.height
+                        };
+                    });
+            }"""
+
+
+    let clickable() = 
+        async {
+            let! page = page()
+            let! clickableAreas = page.EvaluateAsync(clickableObjScript) |> Async.AwaitTask
+            // Deserialize the result
+            let resultsJson = clickableAreas.ToString()
+            printfn "Clickable Elements:\n%A" resultsJson
+            ()
+        }

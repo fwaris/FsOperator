@@ -10,8 +10,8 @@ type VoiceChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let csMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let cuaMode = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
+        let chatMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         Grid.create [
             Grid.column 1
@@ -42,16 +42,30 @@ type VoiceChatView =
                         ]
                         Button.create [
                             Button.isEnabled (model.browserMode.IsBM_Ready
-                                              && (csMode.IsCM_Init 
-                                                  || csMode.IsCM_Voice
-                                                  || csState.IsCUA_Init))
+                                              && (chatMode.IsCM_Init 
+                                                  || chatMode.IsCM_Voice
+                                                  || cuaMode.IsCUA_Init))
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.fontSize 11.
-                            Button.content (if csState.IsCUA_Init then "Start Task" else "Cancel Task" )
+                            Button.content (if cuaMode.IsCUA_Init then Icons.start else Icons.stop )
+                            Button.tip (if cuaMode.IsCUA_Init then "Start task" else "Cancel task")
                             Button.onClick (fun _ -> dispatch VoiceChat_StartStop) 
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
+                        if chatMode.IsCM_Voice && not cuaMode.IsCUA_Init then 
+                            Button.create [
+                                Button.isEnabled (cuaMode.IsCUA_Loop || cuaMode.IsCUA_Pause)
+                                Button.background Brushes.Transparent
+                                Button.margin (Thickness(0.,2.,25.,2.))
+                                Button.fontSize 14.
+                                Button.fontFamily Icons.iconFont
+                                Button.tip "Stop and report"
+                                Button.content Icons.report
+                                Button.onClick (fun _ -> dispatch Chat_StopAndSummarize) 
+                                Button.horizontalAlignment HorizontalAlignment.Right
+                                Button.verticalAlignment VerticalAlignment.Top
+                            ]                       
                     ]
                 ]
                 ScrollViewer.create [
