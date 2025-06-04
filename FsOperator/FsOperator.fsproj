@@ -23,8 +23,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Compile Include="BrowserTypes.fs" />
-		<Compile Include="Browser.fs" />
+		<Compile Include="UIDrivers\UITypes.fs" />
+		<Compile Include="UIDrivers\PlaywrightDriver.fs" />
 		<Compile Include="Model\Chat.fs" />
 		<Compile Include="Model\OpTask.fs" />
 		<Compile Include="Model\Model.fs" />
@@ -59,9 +59,7 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
 		<PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.1" />
 	</ItemGroup>
-	
-	
-	
+		
 	<ItemGroup>
 	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />

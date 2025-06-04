@@ -47,7 +47,7 @@ type App() =
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) ->                 
                 Update.mailbox.Writer.TryComplete() |> ignore
-                Async.RunSynchronously(Browser.shutdown(),1000))
+                Async.RunSynchronously(PlaywrightDriver.shutdown(),1000))
         | _ -> ()
 
 module Program =
