@@ -35,7 +35,10 @@ module Update =
         ]
 
     let testSomething (model:Model) =
-        model.driver.scroll (100,100) (0,700) |> Async.Start
+        let m = NativeDriver.create("olk")
+        let s,(w,h) = m.driver.snapshot() |> Async.RunSynchronously
+
+        
         //Browser.pressKeys ["PageDown"] |> Async.Start
         Log.info "testSomething clicked"
         FsResponses.Log.debug_logging <- not FsResponses.Log.debug_logging

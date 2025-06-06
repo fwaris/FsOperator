@@ -12,3 +12,6 @@ module C =
     let WIN_TITLE = "FsOperator"
 
     let MAX_MESSAGE_HISTORY = 10
+
+    let VIEWPORT_WIDTH = 1280
+    let VIEWPORT_HEIGHT = 768

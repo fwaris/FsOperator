@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-windows10.0.19041.0;</TargetFrameworks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\fwaris1\.nuget\packages\windowsinput\6.4.1\contentFiles\any\net6.0-windows7.0\.nuget\mouse-keyboard-hook-logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="WinDriver.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<PackageReference Include="System.Drawing.Common" Version="10.0.0-preview.4.25258.110" />
+	<PackageReference Include="WindowsInput" Version="6.4.1" />
+    <!--<Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />-->
+  </ItemGroup>
+
+</Project>

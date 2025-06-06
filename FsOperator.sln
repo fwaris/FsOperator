@@ -21,6 +21,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bindings", "Bindings", "{F1
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSAudioExt", "Bindings\SSAudioExt\SSAudioExt.csproj", "{F4D05DDE-75FC-4823-A7C9-0D88FCFE6D41}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpWinDriver", "FsOpWinDriver\FsOpWinDriver.fsproj", "{7765C605-F54E-4D8E-B444-A0E26DE8347B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,14 +61,18 @@ Global
 		{F4D05DDE-75FC-4823-A7C9-0D88FCFE6D41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F4D05DDE-75FC-4823-A7C9-0D88FCFE6D41}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F4D05DDE-75FC-4823-A7C9-0D88FCFE6D41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7765C605-F54E-4D8E-B444-A0E26DE8347B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7765C605-F54E-4D8E-B444-A0E26DE8347B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7765C605-F54E-4D8E-B444-A0E26DE8347B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7765C605-F54E-4D8E-B444-A0E26DE8347B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {FAEC9823-5ABF-4F63-92B2-E9430B74C447}
-	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F4D05DDE-75FC-4823-A7C9-0D88FCFE6D41} = {F1FF22D3-D611-4AF5-BAB5-F8FB65706EAA}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FAEC9823-5ABF-4F63-92B2-E9430B74C447}
 	EndGlobalSection
 EndGlobal

@@ -137,9 +137,9 @@ module PlaywrightDriver =
         do! page.Mouse.DblClickAsync(float32 x, float32 y) |> Async.AwaitTask
     }
 
-    let wheel(x:int,y:int) = async{
+    let wheel(deltaX:int,y:int) = async{
         let! page = page()
-        do! page.Mouse.WheelAsync(float32 x, float32 y) |> Async.AwaitTask
+        do! page.Mouse.WheelAsync(float32 deltaX, float32 y) |> Async.AwaitTask
     }
 
     let move(x:int,y:int) = async{
@@ -157,31 +157,6 @@ module PlaywrightDriver =
         ()
     }
 
-    let mapKeys keys =
-        keys
-        |> List.map (fun k ->
-            if k =*= "Enter" then "Enter"
-            elif k =*= "space" then " "
-            elif k =*= "backspace" then "Backspace"
-            elif k =*= "ESC" then "Escape"
-            elif k =*= "SHIFT" then "Shift"
-            elif k =*= "CTRL" then "Control"
-            elif k =*= "TAB" then "Tab"
-            elif k =*= "ArrowLeft" then "ArrowLeft"
-            elif k =*= "ArrowRight" then "ArrowRight"
-            elif k =*= "ArrowUp" then "ArrowUp"
-            elif k =*= "ArrowDown" then "ArrowDown"
-            elif k =*= "ALT" then "Alt"
-            elif k =*= "ALTGR" then "AltGraph"
-            elif k =*= "META" then "Meta"
-            elif k =*= "PAGEUP" then "PageUp"
-            elif k =*= "PAGEDOWN" then "PageDown"
-            elif k =*= "HOME" then "Home"
-            elif k =*= "END" then "End"
-            elif k =*= "INSERT" then "Insert"
-            elif k =*= "DELETE" then "Delete"
-            else k)
-
     let private pressEsc() =
         async {
             try
@@ -193,7 +168,7 @@ module PlaywrightDriver =
 
     let pressKeys (keys:string list) =
         async {
-            let keys = mapKeys keys
+            let keys = DriverUtils.canonicalize keys
             if keys = ["Escape"] then
                 do! pressEsc()
             else
@@ -246,7 +221,7 @@ module PlaywrightDriver =
             let bmp = SKBitmap.Decode(image)
             let imgUrl = FsResponses.RUtils.toImageUri image
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), image)
-            return imgUrl,(int bmp.Width, int bmp.Height)
+            return imgUrl,(bmp.Width, bmp.Height)
         }
 
 
