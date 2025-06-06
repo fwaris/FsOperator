@@ -293,12 +293,13 @@ module WDriver =
         else
             let width = rect.Right - rect.Left
             let height = rect.Bottom - rect.Top
-            let hWndDC = Win32.GetWindowDC(hWnd)
-            let hMemDC = Win32.CreateCompatibleDC(hWndDC)
-            let hBitmap = Win32.CreateCompatibleBitmap(hWndDC, width, height)
+            let hWndDC = GetDC(hWnd)
+            let hMemDC = CreateCompatibleDC(hWndDC)
+            let hBitmap = CreateCompatibleBitmap(hWndDC, width, height)
             let hOld = Win32.SelectObject(hMemDC, hBitmap)
-            let SRCCOPY = 0x00CC0020
-            let success = Win32.BitBlt(hMemDC, 0, 0, width, height, hWndDC, 0, 0, SRCCOPY)
+            let SRCCOPY = 0x00CC0020u
+            let success = BitBlt(hMemDC, 0, 0, width, height, hWndDC, 0, 0, SRCCOPY)
+            //BitBlt(hdcMemDC, 0, 0, captureWidth, captureHeight, hdcScreen, adjustedLeft, adjustedTop, SRCCOPY) |> ignore
             let bmp = if success then Image.FromHbitmap(hBitmap) else null
             Win32.SelectObject(hMemDC, hOld) |> ignore
             Win32.DeleteObject(hBitmap) |> ignore
