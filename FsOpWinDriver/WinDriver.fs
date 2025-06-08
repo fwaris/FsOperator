@@ -7,47 +7,10 @@ open System.Diagnostics
 open System.Runtime.InteropServices
 open WindowsInput
 
-module Win32 =
-
-    [<StructLayout(LayoutKind.Sequential)>]
-    type RECT =
-        struct
-            val mutable Left: int
-            val mutable Top: int
-            val mutable Right: int
-            val mutable Bottom: int
-        end
-
-    [<DllImport("user32.dll")>]
-    extern IntPtr GetWindowDC(IntPtr hWnd)
-
-    [<DllImport("user32.dll")>]
-    extern int ReleaseDC(IntPtr hWnd, IntPtr hDC)
-
-    [<DllImport("gdi32.dll")>]
-    extern IntPtr CreateCompatibleDC(IntPtr hDC)
-
-    [<DllImport("gdi32.dll")>]
-    extern IntPtr CreateCompatibleBitmap(IntPtr hDC, int nWidth, int nHeight)
-
-    [<DllImport("gdi32.dll")>]
-    extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject)
-
-    [<DllImport("gdi32.dll")>]
-    extern bool BitBlt(IntPtr hdcDest, int nXDest, int nYDest, int nWidth, int nHeight,
-                       IntPtr hdcSrc, int nXSrc, int nYSrc, int dwRop)
-
-    [<DllImport("gdi32.dll")>]
-    extern bool DeleteDC(IntPtr hDC)
-
-    [<DllImport("gdi32.dll")>]
-    extern bool DeleteObject(IntPtr hObject)
-
-    [<DllImport("user32.dll")>]
-    extern bool GetWindowRect(IntPtr hWnd, RECT& lpRect)
 
 
 module WDriver =
+(*
     type EnumWindowsProc = delegate of IntPtr * IntPtr -> bool
 
     // Define necessary Win32 structures and functions
@@ -243,6 +206,22 @@ module WDriver =
     [<DllImport("user32.dll")>]
     extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint32 nFlags)
 
+    let captureWindow (hwnd: IntPtr) =
+        let mutable rect = RECT()
+        GetWindowRect(hwnd, &rect) |> ignore
+        let width = rect.Right - rect.Left
+        let height = rect.Bottom - rect.Top
+        let bmp = new Bitmap(width, height, Imaging.PixelFormat.Format32bppArgb)
+        let gfxBmp = Graphics.FromImage(bmp)
+        let hdcBitmap = gfxBmp.GetHdc()
+        if not (PrintWindow(hwnd, hdcBitmap, 0u)) then
+            let error = Marshal.GetLastWin32Error()
+            let exn = new System.ComponentModel.Win32Exception(error)
+            printfn "ERROR: %d: %s" error exn.Message
+        gfxBmp.ReleaseHdc(hdcBitmap)
+        gfxBmp.Dispose()
+        Some bmp
+
     /// Captures a bitmap of the specified window using PrintWindow
     let captureWindowBitmap (hWnd: IntPtr) : Bitmap option =
         let mutable rect = RECT()
@@ -308,6 +287,7 @@ module WDriver =
             if success then Some bmp else None    // Replace "notepad" with your target process name
     //captureProcessWindow "notepad"
 
+*)
     let getPid name = 
         let procs = System.Diagnostics.Process.GetProcessesByName(name)
         if procs.Length = 0 then    
@@ -316,11 +296,17 @@ module WDriver =
 
     let snapshot (name:string) = async {
         let pid = getPid name
-        let handle = findTopmostWindow pid 
-        let bitmap = handle |> Option.bind captureWindowBitBlt |> Option.defaultWith (fun _ -> failwith "unable to capture snapshot")
+        let handle = Win32.findTopmostWindow pid 
+        //let bitmap = handle |> Option.bind captureWindowBitBlt |> Option.defaultWith (fun _ -> failwith "unable to capture snapshot")
+        let bitmap = 
+            handle 
+            |> Option.bind (fun h -> Win32.captureWindow(h,true)) 
+            |> Option.defaultWith (fun _ -> failwith "unable to capture snapshot")
+        bitmap.Save(@"c:\s\temp.bmp",ImageFormat.Bmp)//, ImageFormat.Jpeg)
         use ms = new MemoryStream()
         bitmap.Save(ms, ImageFormat.Png)
-        return ms.GetBuffer()
+        let buff = ms.GetBuffer()
+        return buff
     }
     
     let doubleClick (x,y) = async {
