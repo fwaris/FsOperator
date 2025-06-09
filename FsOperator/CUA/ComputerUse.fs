@@ -63,7 +63,7 @@ module ComputerUse =
             }
         Async.Start(comp,token)
 
-    let sendStartMessage (driver:IUserInteraction) bus instructions  =
+    let sendStartMessage (driver:IUIDriver) bus instructions  =
        async {
                 let! imgUrl,(w,h) = driver.snapshot()
                 let contImg = Input_image {|image_url = imgUrl|}
@@ -83,7 +83,7 @@ module ComputerUse =
         }
 
 
-    let sendTextResponse (driver:IUserInteraction) bus (instructions: string option, messages:Message list) =
+    let sendTextResponse (driver:IUIDriver) bus (instructions: string option, messages:Message list) =
        async {
             try
                 let! imgUrl,(w,h) = driver.snapshot()
@@ -154,7 +154,7 @@ obtained thus far, in relation to the task instructions.
 
     ///early stop the CUA model interaction and ask the model summarize
     ///the results thus far
-    let summarizeProgressCua (driver:IUserInteraction,taskState:TaskState) =
+    let summarizeProgressCua (driver:IUIDriver,taskState:TaskState) =
         async {
             try
                 match getResponseIdsAndChecks taskState with
@@ -191,7 +191,7 @@ obtained thus far, in relation to the task instructions.
                     return raise ex
         }
 
-    let computerCallResponse (driver:IUserInteraction) (taskState:TaskState) =
+    let computerCallResponse (driver:IUIDriver) (taskState:TaskState) =
         async {
             match getResponseIdsAndChecks taskState with
             | None ->

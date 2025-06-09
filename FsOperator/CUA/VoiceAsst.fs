@@ -93,7 +93,7 @@ module VoiceAsst =
         async {
             try                                                 
                 let url = ev.item.arguments |> Option.map (getArg "url") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
-                Bus.postMessage taskState.bus (ClientMsg.OpTask_SetUrl (url))
+                Bus.postMessage taskState.bus (ClientMsg.OpTask_SetTarget (url))
                 Bus.postLog taskState.bus $"<-- goto url {url}"
                 let conn = TaskState.voiceConnection (Some taskState)
                 let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send responseCreate"

@@ -47,7 +47,7 @@ module Actions =
 
 
 
-    let perform (driver:IUserInteraction) (action:Action)  =
+    let perform (driver:IUIDriver) (action:Action)  =
         async {
             match action with
             | Click p ->

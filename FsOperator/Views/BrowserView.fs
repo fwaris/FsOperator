@@ -41,17 +41,17 @@ type BrowserView =
                         TextBox.create [
                             Grid.column 0
                             TextBox.init (fun x -> Cache.nav.Value <- x)
-                            TextBox.text (model.opTask.url)
+                            TextBox.text (OpTask.targetToString model.opTask.target)
                             TextBox.borderThickness 0.
                             TextBox.margin 5
-                            TextBox.watermark "Enter URL here"
+                            TextBox.watermark "Enter URL or process info here"
                             TextBox.verticalAlignment VerticalAlignment.Center
                             TextBox.horizontalAlignment HorizontalAlignment.Stretch
                             TextBox.onKeyDown (fun e -> 
                                 if e.Key = Avalonia.Input.Key.Enter then
                                     if Cache.nav.Value<> Unchecked.defaultof<_> then
-                                        let url = Cache.nav.Value.Text
-                                        dispatch (OpTask_SetUrl url)
+                                        let tgt = Cache.nav.Value.Text
+                                        dispatch (OpTask_SetTarget tgt)
                                     else
                                         debug("URL is empty")            
                             )

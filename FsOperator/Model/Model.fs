@@ -254,7 +254,7 @@ type BrowserMode = BM_Init | BM_Ready
 
 type Model = {
     ui : UserInterface
-    driver : IUserInteraction
+    driver : IUIDriver
     taskState : TaskState option
     opTask: OpTask
     isDirty : bool
@@ -272,7 +272,7 @@ type ClientMsg =
 
     | OpTask_SetTextInstructions of string
     | OpTask_Update of OpTask
-    | OpTask_SetUrl of string
+    | OpTask_SetTarget of string
     | OpTask_MarkDirty
     | OpTask_ClearDirty
     | OpTask_Load

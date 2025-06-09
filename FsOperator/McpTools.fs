@@ -44,7 +44,7 @@ type JiraTools() =
                 {
                     id="mcp jira task"
                     description="Add task to jira"
-                    url = $"https://jirasw.t-mobile.com/browse/{parentTaskId.Trim()}" 
+                    target = TLink $"https://jirasw.t-mobile.com/browse/{parentTaskId.Trim()}" 
                     voiceAsstInstructions= ""
                     textModeInstructions = $"""Goal: Create a sub-task under the story {parentTaskId}.
 

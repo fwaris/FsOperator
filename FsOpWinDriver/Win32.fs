@@ -116,50 +116,9 @@ module Win32 =
         EnumWindows(callback, IntPtr.Zero) |> ignore
         if result <> IntPtr.Zero then Some result else None
 
-    let captureWindowPixel (hwnd: IntPtr) =
-        let mutable rect = RECT()
-        GetWindowRect(hwnd, &rect) |> ignore
-        let width = rect.Right - rect.Left
-        let height = rect.Bottom - rect.Top
-        let bmp = new Bitmap(width, height, Imaging.PixelFormat.Format32bppArgb)
-        let gfxBmp = Graphics.FromImage(bmp)
-        let hdcBitmap = gfxBmp.GetHdc()
-        if not (PrintWindow(hwnd, hdcBitmap, 0u)) then
-            let error = Marshal.GetLastWin32Error()
-            let exn = new System.ComponentModel.Win32Exception(error)
-            printfn "ERROR: %d: %s" error exn.Message
-        gfxBmp.ReleaseHdc(hdcBitmap)
-        gfxBmp.Dispose()
-        Some bmp
-
-
     /// Resize and optionally move a window
     let resizeAndMoveWindow (hWnd: nativeint) (x: int) (y: int) (width: int) (height: int) =
         MoveWindow(hWnd, x, y, width, height, true)
-
-
-    let captureWindowPrint (hWnd: nativeint) : Bitmap option =
-        let mutable rect = RECT()
-        if GetWindowRect(hWnd, &rect) then
-            let width = rect.Right - rect.Left
-            let height = rect.Bottom - rect.Top
-            let hdcWindow = GetWindowDC(hWnd)
-            let hdcMemDC = CreateCompatibleDC(hdcWindow)
-            let hBitmap = CreateCompatibleBitmap(hdcWindow, width, height)
-            let hOld = SelectObject(hdcMemDC, hBitmap)
-        
-            let succeeded = PrintWindow(hWnd, hdcMemDC, 0u)
-        
-            let img = if succeeded then Some(Image.FromHbitmap(hBitmap)) else None
-
-            SelectObject(hdcMemDC, hOld) |> ignore
-            DeleteDC(hdcMemDC) |> ignore
-            ReleaseDC(hWnd, hdcWindow) |> ignore
-            DeleteObject(hBitmap) |> ignore
-
-            img
-        else
-            None
 
     let captureWindow (handle:IntPtr) =
             // fix windows 10 extra borders
@@ -216,60 +175,6 @@ module Win32 =
             | None -> None
 
 
-    let captureWindowP (handle: IntPtr, isWindow: bool) =
-        let adjustWindow = if isWindow then 7 else 0
-        let hdcSrc = GetWindowDC(handle)
-        let mutable windowRect = RECT()
-        if GetWindowRect(handle, &windowRect) then
-            let width = windowRect.Right - windowRect.Left - adjustWindow * 2
-            let height = windowRect.Bottom - windowRect.Top - adjustWindow
-            let hdcDest = CreateCompatibleDC(hdcSrc)
-            let hBitmap = CreateCompatibleBitmap(hdcSrc, width, height)
-            let hOld = SelectObject(hdcDest, hBitmap)
-        
-            let success = PrintWindow(handle, hdcDest, 0u)
-        
-            SelectObject(hdcDest, hOld) |> ignore
-            DeleteDC(hdcDest) |> ignore
-            ReleaseDC(handle, hdcSrc) |> ignore
-        
-            if success then
-                let img = Image.FromHbitmap(hBitmap)
-                DeleteObject(hBitmap) |> ignore
-                Some img
-            else
-                DeleteObject(hBitmap) |> ignore
-                None
-        else
-            None
-(*
-            // get te hDC of the target window
-            IntPtr hdcSrc = User32.GetWindowDC(handle);
-            // get the size
-            User32.RECT windowRect = new User32.RECT();
-            User32.GetWindowRect(handle, ref windowRect);
-            // create a device context we can copy to
-            IntPtr hdcDest = GDI32.CreateCompatibleDC(hdcSrc);
-            // create a bitmap we can copy it to,
-            // using GetDeviceCaps to get the width/height
-            IntPtr hBitmap = GDI32.CreateCompatibleBitmap(hdcSrc, width, height);
-            // select the bitmap object
-            IntPtr hOld = GDI32.SelectObject(hdcDest, hBitmap);
-            // bitblt over
-            GDI32.BitBlt(hdcDest, 0, 0, width, height, hdcSrc, 0 + adjustWindow, 0, GDI32.SRCCOPY);
-            // restore selection
-            GDI32.SelectObject(hdcDest, hOld);
-            // clean up
-            GDI32.DeleteDC(hdcDest);
-            User32.ReleaseDC(handle, hdcSrc);
-            // get a .NET image object for it
-            Image img = Image.FromHbitmap(hBitmap);
-            // free up the Bitmap object
-            GDI32.DeleteObject(hBitmap);
-            return img;
-        }
-
-*)
     // Function to get the monitor size for a given window handle
     let getMonitorSizeForWindow (hwnd: IntPtr) =
         let hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
@@ -284,40 +189,8 @@ module Win32 =
             else
                 None
 
-    let captureWindowScreenshot (hWnd: IntPtr) : Bitmap option =
-        let mutable rect = RECT()
-        if GetWindowRect(hWnd, &rect) then
-            let windowWidth = rect.Right - rect.Left
-            let windowHeight = rect.Bottom - rect.Top
-            let windowCenterX = rect.Left + windowWidth / 2
-            let windowTop = rect.Top
-
-            // Desired capture size
-            let captureWidth = 1280
-            let captureHeight = 768
-
-            // Calculate top-left corner of the capture region
-            let captureLeft = windowCenterX - captureWidth / 2
-            let captureTop = windowTop
-
-            let sz = getMonitorSizeForWindow(hWnd)
-            let screenWidth, screenHeight = sz |> Option.defaultValue (windowWidth,windowHeight)
-
-            let adjustedLeft = Math.Max(0, Math.Min(captureLeft, screenWidth - captureWidth))
-            let adjustedTop = Math.Max(0, Math.Min(captureTop, screenHeight - captureHeight))
-
-            // Create bitmap and perform BitBlt
-            let hdcScreen = GetDC(IntPtr.Zero)
-            let hdcMemDC = CreateCompatibleDC(hdcScreen)
-            let hBitmap = CreateCompatibleBitmap(hdcScreen, captureWidth, captureHeight)
-            let hOld = SelectObject(hdcMemDC, hBitmap)
-            BitBlt(hdcMemDC, 0, 0, captureWidth, captureHeight, hdcScreen, adjustedLeft, adjustedTop, SRCCOPY) |> ignore
-            let bmp = Image.FromHbitmap(hBitmap)
-            // Cleanup
-            SelectObject(hdcMemDC, hOld) |> ignore
-            DeleteObject(hBitmap) |> ignore
-            DeleteDC(hdcMemDC) |> ignore
-            ReleaseDC(IntPtr.Zero, hdcScreen) |> ignore
-            Some (new Bitmap(bmp))
-        else
-            None
+    let getWindowAndScreenSizes (hWnd:IntPtr) =
+       getWindowPos hWnd
+       |> Option.bind (fun wSz ->
+        getMonitorSizeForWindow hWnd 
+        |> Option.map(fun mSz -> wSz,mSz))

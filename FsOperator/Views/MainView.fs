@@ -126,7 +126,7 @@ type MainView =
                     Grid.row 1
                     Grid.column 1
                     Control.margin 2
-                    TextBox.text model.opTask.url
+                    TextBox.text (OpTask.targetToString model.opTask.target)
                 ]
                 TextBlock.create [
                     Grid.row 2
@@ -178,20 +178,18 @@ type MainView =
                     Button.content "Apply"
                     Button.onClick (fun _ -> 
                         let description = cache.[0].Value.Text
-                        let url = cache.[1].Value.Text
+                        let target = cache.[1].Value.Text
                         let textPrompt = cache.[2].Value.Text
                         let voicePrompt = cache.[3].Value.Text |> fixEmpty                        
-                        match Update.checkUrl url with 
-                        | Some url -> 
-                            {   id = ""
-                                description = description
-                                url = url
-                                textModeInstructions = textPrompt
-                                voiceAsstInstructions = voicePrompt 
-                            }
-                            |> OpTask_Update
-                            |> dispatch
-                        | None -> dispatch (StatusMsg_Set $"Invalid URL Please enter a valid URL")
+                        let pTarget = OpTask.parseTarget target
+                        {   id = ""
+                            description = description
+                            target = pTarget
+                            textModeInstructions = textPrompt
+                            voiceAsstInstructions = voicePrompt 
+                        }
+                        |> OpTask_Update
+                        |> dispatch
                         )
                 ]
             ]

@@ -35,10 +35,10 @@ module Update =
         ]
 
     let testSomething (model:Model) =
-        let m = NativeDriver.create("olk")
-        //let m = NativeDriver.create("dotnet")
-        let s,(w,h) = m.driver.snapshot() |> Async.RunSynchronously
-
+        //let m = NativeDriver.create("olk")
+        let m = NativeDriver.create("dotnet") (Some "FsOperator")
+        let p,a = match m with Na x -> x.processName, x.arg | _ -> failwith "not a native driver"
+        let s,(w,h) = m.driver.snapshot () |> Async.RunSynchronously
         
         //Browser.pressKeys ["PageDown"] |> Async.Start
         Log.info "testSomething clicked"
@@ -83,7 +83,7 @@ module Update =
 
     let startTextChat model =
         if isEmpty model.opTask.textModeInstructions then failwith "No instructions provided for text mode task"
-        if isEmpty model.opTask.url then failwith "No URL provided for text mode task"
+        if OpTask.isEmptyTarget model.opTask.target then failwith "No target (url or process) provided for text mode task"
         let runState = {TaskState.initForText model.mailbox model.opTask with cuaState = CUA_Loop}
         ComputerUse.startApiMessaging (runState.tokenSource.Token,runState.bus)
         ComputerUse.sendStartMessage model.driver runState.bus (model.opTask.textModeInstructions) |> Async.Start
@@ -207,8 +207,8 @@ module Update =
         | _ -> model, Cmd.none
 
     let browserPostUrl model =
-        match model.ui with
-        | Pw u -> u.postUrl model.opTask.url |> Async.Start //model.browserMode
+        match model.ui, model.opTask.target with
+        | Pw u, TLink url -> u.postUrl url |> Async.Start //model.browserMode
         | _ -> ()
 
     let checkUrl (url:string) =
@@ -221,20 +221,14 @@ module Update =
             else
                 None
 
-    let setUrl model (origUrl:string) =
-        let prevUrl = model.opTask.url
-        match checkUrl origUrl with
-        | Some url ->
-            let m = {model with opTask = OpTask.setUrl url model.opTask}
-            let isDirty = prevUrl <> m.opTask.url
-            let syncCmd = Cmd.ofMsg SyncUrlToBrowser
-            let cmds =
-                if isDirty then
-                    Cmd.batch (Cmd.ofMsg OpTask_MarkDirty::syncCmd::[])
-                else
-                    Cmd.none
-            m,cmds
-        | None -> model, Cmd.ofMsg (StatusMsg_Set $"Invalid URL '{origUrl}'")
+    let setTarget model (tgt:string) = 
+        let prevTarget = model.opTask.target
+        let newTarget = OpTask.parseTarget tgt 
+        let isDirty = prevTarget <> newTarget
+        let model = {model with opTask = OpTask.setTarget newTarget model.opTask}
+        let cmds = match newTarget with TLink url -> [Cmd.ofMsg SyncUrlToBrowser] | _ -> []
+        let cmds = if isDirty then (Cmd.ofMsg OpTask_MarkDirty::cmds) else cmds
+        model, Cmd.batch cmds
 
     let syncUrl model =
         match TaskState.cuaMode model.taskState, TaskState.chatMode model.taskState with
@@ -259,11 +253,10 @@ module Update =
         }
 
     let serializeTask (file:string) (opTask:OpTask) =
-        use strw = System.IO.File.Create file
-        let opTask = OpTask.setId file opTask
-        (System.Text.Json.JsonSerializer.Serialize<OpTask>(strw,opTask))
+        use strw = System.IO.File.Create file        
+        OpTask.serialize strw opTask
         opTask
-
+        
     let saveTaskAs (win:HostWindow, opTask:OpTask) =
         async {
             let! file = Dialogs.saveFileDialog win (Some opTask.id)
@@ -289,7 +282,7 @@ module Update =
         | Some file ->
             let opTask =
                 use str = System.IO.File.OpenRead file
-                let t =  System.Text.Json.JsonSerializer.Deserialize<OpTask>(str)
+                let t =  OpTask.deserialize str
                 t
                 |> OpTask.setId file
                 |> OpTask.setVoicePrompt (fixEmpty t.voiceAsstInstructions)
@@ -339,7 +332,7 @@ module Update =
     let updateTask model (instr:OpTask) =
         let task =
             {model.opTask with
-                url=instr.url
+                target=instr.target
                 description=instr.description
                 textModeInstructions=instr.textModeInstructions
                 voiceAsstInstructions=instr.voiceAsstInstructions
@@ -405,7 +398,7 @@ module Update =
             | OpTask_Update instr -> updateTask model instr
             | OpTask_MarkDirty -> let m = {model with isDirty = true} in setTitle win m; m, Cmd.none
             | OpTask_ClearDirty -> let m = {model with isDirty = false} in setTitle win m; m, Cmd.none
-            | OpTask_SetUrl txt -> setUrl model txt
+            | OpTask_SetTarget txt -> setTarget model txt
             | OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
             | OpTask_Load -> model,Cmd.none
             | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg SyncUrlToBrowser]

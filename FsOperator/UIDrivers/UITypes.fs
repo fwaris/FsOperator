@@ -55,7 +55,7 @@ type MouseButton =
     | Right
     | Middle
 
-type IUserInteraction =
+type IUIDriver =
     interface
         abstract member doubleClick: x:int*y:int -> Async<unit>
         abstract member click : x:int*y:int*MouseButton -> Async<unit>
@@ -73,6 +73,6 @@ type IUserInteraction =
 
 [<ReferenceEquality>]
 type UserInterface =
-    | Pw of {|postUrl:string->Async<unit>; driver:IUserInteraction |}
-    | Na of {|driver:IUserInteraction|}
+    | Pw of {|postUrl:string->Async<unit>; driver:IUIDriver |}
+    | Na of {|driver:IUIDriver; processName:string; arg:string option|}
     with member this.driver = match this with Pw u -> u.driver | Na u -> u.driver

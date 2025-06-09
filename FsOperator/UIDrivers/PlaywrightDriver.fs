@@ -304,7 +304,7 @@ module PlaywrightDriver =
 
     let create() =
         let userInteraction =            
-            {new IUserInteraction with
+            {new IUIDriver with
                 member _.doubleClick(x,y) = doubleClick(x,y)
                 member _.click(x,y,btn) = click(x,y,btn)
                 member _.wheel(x,y) = wheel(x,y)

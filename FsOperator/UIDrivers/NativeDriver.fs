@@ -42,11 +42,12 @@ module NativeDriver =
         )
         |> List.toArray
 
-    let winSnapshot (name:string) = async { 
+    let winSnapshot (hWndRef:Ref<IntPtr>) (name:string) arg = async { 
         Log.info $"taking snapshot of window"
-        let! bytes = WDriver.snapshot name
+        let! bytes,hWnd = WDriver.snapshot name arg
+        hWndRef.Value <- hWnd
         use ms = new MemoryStream(bytes)
-        Log.info $"done snapshot"
+        Log.info $"done native snapshot"
         let bmp = SKBitmap.Decode(ms)       
         let imgUrl = FsResponses.RUtils.toImageUri bytes
         System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), bytes)
@@ -55,24 +56,25 @@ module NativeDriver =
 
 #endif
 
-    let create (name:string) = 
+    let create (name:string) (arg:string option) = 
 #if WINDOWS 
+        let hWndRef : Ref<IntPtr> = ref IntPtr.Zero
         let userInteraction =            
-            {new IUserInteraction with
-                member _.doubleClick(x,y) = WDriver.doubleClick(x,y)
-                member _.click(x,y,btn) = WDriver.click(x,y,winMapButton btn)
+            {new IUIDriver with
+                member _.doubleClick(x,y) = WDriver.doubleClick hWndRef (x,y)
+                member _.click(x,y,btn) = WDriver.click hWndRef (x,y,winMapButton btn)
                 member _.wheel(x,y) = WDriver.wheel(x,y)
-                member _.move(x,y) = WDriver.move(x,y)
-                member _.scroll (x,y) (scrollX,scrollY) = WDriver.scroll (x,y) (scrollX,scrollY)
+                member _.move(x,y) = WDriver.move hWndRef (x,y)
+                member _.scroll (x,y) (scrollX,scrollY) = WDriver.scroll hWndRef (x,y) (scrollX,scrollY)
                 member _.pressKeys keys = WDriver.pressKeys (winMapKeys keys)
-                member _.dragDrop (sX,sY) (tX,tY) = WDriver.dragAndDrop (sX,sY) (tX,tY)
-                member _.snapshot() = winSnapshot name
+                member _.dragDrop (sX,sY) (tX,tY) = WDriver.dragAndDrop hWndRef (sX,sY) (tX,tY)
+                member _.snapshot() = winSnapshot hWndRef name arg
                 member _.goBack () = WDriver.pressKeys [|KeyCode.Alt; KeyCode.Left|] //by convention
                 member _.goForward () = WDriver.pressKeys [|KeyCode.Alt; KeyCode.Right|]
                 member _.typeText text = WDriver.typeText text
                 member _.url () = async{ return None}
             }
-        Na {|driver=userInteraction|}        
+        Na {|driver=userInteraction; processName = name; arg=arg|}        
 
 #else
         failwith "native ui driver not implmented for non-windows platform"
