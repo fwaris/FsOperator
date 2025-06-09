@@ -351,27 +351,15 @@ module WDriver =
             failwith $"no process found with name '{name}'"
         procs.[0].Id    
 
-    let viewport = 1280,768
-
     let snapshot (name:string) = async {
         let pid = getPid name
         let handle = Win32.findTopmostWindow pid 
         //let bitmap = handle |> Option.bind captureWindowBitBlt |> Option.defaultWith (fun _ -> failwith "unable to capture snapshot")
-        handle 
-        |> Option.bind Win32.getWindowPos
-        |> Option.iter (fun (x,y,w,h) ->
-            let width,height = viewport
-            Win32.resizeAndMoveWindow handle.Value x y width height |> ignore)
-        do! Async.Sleep 0
-        handle 
-        |> Option.iter (fun h ->
-            Win32.SetForegroundWindow(h) |> ignore
-            Win32.UpdateWindow(h) |> ignore)
-        do! Async.Sleep 100        
         let bitmap = 
             handle 
-            |> Option.bind (fun h -> Win32.captureWindowViewport viewport (h)) 
+            |> Option.bind (fun h -> Win32.captureWindow(h)) 
             |> Option.defaultWith (fun _ -> failwith "unable to capture snapshot")
+        bitmap.Save(@"c:\s\temp.bmp",ImageFormat.Bmp)//, ImageFormat.Jpeg)
         use ms = new MemoryStream()
         bitmap.Save(ms, ImageFormat.Png)
         let buff = ms.GetBuffer()

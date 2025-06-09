@@ -36,7 +36,7 @@ module Update =
 
     let testSomething (model:Model) =
         let m = NativeDriver.create("olk")
-        let m = NativeDriver.create("dotnet")
+        //let m = NativeDriver.create("dotnet")
         let s,(w,h) = m.driver.snapshot() |> Async.RunSynchronously
 
         
