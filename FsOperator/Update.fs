@@ -60,7 +60,7 @@ module Update =
             ui = ui
             driver = ui.driver
         }
-        model,Cmd.ofMsg InitializeExternalBrowser
+        model,Cmd.none
 
     let shouldClearStatus (inComingDT:DateTime option) messageDT =
         match inComingDT,messageDT with

@@ -7,6 +7,8 @@ open FsOpCore
 type CUAState =
     ///initial (or ready start)
     | CUA_Init
+    ///wait for the target process (browser, etc. to become available)
+    | CUA_Await_Target
     ///cua model is requestion computer actions
     | CUA_Loop
     ///the cua model has been asked to stop computer actions and produce the results

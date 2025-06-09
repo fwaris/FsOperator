@@ -35,7 +35,7 @@ module OpTask =
     let private _parseTarget (xs:string array) =
         let a = xs.[0]
         let b = if xs.Length > 1 then Some xs.[1] else None
-        if a.EndsWith "*.exe" then 
+        if a.EndsWith ".exe" then 
             TProcess (a,b)
         else 
             let a = if a.StartsWith("http") then a else "https://" + a
@@ -53,7 +53,7 @@ module OpTask =
     let serialize (str:IO.Stream) (task:OpTask) =         
         JsonSerializer.Serialize(str,task,options=serOpts())
 
-    let opTask deserialize (str:IO.Stream) = 
+    let deserialize (str:IO.Stream) = 
         JsonSerializer.Deserialize<OpTask>(str,options=serOpts())
 
                 
