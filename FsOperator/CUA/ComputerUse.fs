@@ -77,7 +77,6 @@ module ComputerUse =
                           }
                 req |> Bus.postToCua bus
         }
-        |> Async.Start
 
     let sendTextResponse (driver:IUIDriver) bus (instructions: string option, messages:Message list) =
        async {

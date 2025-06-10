@@ -47,8 +47,4 @@ module TextChat =
     let create (t:OpTask) =
         let s0 = {|t = t; |}
         let bus = WBus.Create<ClientMsg,ClientMsg>()
-
-
-        bus,s0,transition
-        
- 
+        () 
