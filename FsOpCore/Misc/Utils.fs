@@ -29,6 +29,8 @@ module Utility =
 
     let isEmpty (s:string) = 
         String.IsNullOrWhiteSpace s
+     
+    let checkEmpty s = if isEmpty s then None else Some s
 
     let fixEmpty s = if isEmpty s then "" else s
     

@@ -307,6 +307,7 @@ type ClientMsg =
     | Chat_StopAndSummarize
     | Chat_GotSummary_Cua of (string*string)
     | Chat_GotSummary_Alt of (string*string)
+    | Chat_TargetAcquired
 
     | TextChat_StartStopTask
     | VoiceChat_StartStop

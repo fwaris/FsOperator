@@ -1,10 +1,6 @@
 ﻿namespace FsOperator
-open System
 open FSharp.Control
-open PuppeteerSharp
 open FsResponses
-open System.IO
-open PuppeteerSharp.Input
 open FsOperator
 open FsOpCore
 
@@ -81,7 +77,7 @@ module ComputerUse =
                           }
                 req |> Bus.postToCua bus
         }
-
+        |> Async.Start
 
     let sendTextResponse (driver:IUIDriver) bus (instructions: string option, messages:Message list) =
        async {

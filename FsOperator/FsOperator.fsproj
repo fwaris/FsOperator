@@ -34,6 +34,9 @@
 		<Compile Include="CUA\Actions.fs" />
 		<Compile Include="CUA\ComputerUse.fs" />
 		<Compile Include="CUA\VoiceAsst.fs" />
+		<Compile Include="CUA\Workflow.fs" />
+		<Compile Include="Flows\FlowsCommon.fs" />
+		<Compile Include="Flows\TextChat.fs" />
 		<Compile Include="Dialogs.fs" />
 		<Compile Include="Update.fs" />
 		<Compile Include="Views\ViewCommon.fs" />

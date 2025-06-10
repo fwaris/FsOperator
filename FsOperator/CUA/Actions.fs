@@ -7,9 +7,7 @@ open System.IO
 open FsOpCore
 open PuppeteerSharp.Input
 
-
 module Actions =
-
 
     let actionToString action =
         try
@@ -44,8 +42,6 @@ module Actions =
         | "forward" | "Forward" -> Forward
         | "wheel"   | "Wheel"   -> Wheel
         | x -> Log.info $"cannot use '{x}' button"; Unknown
-
-
 
     let perform (driver:IUIDriver) (action:Action)  =
         async {
