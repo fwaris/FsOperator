@@ -13,6 +13,7 @@ module TextChat =
     let rec s_start ss msg = async {
         return
             match msg with 
+            | W_Err e -> F(s_terminate ss e,[])
             | W_App Chat_TargetAcquired -> 
                 Resps.sendStartCua ss.driver ss.bus ss.t.textModeInstructions                 
                 F(s_loop ss,[])
@@ -41,6 +42,10 @@ module TextChat =
 
     and s_pause ss msg = async {
         return F(s_pause ss,[])
+    }
+
+    and s_terminate ss e = async {
+        
     }
 
 
