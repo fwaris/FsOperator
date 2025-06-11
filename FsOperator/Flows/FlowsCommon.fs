@@ -44,7 +44,7 @@ module Resps =
             let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
             let req = {Request.Default with
                             input = [Message input]; tools=[tool]
-                            instructions = Some instructions
+                            instructions = instructions
                             previous_response_id = None
                             store = true
                             temperature = temperature
@@ -56,3 +56,6 @@ module Resps =
         }
         |> Async.Start
 
+module FUtils = 
+    ///utility operator to create default workflow states
+    let (!!) s = F(s,[])

@@ -39,6 +39,11 @@ with static member Create mailbox =
                     mailbox = mailbox
                 }
 
+type FlowState = 
+    | Fl_Init 
+    | Fl_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat |}
+    with member this.setChat ch = match this with Fl_Flow fs -> Fl_Flow {|fs with chat=ch|} | f -> f
+
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
     let postLog bus msg =  postMessage bus (ClientMsg.Log_Append msg)
@@ -255,18 +260,20 @@ with static member Default = {
 type BrowserMode = BM_Init | BM_Ready
 
 type Model = {
-    ui : UserInterface
-    driver : IUIDriver
-    taskState : TaskState option
-    opTask: OpTask
-    isDirty : bool
-    mailbox : Channel<ClientMsg>
-    log : string list
-    action : string
-    statusMsg : (DateTime option*string)
+    ui          : UserInterface
+    driver      : IUIDriver
+    taskState   : TaskState option
+    opTask      : OpTask
+    isDirty     : bool
+    mailbox     : Channel<ClientMsg>
+    log         : string list
+    action      : string
+    statusMsg   : (DateTime option*string)
     browserMode : BrowserMode
-    isFlashing : bool
+    isFlashing  : bool
+    flow        : FlowState
 }
+    with member this.post msg = this.mailbox.Writer.TryWrite msg |> ignore
 
 type ClientMsg =
     | InitializeExternalBrowser
@@ -284,6 +291,9 @@ type ClientMsg =
     | OpTask_SaveAs
     | OpTask_Clear
     | OpTask_Saved of OpTask option
+
+    | Flow_Start
+    | Flow_Msg of TaskFlow.TaskFLowMsgOut
 
     | Action_Set of string
     | Action_Flash of bool

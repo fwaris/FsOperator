@@ -51,16 +51,13 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (model.browserMode.IsBM_Ready 
-                                              && (chatMode.IsCM_Init 
-                                                  || chatMode.IsCM_Text
-                                                  || cuaMode.IsCUA_Init))
+                            Button.isEnabled (model.flow.IsFl_Init)
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.background Brushes.Transparent
                             Button.fontSize 11.
                             Button.content (if cuaMode.IsCUA_Init then Icons.start else Icons.stop )
                             Button.tip (if cuaMode.IsCUA_Init then "Start task" else "Cancel task")
-                            Button.onClick (fun _ -> dispatch TextChat_StartStopTask) 
+                            Button.onClick (fun _ -> dispatch Flow_Start) 
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
