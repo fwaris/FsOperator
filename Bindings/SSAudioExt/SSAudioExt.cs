@@ -199,5 +199,10 @@ namespace SIPSorceryMedia.SDL2.SSAudioExt
 
             return Task.CompletedTask;
         }
+
+        public void GotEncodedMediaFrame(EncodedAudioFrame encodedMediaFrame)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

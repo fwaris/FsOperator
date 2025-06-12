@@ -1,5 +1,4 @@
-﻿namespace FsOperator
-open FsOpCore
+﻿namespace FsOpCore
 open Microsoft.Playwright
 open SkiaSharp
 open System.Threading
@@ -121,13 +120,13 @@ module PlaywrightDriver =
     }
 
 
-    let click(x:int,y:int, btn:FsOperator.MouseButton) = async{
+    let click(x:int,y:int, btn:FsOpCore.MouseButton) = async{
         let! page = page()
         let btn =
             match btn with
-            | FsOperator.MouseButton.Left -> MouseButton.Left
-            | FsOperator.MouseButton.Middle -> MouseButton.Middle
-            | FsOperator.MouseButton.Right -> MouseButton.Right
+            | FsOpCore.MouseButton.Left -> MouseButton.Left
+            | FsOpCore.MouseButton.Middle -> MouseButton.Middle
+            | FsOpCore.MouseButton.Right -> MouseButton.Right
         let opts = MouseClickOptions(Button = btn)
         do! page.Mouse.ClickAsync(float32 x, float32 y, opts) |> Async.AwaitTask
     }

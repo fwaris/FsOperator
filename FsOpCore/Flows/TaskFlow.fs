@@ -1,8 +1,7 @@
-﻿namespace FsOperator
+﻿namespace FsOpCore
 open System.Threading
 open System.Threading.Channels
 open FsResponses
-open FsOpCore
 open FlUtils
 
 module TaskFlow =

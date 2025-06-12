@@ -1,4 +1,5 @@
 ﻿namespace FsOperator
+open FsOpCore
 open System
 open Avalonia.Controls
 open Avalonia.FuncUI.DSL

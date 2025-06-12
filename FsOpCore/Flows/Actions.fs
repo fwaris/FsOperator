@@ -1,11 +1,8 @@
-﻿namespace FsOperator
+﻿namespace FsOpCore
 open System
 open FSharp.Control
-open PuppeteerSharp
 open FsResponses
 open System.IO
-open FsOpCore
-open PuppeteerSharp.Input
 
 module Actions =
 
@@ -49,7 +46,7 @@ module Actions =
             | Click p ->
                 match mouseButton p.button with
                 | Btn btn when btn = MouseButton.Left ->
-                    do! driver.click(p.x, int p.y,FsOperator.MouseButton.Left)
+                    do! driver.click(p.x, int p.y,FsOpCore.MouseButton.Left)
                 | Btn btn -> Log.info $"Did not use {btn} button (as it may cause issues on web pages)"
                 | Back -> do! driver.goBack()
                 | Forward -> do! driver.goForward()

@@ -1,10 +1,8 @@
 ﻿namespace FsOperator
 open System
 open FSharp.Control
-open PuppeteerSharp
 open FsResponses
 open System.IO
-open PuppeteerSharp.Input
 open FsOpCore
 
 

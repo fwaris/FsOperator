@@ -1,5 +1,4 @@
-﻿namespace FsOperator
-open FsOpCore
+﻿namespace FsOpCore
 open System
 open System.Threading
 open System.Threading.Channels

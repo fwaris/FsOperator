@@ -1,4 +1,4 @@
-﻿namespace FsOperator
+﻿namespace FsOpCore
 
 type AsstMsg = {
     id      : string    
