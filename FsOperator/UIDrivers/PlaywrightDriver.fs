@@ -317,5 +317,6 @@ module PlaywrightDriver =
                 member _.goForward () = goForward()
                 member _.typeText text = typeText text
                 member _.url () = url()
+                member _.environment with get (): string = FsResponses.ComputerEnvironment.browser
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

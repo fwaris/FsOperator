@@ -51,7 +51,7 @@ module Workflow =
             bus.inCh.Reader.ReadAllAsync(token)
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.scanAsync (transition bus) initState
-            |> AsyncSeq.iter (fun x -> ())
+            |> AsyncSeq.iter (fun x -> Log.info ".")
 
         let catcher = 
             async {

@@ -69,6 +69,7 @@ type IUIDriver =
         abstract member goBack : unit -> Async<unit>
         abstract member goForward : unit -> Async<unit>
         abstract member url : unit -> Async<string option>
+        abstract member environment : string //computer call envrionment
     end
 
 [<ReferenceEquality>]

@@ -73,6 +73,7 @@ module NativeDriver =
                 member _.goForward () = WDriver.pressKeys [|KeyCode.Alt; KeyCode.Right|]
                 member _.typeText text = WDriver.typeText text
                 member _.url () = async{ return None}
+                member _.environment with get (): string = FsResponses.ComputerEnvironment.windows
             }
         Na {|driver=userInteraction; processName = name; arg=arg|}        
 
