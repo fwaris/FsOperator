@@ -1,6 +1,7 @@
 ﻿namespace FsOperator
 open System.Threading
 open System.Threading.Channels
+open FsResponses
 open FsOpCore
 open FlUtils
 
@@ -12,6 +13,7 @@ module TaskFlow =
         | TFi_Start 
         | TFi_Resume of Chat
         | TFi_ChatUpdated of Chat
+        | TFi_StopAndSummarize
 
     ///messages output by flow
     type TaskFLowMsgOut =
@@ -19,6 +21,7 @@ module TaskFlow =
         | TFo_ChatUpdated of Chat
         | TFo_Error of WErrorType
         | TFo_Action of string
+        | TFo_Summary of Chat
 
     type SubState = {
         cts         : CancellationTokenSource
@@ -61,11 +64,47 @@ module TaskFlow =
         return ss,outMsgs
     }
 
+    let summarizationPrompt taskInstructions = """The user has tasked an automated 'computer assistant'
+to accomplish a task as given in the TASK INSTRUCTIONS below. The computer
+assistant has operated the computer in pursuit of the task. Along the way it has
+taken some screenshots. Give any available message history and the screenshots, summarize the content
+obtained thus far, in relation to the task instructions.
+
+# TASK INSTRUCTIONS
+{taskInstructions}
+"""
+
+    ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
+    let summarizeProgressReasoner replyChannel (ss:SubState) =
+        async {
+            try
+                let screenshots = ss.snapshots |> List.rev
+                let messages = ss.chat.messages |> FlResps.toMessages |> FlResps.truncateHistory 
+                let txt = Content.Input_text {|text = "Summarize and report"|}
+                let imgs = screenshots |> List.map(fun i -> Content.Input_image {|image_url=i|})
+                let msg = {Message.Default with content = [txt] @ imgs}//contImgs}
+                let chatHistory = messages |> List.map InputOutputItem.Message
+                let msgInput = InputOutputItem.Message msg
+                let req = {Request.Default with
+                                    input = chatHistory @ [msgInput];
+                                    instructions = ss.chat.systemMessage |> Option.map summarizationPrompt
+                                    store = false
+                                    model=Models.gpt_41
+                                    truncation = Some Truncation.auto
+                                }
+                do! FlResps.sendRequest W_Reasoner replyChannel req                                    
+            with ex ->
+                Log.exn(ex,"summarizeProgressReasoner")
+                return raise ex
+        }
+        |> FlResps.catch replyChannel
+
+
     (* --- states --- *)
 
     let rec s_start ss msg = async {    
         match msg with 
-        | W_Err e         -> return !!(s_terminate ss e)
+        | W_Err e         -> return !!(s_terminate ss (Some e))
         | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
                              let ss = ss.appendSnapshot snapshot
                              FlResps.sendStartCua ss.bus.PostIn ss.chat.systemMessage (snapshot,w,h,url,env)
@@ -75,24 +114,40 @@ module TaskFlow =
 
     and s_loop ss msg = async {
         match msg with 
-        | W_Err e    -> return !!(s_terminate ss e)
-        | W_Cua resp -> let! ss,outMsgs = performCall ss resp
-                        return F(s_loop ss,outMsgs)
-        | _          -> return !!(s_loop ss)
+        | W_Err e                    -> return !!(s_terminate ss (Some e))
+        | W_App TFi_StopAndSummarize -> summarizeProgressReasoner ss.bus.PostIn ss
+                                        return !!(s_summarizing ss) 
+        | W_Cua resp                 -> let! ss,outMsgs = performCall ss resp
+                                        return F(s_loop ss,outMsgs)
+        | _                          -> return !!(s_loop ss)
     }            
 
     and s_pause ss msg = async {   
         match msg with 
-        | W_Err e               -> return !!(s_terminate ss e)
+        | W_Err e               -> return !!(s_terminate ss (Some e))
         | W_App (TFi_Resume ch) -> return !!(s_loop {ss with chat = ch})
         | _                     -> return !!(s_pause ss)
     }
 
-    and s_terminate ss e msg = async {
-        Log.error (string e)
+    and s_summarizing ss msg = async {
+        match msg with 
+        | W_Err e -> return !!(s_terminate ss (Some e))
+        | W_Reasoner resp -> 
+            let ss =
+                FlResps.extractText resp 
+                |> Option.map (fun txt -> ss.appendMsg (Assistant {id=resp.id; content=txt}))
+                |> Option.defaultValue ss
+            return F(s_terminate ss None, [TFo_Summary ss.chat])
+        | _ -> return !!(s_summarizing ss)
+    }
+
+    and s_terminate ss (e:WErrorType option) msg = async {
+        e 
+        |> Option.iter (fun e -> 
+            ss.bus.post (TFo_Error e)
+            Log.error (string e))
         ss.cts.Cancel()
-        ss.bus.post (TFo_Error e)
-        return !!(s_terminate ss e)
+        return !!(s_terminate ss None)
     }
 
     (* --- states [end] --- *)

@@ -59,7 +59,7 @@ module Update =
             isFlashing = false
             ui = ui
             driver = ui.driver
-            flow = FL_Init
+            flow = FL_Init Chat.Default
         }
         model,Cmd.none
 
@@ -395,7 +395,7 @@ module Update =
             let chat = {Chat.Default with systemMessage = Some instr}
             let ui = PlaywrightDriver.create()
             let flow = TaskFlow.create (Flow_Msg>>model.post) ui.driver chat       
-            let m = {model with flow = FL_Flow {|flow=flow; chat=chat|}}        
+            let model = {model with flow = FL_Flow {|flow=flow; chat=chat|}}        
             async {
                 do! Async.Sleep 100
                 flow.Post TaskFlow.TFi_Start
@@ -404,6 +404,13 @@ module Update =
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
         | None,_ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, no instructions given")
         | _,true -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, target is empty")
+
+    let terminateFlow model = 
+        match model.flow with 
+        | FL_Flow f -> 
+            f.flow.Terminate()
+            {model with flow = FL_Init f.chat}, Cmd.none
+        | _ -> model,Cmd.none
 
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -451,8 +458,9 @@ module Update =
             | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
             | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
-            | Flow_Start when model.flow.IsFL_Flow -> failwith "already have a flow running"
-            | Flow_Start -> startFlow model
+            | Flow_StartStop when model.flow.IsFL_Flow -> terminateFlow model
+            | Flow_StartStop                           -> startFlow model
+            | Flow_StopAndSummarize -> model.flow.stopAndSummarize(); model,Cmd.none
 
             ///handle messages emitted by a running flow
             | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)

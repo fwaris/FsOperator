@@ -40,11 +40,12 @@ with static member Create mailbox =
                 }
 
 type FlowState = 
-    | FL_Init 
+    | FL_Init of Chat
     | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat |}
     with 
         member this.setChat ch = match this with FL_Flow fs -> FL_Flow {|fs with chat=ch|} | f -> f
         member this.messages() = match this with FL_Flow fs -> fs.chat.messages | _ -> []
+        member this.stopAndSummarize() = match this with FL_Flow fs -> fs.flow.Post TaskFlow.TFi_StopAndSummarize | _ -> ()
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
@@ -294,7 +295,8 @@ type ClientMsg =
     | OpTask_Clear
     | OpTask_Saved of OpTask option
 
-    | Flow_Start
+    | Flow_StartStop
+    | Flow_StopAndSummarize
     | Flow_Msg of TaskFlow.TaskFLowMsgOut
 
     | Action_Set of string

@@ -55,6 +55,8 @@ type MouseButton =
     | Right
     | Middle
 
+type UITarget = BrowserTarget of string | AppTarget of string
+
 type IUIDriver =
     interface
         abstract member doubleClick: x:int*y:int -> Async<unit>

@@ -49,13 +49,13 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (model.flow.IsFL_Init)
+                            //Button.isEnabled (model.flow.IsFL_Init)
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.background Brushes.Transparent
                             Button.fontSize 11.
                             Button.content (if model.flow.IsFL_Init then Icons.start else Icons.stop )
                             Button.tip (if model.flow.IsFL_Init  then "Start task" else "Cancel task")
-                            Button.onClick (fun _ -> dispatch Flow_Start) 
+                            Button.onClick (fun _ -> dispatch Flow_StartStop)
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
@@ -67,7 +67,7 @@ type TextChatView =
                                 Button.fontFamily Icons.iconFont
                                 Button.tip "Stop and report"
                                 Button.content Icons.report
-                                Button.onClick (fun _ -> dispatch Chat_StopAndSummarize) 
+                                Button.onClick (fun _ -> dispatch Flow_StopAndSummarize) 
                                 Button.horizontalAlignment HorizontalAlignment.Right
                                 Button.verticalAlignment VerticalAlignment.Top
                             ]                       

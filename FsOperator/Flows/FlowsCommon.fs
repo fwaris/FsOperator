@@ -18,6 +18,17 @@ module FlResps =
 
     let temperature = 0.f
 
+    let toMessages (chatMsgs:ChatMsg list) =
+        chatMsgs
+        |> List.map (function
+            | ChatMsg.User m -> {id = None; role="user"; content = [Input_text {| text = m |}]; status = None}
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Output_text {text = m.content; annotations=None}] ; status = None})    
+
+    let truncateHistory messages =
+        List.rev messages
+        |> List.truncate C.MAX_MESSAGE_HISTORY
+        |> List.rev
+
     ///general exception handler for async computations - traps and posts error as W_Err message to input channel
     let catch replyChannel (comp:Async<'t>) =   
         async{
