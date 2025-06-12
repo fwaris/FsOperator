@@ -40,9 +40,11 @@ with static member Create mailbox =
                 }
 
 type FlowState = 
-    | Fl_Init 
-    | Fl_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat |}
-    with member this.setChat ch = match this with Fl_Flow fs -> Fl_Flow {|fs with chat=ch|} | f -> f
+    | FL_Init 
+    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat |}
+    with 
+        member this.setChat ch = match this with FL_Flow fs -> FL_Flow {|fs with chat=ch|} | f -> f
+        member this.messages() = match this with FL_Flow fs -> fs.chat.messages | _ -> []
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore

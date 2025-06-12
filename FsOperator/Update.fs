@@ -59,7 +59,7 @@ module Update =
             isFlashing = false
             ui = ui
             driver = ui.driver
-            flow = Fl_Init
+            flow = FL_Init
         }
         model,Cmd.none
 
@@ -395,7 +395,7 @@ module Update =
             let chat = {Chat.Default with systemMessage = Some instr}
             let ui = PlaywrightDriver.create()
             let flow = TaskFlow.create (Flow_Msg>>model.post) ui.driver chat       
-            let m = {model with flow = Fl_Flow {|flow=flow; chat=chat|}}        
+            let m = {model with flow = FL_Flow {|flow=flow; chat=chat|}}        
             async {
                 do! Async.Sleep 100
                 flow.Post TaskFlow.TFi_Start
@@ -451,11 +451,11 @@ module Update =
             | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
             | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
-            | Flow_Start when model.flow.IsFl_Flow -> failwith "already have a flow running"
+            | Flow_Start when model.flow.IsFL_Flow -> failwith "already have a flow running"
             | Flow_Start -> startFlow model
 
             ///handle messages emitted by a running flow
-            | Flow_Msg (TaskFlow.TFo_Action action) -> {model with action=action}, Cmd.none
+            | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
             | Flow_Msg (TaskFlow.TFo_Paused chat)   ->  {model with flow = model.flow.setChat chat}, Cmd.none
             | Flow_Msg (TaskFlow.TFo_ChatUpdated chat) -> {model with flow = model.flow.setChat chat}, Cmd.none
             | Flow_Msg (TaskFlow.TFo_Error e) -> model, Cmd.ofMsg (StatusMsg_Set (string e))

@@ -16,8 +16,6 @@ type TextChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let cuaMode = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let chatMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
        
         Grid.create [
             Grid.column 1
@@ -51,19 +49,18 @@ type TextChatView =
                             TextBox.onTextChanged (fun t -> dispatch (OpTask_SetTextInstructions t))
                         ]
                         Button.create [
-                            Button.isEnabled (model.flow.IsFl_Init)
+                            Button.isEnabled (model.flow.IsFL_Init)
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.background Brushes.Transparent
                             Button.fontSize 11.
-                            Button.content (if cuaMode.IsCUA_Init then Icons.start else Icons.stop )
-                            Button.tip (if cuaMode.IsCUA_Init then "Start task" else "Cancel task")
+                            Button.content (if model.flow.IsFL_Init then Icons.start else Icons.stop )
+                            Button.tip (if model.flow.IsFL_Init  then "Start task" else "Cancel task")
                             Button.onClick (fun _ -> dispatch Flow_Start) 
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
-                        if chatMode.IsCM_Text && not cuaMode.IsCUA_Init then 
+                        if model.flow.IsFL_Flow then 
                             Button.create [
-                                Button.isEnabled (cuaMode.IsCUA_Loop || cuaMode.IsCUA_Pause)
                                 Button.background Brushes.Transparent
                                 Button.margin (Thickness(0.,2.,25.,2.))
                                 Button.fontSize 14.
@@ -126,7 +123,7 @@ type TextChatView =
                                 ChatHistoryView.chatHistory 
                                     leftMargin 
                                     model 
-                                    (TaskState.textChatMessages model.taskState)
+                                    (model.flow.messages())
                                     dispatch)                            
                         ]
                     ]
