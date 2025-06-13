@@ -177,7 +177,7 @@ may be provided to the CUA model *after* the current given command has been perf
                                postCuaNext ss vs cuaResp cuaInstr
                                return !!(s_loop ss)
         | x                 -> Log.warn $"s_reasoner message ignored {x}"
-                               return !!(s_reasoner: ss (vs,cuaResp))
+                               return !!(s_reasoner ss (vs,cuaResp))
     }
 
     and s_pause ss msg = async {   
