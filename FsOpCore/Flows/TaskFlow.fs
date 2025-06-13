@@ -79,9 +79,6 @@ suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
 
 When asking CUA to enter text, suggest type <text> in the <field name>
 
-Just give the immediate next step to follow. Dont' give multi-step instructions. 
-
-BE BRIEF
 
 [CUA_INSTRUCTIONS]
 {cuaInstructions}
@@ -89,6 +86,9 @@ BE BRIEF
 [ACTION_HISTROY]
 {cuaActions |> List.rev |> String.concat ", "}
 """
+//Just give the immediate next step to follow. Dont' give multi-step instructions. 
+
+//BE BRIEF
 
     let postToReasoner (ss:SubState) reasonerInstructions =
         async {

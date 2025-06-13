@@ -41,12 +41,24 @@ with static member Create mailbox =
 
 type FlowState = 
     | FL_Init of Chat
-    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat |}
+    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat; |}
+    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat; |}
     with 
         member this.setChat ch = match this with FL_Flow fs -> FL_Flow {|fs with chat=ch|} | f -> f
-        member this.messages() = match this with FL_Flow fs -> fs.chat.messages | _ -> []
-        member this.stopAndSummarize() = match this with FL_Flow fs -> fs.flow.Post TaskFlow.TFi_StopAndSummarize | _ -> ()
+        member this.chat = match this with FL_Init c -> c | FL_Flow f -> f.chat | FL_Flow_Summarizing f -> f.chat
+        member this.messages() = this.chat.messages
         member this.Post msg = match this with FL_Flow f -> f.flow.Post msg | _ -> ()
+        
+        member this.stopAndSummarize() = 
+            match this with 
+            | FL_Flow fs -> fs.flow.Post TaskFlow.TFi_StopAndSummarize; FL_Flow_Summarizing fs 
+            | x -> x
+
+        member this.Terminate () = 
+            match this with 
+            | FL_Flow f 
+            | FL_Flow_Summarizing f -> f.flow.Terminate(); FL_Init f.chat 
+            | x -> x
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
@@ -297,6 +309,7 @@ type ClientMsg =
     | OpTask_Saved of OpTask option
 
     | Flow_StartStop
+    | Flow_Terminate
     | Flow_StopAndSummarize
     | Flow_Resume of string
     | Flow_Msg of TaskFlow.TaskFLowMsgOut
@@ -323,7 +336,6 @@ type ClientMsg =
     | Chat_StopAndSummarize
     | Chat_GotSummary_Cua of (string*string)
     | Chat_GotSummary_Alt of (string*string)
-    | Chat_TargetAcquired
 
     | TextChat_StartStopTask
     | VoiceChat_StartStop

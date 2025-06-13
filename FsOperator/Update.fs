@@ -409,7 +409,7 @@ module Update =
         match model.flow with 
         | FL_Flow f -> 
             f.flow.Terminate()
-            {model with flow = FL_Init f.chat}, Cmd.none
+            {model with flow = model.flow.Terminate()}, Cmd.none
         | _ -> model,Cmd.none
 
     let update (win:HostWindow) msg (model:Model) =
@@ -460,14 +460,16 @@ module Update =
 
             | Flow_StartStop when model.flow.IsFL_Flow -> terminateFlow model
             | Flow_StartStop                           -> startFlow model
-            | Flow_StopAndSummarize -> model.flow.stopAndSummarize(); model,Cmd.none
+            | Flow_StopAndSummarize -> {model with flow = model.flow.stopAndSummarize()},Cmd.none
             | Flow_Resume txt -> model.flow.Post (TaskFlow.TFi_Resume txt); model,Cmd.none
+            | Flow_Terminate -> {model with flow = model.flow.Terminate()}, Cmd.none
 
             ///handle messages emitted by a running flow
             | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (TaskFlow.TFo_Paused)   ->  model, Cmd.none
+            | Flow_Msg (TaskFlow.TFo_Paused)   -> model, Cmd.none
             | Flow_Msg (TaskFlow.TFo_ChatUpdated chat) -> {model with flow = model.flow.setChat chat}, Cmd.none
-            | Flow_Msg (TaskFlow.TFo_Error e) -> model, Cmd.ofMsg (StatusMsg_Set (string e))
+            | Flow_Msg (TaskFlow.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
+            | Flow_Msg (TaskFlow.TFo_Summary ch) -> {model with flow = model.flow.setChat ch}, Cmd.ofMsg Flow_Terminate
 
             | TextChat_StartStopTask -> startStopTextChat model
             | VoiceChat_StartStop -> startStopVoiceChat model

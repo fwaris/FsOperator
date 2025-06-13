@@ -5,11 +5,6 @@ open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.Media
 open Avalonia
-open Avalonia.FuncUI
-open Avalonia.Labs.Lottie
-open Avalonia.Labs.Lottie.Ext
-open Avalonia.Styling
-open Avalonia.Platform
 
 [<AbstractClass; Sealed>]
 type TextChatView =    
@@ -59,7 +54,7 @@ type TextChatView =
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
-                        if model.flow.IsFL_Flow then 
+                        if model.flow.IsFL_Flow || model.flow.IsFL_Flow_Summarizing then 
                             Button.create [
                                 Button.background Brushes.Transparent
                                 Button.margin (Thickness(0.,2.,25.,2.))
@@ -67,6 +62,7 @@ type TextChatView =
                                 Button.fontFamily Icons.iconFont
                                 Button.tip "Stop and report"
                                 Button.content Icons.report
+                                Button.isEnabled (model.flow.IsFL_Flow)
                                 Button.onClick (fun _ -> dispatch Flow_StopAndSummarize) 
                                 Button.horizontalAlignment HorizontalAlignment.Right
                                 Button.verticalAlignment VerticalAlignment.Top
