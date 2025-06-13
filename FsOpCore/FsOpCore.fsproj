@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<None Include="scripts\packages.fsx" />
 		<Compile Include="Misc\Constants.fs" />
 		<Compile Include="Misc\Log.fs" />
 		<Compile Include="Misc\Utils.fs" />
@@ -48,5 +49,7 @@
 	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
 		
 	</ItemGroup>
+
+	<ItemGroup />
 
 </Project>

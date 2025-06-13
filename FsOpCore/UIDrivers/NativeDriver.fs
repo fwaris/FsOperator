@@ -1,8 +1,6 @@
 ﻿namespace FsOpCore
 open System
 open System.IO
-open System.Drawing
-open System.Drawing.Imaging
 open SkiaSharp
 
 module NativeDriver = 
