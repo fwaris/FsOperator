@@ -25,9 +25,9 @@ type OpTask = {
 module OpTask =
     let setTextPrompt text opTask = {opTask with textModeInstructions = text}
     let setVoicePrompt text opTask = {opTask with voiceAsstInstructions = text}
-    let setUrl url opTask = {opTask with target = TLink url}
-    let setProcess name arg opTask = {opTask with target = TProcess (name,arg)}
-    let setTarget tgt  opTask = {opTask with target = tgt}
+    let setUrl url (opTask:OpTask) = {opTask with target = TLink url}
+    let setProcess name arg (opTask:OpTask) = {opTask with target = TProcess (name,arg)}
+    let setTarget tgt  (opTask:OpTask) = {opTask with target = tgt}
     let setId id opTask = {opTask with OpTask.id = id}
     let targetToString = function TLink url -> url | TProcess (a,b) -> match b with Some b -> $"{a} {b}" | None -> a
     let isEmptyTarget = function TLink url -> String.IsNullOrWhiteSpace url | _ -> false

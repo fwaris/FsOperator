@@ -10,16 +10,18 @@
 
 	<ItemGroup>
 		<None Include="scripts\packages.fsx" />
+		<None Include="scripts\testflow.fsx" />
 		<Compile Include="Misc\Constants.fs" />
 		<Compile Include="Misc\Log.fs" />
 		<Compile Include="Misc\Utils.fs" />
 		<Compile Include="UIDrivers\UITypes.fs" />
 		<Compile Include="UIDrivers\NativeDriver.fs" />
 		<Compile Include="UIDrivers\PlaywrightDriver.fs" />
-		<Compile Include="Flows\Workflow.fs" />
 		<Compile Include="Flows\Actions.fs" />
+		<Compile Include="Flows\Workflow.fs" />
 		<Compile Include="Flows\Chat.fs" />
 		<Compile Include="Flows\FlowsCommon.fs" />
+		<Compile Include="Flows\Plan.fs" />
 		<Compile Include="Flows\TaskFlow.fs" />
 	</ItemGroup>
 
@@ -49,7 +51,5 @@
 	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
 		
 	</ItemGroup>
-
-	<ItemGroup />
 
 </Project>
