@@ -46,6 +46,7 @@ type FlowState =
         member this.setChat ch = match this with FL_Flow fs -> FL_Flow {|fs with chat=ch|} | f -> f
         member this.messages() = match this with FL_Flow fs -> fs.chat.messages | _ -> []
         member this.stopAndSummarize() = match this with FL_Flow fs -> fs.flow.Post TaskFlow.TFi_StopAndSummarize | _ -> ()
+        member this.Post msg = match this with FL_Flow f -> f.flow.Post msg | _ -> ()
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
@@ -297,6 +298,7 @@ type ClientMsg =
 
     | Flow_StartStop
     | Flow_StopAndSummarize
+    | Flow_Resume of string
     | Flow_Msg of TaskFlow.TaskFLowMsgOut
 
     | Action_Set of string

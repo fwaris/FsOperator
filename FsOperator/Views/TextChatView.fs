@@ -85,14 +85,15 @@ type TextChatView =
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
-                        match model.taskState with 
-                        | Some rs when rs.cuaState.IsCUA_Pause && rs.chatMode.IsCM_Text -> 
+                        match model.flow with 
+                        | FL_Flow f when f.chat.prompt ->
                             Panel.create [
                                 DockPanel.dock Dock.Top
                                 Panel.margin 2
                                 Panel.children [
                                     TextBox.create [
-                                        TextBox.text rs.question
+                                        TextBlock.init (fun t -> Cache.textQuestion.Value <- t)
+                                        //TextBox.text (Cache.textQuestion.Value.Text)
                                         TextBox.textWrapping TextWrapping.Wrap
                                         TextBox.horizontalAlignment HorizontalAlignment.Stretch
                                         TextBox.verticalAlignment VerticalAlignment.Stretch
@@ -103,13 +104,13 @@ type TextChatView =
                                         TextBox.margin 1  
                                         TextBox.fontSize 14.
                                         TextBox.borderThickness 1.
-                                        TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
+                                        //TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
                                         TextBox.margin (Thickness(2.,2.,35.,2.))
                                     ]
                                     Button.create [
                                         Button.margin (Thickness(0.,0.,1.,2.))
                                         Button.content Icons.send
-                                        Button.onClick (fun _ -> dispatch Chat_Resume) 
+                                        Button.onClick (fun _ -> dispatch (Flow_Resume Cache.textQuestion.Value.Text)) 
                                         Button.horizontalAlignment HorizontalAlignment.Right
                                         Button.verticalAlignment VerticalAlignment.Bottom
                                     ]

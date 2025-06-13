@@ -9,11 +9,14 @@ module Cache =
     let scrollViewText : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
     let scrollViewVoice : Ref<ScrollViewer> = ref Unchecked.defaultof<_>
     let splitView : Ref<SplitView> = ref Unchecked.defaultof<_>
+    let textQuestion : Ref<TextBox> = ref Unchecked.defaultof<_>
+
     let saveIcon = lazy new Bitmap(AssetLoader.Open(Uri("avares://FsOperator/Assets/save.png")))
 
     let opTaskTexts : Ref<TextBox> list = 
         [for _ in 1 .. ((FSharp.Reflection.FSharpType.GetRecordFields typeof<OpTask>).Length - 1) -> //textboxes for all fields except id  
             (ref Unchecked.defaultof<_>)]
+    
 
 module Icons =
     let iconFont = "Segoe UI Emoji"

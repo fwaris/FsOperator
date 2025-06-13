@@ -461,6 +461,7 @@ module Update =
             | Flow_StartStop when model.flow.IsFL_Flow -> terminateFlow model
             | Flow_StartStop                           -> startFlow model
             | Flow_StopAndSummarize -> model.flow.stopAndSummarize(); model,Cmd.none
+            | Flow_Resume txt -> model.flow.Post (TaskFlow.TFi_Resume txt); model,Cmd.none
 
             ///handle messages emitted by a running flow
             | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)

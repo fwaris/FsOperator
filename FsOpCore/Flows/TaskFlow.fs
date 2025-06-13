@@ -10,7 +10,7 @@ module TaskFlow =
     ///flow input messages
     type TaskFLowMsgIn =
         | TFi_Start 
-        | TFi_Resume of Chat
+        | TFi_Resume of string
         | TFi_ChatUpdated of Chat
         | TFi_StopAndSummarize
 
@@ -34,6 +34,7 @@ module TaskFlow =
             member this.appendSnapshot s = {this with snapshots = s::this.snapshots |> List.truncate MAX_SNAPSHOTS }
             member this.appendMsg msg = {this with chat = Chat.append msg this.chat}
             member this.appendAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
+            member this.setPrompt b = {this with chat = Chat.setPrompt b this.chat}
 
     ///handle Cua respones to potentially perform a computer call
     let performCall (ss:SubState) resp = async {
@@ -75,6 +76,12 @@ may be provided to the CUA model *after* the current given command has been perf
 
 Note: Sometimes CUA has trouble performing scrolling using the simple 'scroll' command. If CUA seems stuck,
 suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
+
+When asking CUA to enter text, suggest type <text> in the <field name>
+
+Just give the immediate next step to follow. Dont' give multi-step instructions. 
+
+BE BRIEF
 
 [CUA_INSTRUCTIONS]
 {cuaInstructions}
@@ -127,9 +134,14 @@ suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
         FlResps.extractText resp 
         |> Option.map (fun text -> 
             let ss = ss.appendMsg (Assistant {id=resp.id; content=text})
-            ss.bus.post (TFo_ChatUpdated ss.chat)
-            ss)
-        |> Option.defaultValue ss
+            ss,[TFo_ChatUpdated ss.chat])
+        |> Option.defaultValue (ss,[])
+
+    ///if there is text content in resp then update substate chat and post updated chat message
+    let emitTextAndPrompt (ss:SubState) resp = 
+        let ss,_ = emitText ss resp
+        let ss = ss.setPrompt true
+        ss,[TFo_ChatUpdated ss.chat]
 
     let postCuaNext ss vs (cuaResp:Response) cuaInstr = 
         match vs, FlResps.computerCall cuaResp with 
@@ -180,13 +192,12 @@ suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
         | W_Err e                    -> return !!(s_terminate ss (Some e))
         | W_App TFi_StopAndSummarize -> postSummarizeProgress ss
                                         return !!(s_summarizing ss) 
-        | W_Cua resp when noCC resp  -> let ss = emitText ss resp
-                                        ss.bus.post TFo_Paused
-                                        return !!(s_pause ss )
-        | W_Cua resp                 -> let ss = emitText ss resp
-                                        let! ss,outMsgs,visualState = performCall ss resp
+        | W_Cua resp when noCC resp  -> let ss,outMsgs = emitTextAndPrompt ss resp
+                                        return F(s_pause ss, outMsgs)
+        | W_Cua resp                 -> let ss,outMsgs1 = emitText ss resp
+                                        let! ss,outMsgs2,visualState = performCall ss resp
                                         postGetRsnrGuidanceForCua ss
-                                        return F(s_reasoner ss (visualState,resp),outMsgs)
+                                        return F(s_reasoner ss (visualState,resp),outMsgs1 @ outMsgs2)
         | x                          -> Log.warn $"s_loop: message ignored {x}"
                                         return !!(s_loop ss)
     }            
@@ -204,7 +215,9 @@ suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
     and s_pause ss msg = async {   
         match msg with 
         | W_Err e               -> return !!(s_terminate ss (Some e))
-        | W_App (TFi_Resume ch) -> return !!(s_loop {ss with chat = ch})
+        | W_App (TFi_Resume tx) -> let ss = ss.appendMsg (User tx)
+                                   let ss = ss.setPrompt false
+                                   return F(s_loop ss,[TFo_ChatUpdated ss.chat])
         | x                     -> Log.warn $"s_pause: message ignored {x}"
                                    return !!(s_pause ss)
     }
