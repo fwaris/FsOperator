@@ -28,15 +28,17 @@ module TaskFlow =
         driver      : IUIDriver       
         bus         : WBus<TaskFLowMsgIn,TaskFLowMsgOut>
         snapshots   : string list
+        actions     : string list
     }
         with 
             member this.appendSnapshot s = {this with snapshots = s::this.snapshots |> List.truncate MAX_SNAPSHOTS }
             member this.appendMsg msg = {this with chat = Chat.append msg this.chat}
+            member this.appendAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
 
     ///handle Cua respones to potentially perform a computer call
     let performCall (ss:SubState) resp = async {
         //process computer call
-        let! (ss,outMsgs,visuaState) = 
+        let! (ss,outMsgs,visualState) = 
             match FlResps.computerCall resp with
             | Some cb -> 
                 async {
@@ -44,11 +46,13 @@ module TaskFlow =
                     let! visualState = snapshot ss.driver
                     let (snapshot,w,h,url,env) = visualState
                     let ss = ss.appendSnapshot snapshot      
-                    return ss,[(TFo_Action (Actions.actionToString cb.action))],Some visualState
+                    let actStr = Actions.actionToString cb.action
+                    let ss = ss.appendAction actStr
+                    return ss,[(TFo_Action actStr)],Some visualState
                 }
             | None -> async{ return ss,[],None }
 
-        return ss,outMsgs,None
+        return ss,outMsgs,visualState
     }
 
     let summarizationPrompt taskInstructions = """The user has tasked an automated 'computer assistant'
@@ -61,15 +65,22 @@ obtained thus far, in relation to the task instructions.
 {taskInstructions}
 """
 
-    let reasonerPrompt cuaInstructions = $"""
+    let reasonerPrompt cuaInstructions (cuaActions:string list) = $"""
 The 'computer use agent' (CUA) model is given instructions [CUA_INSTRUCTIONS] to accomplish a task.
+
 CUA 'looks' at screenshots and issues computer commands such as, 'click', 'move', 'type text', etc. to achieve its goal.
 However the CUA model is not good at following instructions sometimes. 
-Look at the message history (including the screenshots) and generate additional guidance that 
+Look at the message history (including the screenshots); [ACTION_HISTORY]; and generate additional guidance that 
 may be provided to the CUA model *after* the current given command has been performed and *before* CUA is ready to generate the next command.
+
+Note: Sometimes CUA has trouble performing scrolling using the simple 'scroll' command. If CUA seems stuck,
+suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
 
 [CUA_INSTRUCTIONS]
 {cuaInstructions}
+
+[ACTION_HISTROY]
+{cuaActions |> List.rev |> String.concat ", "}
 """
 
     let postToReasoner (ss:SubState) reasonerInstructions =
@@ -77,9 +88,8 @@ may be provided to the CUA model *after* the current given command has been perf
             try
                 let screenshots = ss.snapshots |> List.rev
                 let messages = ss.chat.messages |> FlResps.toMessages |> FlResps.truncateHistory 
-                let txt = Content.Input_text {|text = "Summarize and report"|}
                 let imgs = screenshots |> List.map(fun i -> Content.Input_image {|image_url=i|})
-                let msg = {Message.Default with content = [txt] @ imgs}//contImgs}
+                let msg = {Message.Default with content = imgs}//contImgs}
                 let chatHistory = messages |> List.map InputOutputItem.Message
                 let msgInput = InputOutputItem.Message msg
                 let req = {Request.Default with
@@ -104,11 +114,13 @@ may be provided to the CUA model *after* the current given command has been perf
         |> postToReasoner ss 
 
     let postGetRsnrGuidanceForCua ss = 
-        Some(reasonerPrompt ss.chat.systemMessage)
+        Some(reasonerPrompt ss.chat.systemMessage ss.actions)
         |> postToReasoner ss
 
     ///returns true if no compter call present
-    let noCC = FlResps.computerCall>>Option.isNone
+    let noCC resp = 
+        let cc = FlResps.computerCall resp        
+        cc |> Option.isNone
 
     ///if there is text content in resp then update substate chat and post updated chat message
     let emitText (ss:SubState) resp = 
@@ -123,14 +135,23 @@ may be provided to the CUA model *after* the current given command has been perf
         match vs, FlResps.computerCall cuaResp with 
         | Some (snapshot,w,h,url,env), Some cc ->            
             let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = env|}
-            let cc_out = {
-                call_id = cc.call_id
-                acknowledged_safety_checks = FlResps.safetyChecks cuaResp
-                output = Computer_creenshot {|image_url = snapshot |}
-                current_url = url
-            }
+            let cc_out = 
+                {
+                    call_id = cc.call_id
+                    acknowledged_safety_checks = FlResps.safetyChecks cuaResp
+                    output = Computer_creenshot {|image_url = snapshot |}
+                    current_url = url
+                }
+                |> Computer_call_output
+            let input = 
+                match cuaInstr with 
+                | Some text ->  
+                    Log.info $"Reasoner guidance: `{text}`"
+                    let textMsg = {Message.Default with content = [Content.Input_text {|text=text|}]}
+                    [cc_out;InputOutputItem.Message textMsg]
+                | None -> [cc_out]            
             let req = {Request.Default with
-                            input = [Computer_call_output cc_out]; tools=[tool]
+                            input = input; tools=[tool]
                             previous_response_id = Some cuaResp.id
                             store = true
                             model=Models.computer_use_preview
@@ -222,6 +243,7 @@ may be provided to the CUA model *after* the current given command has been perf
             chat = chat
             bus=bus
             driver=driver; snapshots=[]
+            actions = []        
         }
 
         //initial state
