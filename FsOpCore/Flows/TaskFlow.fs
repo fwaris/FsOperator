@@ -16,7 +16,7 @@ module TaskFlow =
 
     ///messages output by flow
     type TaskFLowMsgOut =
-        | TFo_Paused of Chat
+        | TFo_Paused 
         | TFo_ChatUpdated of Chat
         | TFo_Error of WErrorType
         | TFo_Action of string
@@ -33,34 +33,22 @@ module TaskFlow =
             member this.appendSnapshot s = {this with snapshots = s::this.snapshots |> List.truncate MAX_SNAPSHOTS }
             member this.appendMsg msg = {this with chat = Chat.append msg this.chat}
 
-
     ///handle Cua respones to potentially perform a computer call
     let performCall (ss:SubState) resp = async {
-
-        //extract and post any text response from cua model
-        let ss,outMsgs = 
-            FlResps.extractText resp
-            |> Option.map (fun txt ->  
-                let ss = ss.appendMsg (Assistant {id=resp.id; content=txt})
-                ss,[TaskFLowMsgOut.TFo_ChatUpdated ss.chat])
-            |> Option.defaultValue (ss,[])
-
-        //take snapshot
-        let! (snapshot,w,h,url,env) = snapshot ss.driver
-        let ss = ss.appendSnapshot snapshot      
-
         //process computer call
-        let! (ss,outMsgs) = 
+        let! (ss,outMsgs,visuaState) = 
             match FlResps.computerCall resp with
             | Some cb -> 
                 async {
                     do! Actions.doAction 2 ss.driver cb.action
-                    FlResps.continueCua ss.bus.PostIn resp (snapshot,w,h,url,env)
-                    return ss,(TFo_Action (Actions.actionToString cb.action))::outMsgs
+                    let! visualState = snapshot ss.driver
+                    let (snapshot,w,h,url,env) = visualState
+                    let ss = ss.appendSnapshot snapshot      
+                    return ss,[(TFo_Action (Actions.actionToString cb.action))],Some visualState
                 }
-            | None -> async{ return ss,outMsgs }
+            | None -> async{ return ss,[],None }
 
-        return ss,outMsgs
+        return ss,outMsgs,None
     }
 
     let summarizationPrompt taskInstructions = """The user has tasked an automated 'computer assistant'
@@ -73,8 +61,18 @@ obtained thus far, in relation to the task instructions.
 {taskInstructions}
 """
 
-    ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
-    let summarizeProgressReasoner replyChannel (ss:SubState) =
+    let reasonerPrompt cuaInstructions = $"""
+The 'computer use agent' (CUA) model is given instructions [CUA_INSTRUCTIONS] to accomplish a task.
+CUA 'looks' at screenshots and issues computer commands such as, 'click', 'move', 'type text', etc. to achieve its goal.
+However the CUA model is not good at following instructions sometimes. 
+Look at the message history (including the screenshots) and generate additional guidance that 
+may be provided to the CUA model *after* the current given command has been performed and *before* CUA is ready to generate the next command.
+
+[CUA_INSTRUCTIONS]
+{cuaInstructions}
+"""
+
+    let postToReasoner (ss:SubState) reasonerInstructions =
         async {
             try
                 let screenshots = ss.snapshots |> List.rev
@@ -86,18 +84,62 @@ obtained thus far, in relation to the task instructions.
                 let msgInput = InputOutputItem.Message msg
                 let req = {Request.Default with
                                     input = chatHistory @ [msgInput];
-                                    instructions = ss.chat.systemMessage |> Option.map summarizationPrompt
+                                    instructions = reasonerInstructions
                                     store = false
                                     model=Models.gpt_41
                                     truncation = Some Truncation.auto
                                 }
-                do! FlResps.sendRequest W_Reasoner replyChannel req                                    
+                do! FlResps.sendRequest W_Reasoner ss.bus.PostIn req                                    
             with ex ->
                 Log.exn(ex,"summarizeProgressReasoner")
                 return raise ex
         }
-        |> FlResps.catch replyChannel
+        |> FlResps.catch ss.bus.PostIn
 
+
+    ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
+    let postSummarizeProgress (ss:SubState) = 
+        ss.chat.systemMessage
+        |> Option.map summarizationPrompt
+        |> postToReasoner ss 
+
+    let postGetRsnrGuidanceForCua ss = 
+        Some(reasonerPrompt ss.chat.systemMessage)
+        |> postToReasoner ss
+
+    ///returns true if no compter call present
+    let noCC = FlResps.computerCall>>Option.isNone
+
+    ///if there is text content in resp then update substate chat and post updated chat message
+    let emitText (ss:SubState) resp = 
+        FlResps.extractText resp 
+        |> Option.map (fun text -> 
+            let ss = ss.appendMsg (Assistant {id=resp.id; content=text})
+            ss.bus.post (TFo_ChatUpdated ss.chat)
+            ss)
+        |> Option.defaultValue ss
+
+    let postCuaNext ss vs (cuaResp:Response) cuaInstr = 
+        match vs, FlResps.computerCall cuaResp with 
+        | Some (snapshot,w,h,url,env), Some cc ->            
+            let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = env|}
+            let cc_out = {
+                call_id = cc.call_id
+                acknowledged_safety_checks = FlResps.safetyChecks cuaResp
+                output = Computer_creenshot {|image_url = snapshot |}
+                current_url = url
+            }
+            let req = {Request.Default with
+                            input = [Computer_call_output cc_out]; tools=[tool]
+                            previous_response_id = Some cuaResp.id
+                            store = true
+                            model=Models.computer_use_preview
+                            truncation = Some Truncation.auto
+                        }
+            FlResps.sendRequest W_Cua ss.bus.PostIn req
+        | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
+        | _,None -> async {return failwith "no computer call output found in response"}
+        |> FlResps.catch ss.bus.PostIn
 
     (* --- states --- *)
 
@@ -106,38 +148,56 @@ obtained thus far, in relation to the task instructions.
         | W_Err e         -> return !!(s_terminate ss (Some e))
         | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
                              let ss = ss.appendSnapshot snapshot
-                             FlResps.sendStartCua ss.bus.PostIn ss.chat.systemMessage (snapshot,w,h,url,env)
+                             FlResps.postStartCua ss.bus.PostIn ss.chat.systemMessage (snapshot,w,h,url,env)
                              return !!(s_loop ss)
-        | _               -> return !!(s_start ss)
+        | x               -> Log.warn $"s_start: expecting {TFi_Start} message to start flow but got {x}"
+                             return !!(s_start ss)
     }
 
     and s_loop ss msg = async {
         match msg with 
         | W_Err e                    -> return !!(s_terminate ss (Some e))
-        | W_App TFi_StopAndSummarize -> summarizeProgressReasoner ss.bus.PostIn ss
+        | W_App TFi_StopAndSummarize -> postSummarizeProgress ss
                                         return !!(s_summarizing ss) 
-        | W_Cua resp                 -> let! ss,outMsgs = performCall ss resp
-                                        return F(s_loop ss,outMsgs)
-        | _                          -> return !!(s_loop ss)
+        | W_Cua resp when noCC resp  -> let ss = emitText ss resp
+                                        ss.bus.post TFo_Paused
+                                        return !!(s_pause ss )
+        | W_Cua resp                 -> let ss = emitText ss resp
+                                        let! ss,outMsgs,visualState = performCall ss resp
+                                        postGetRsnrGuidanceForCua ss
+                                        return F(s_reasoner ss (visualState,resp),outMsgs)
+        | x                          -> Log.warn $"s_loop: message ignored {x}"
+                                        return !!(s_loop ss)
     }            
+
+    and s_reasoner ss (vs,cuaResp) msg = async {
+        match msg with 
+        | W_Err e           -> return !!(s_terminate ss (Some e))
+        | W_Reasoner resp   -> let cuaInstr = FlResps.extractText resp  
+                               postCuaNext ss vs cuaResp cuaInstr
+                               return !!(s_loop ss)
+        | x                 -> Log.warn $"s_reasoner message ignored {x}"
+                               return !!(s_reasoner: ss (vs,cuaResp))
+    }
 
     and s_pause ss msg = async {   
         match msg with 
         | W_Err e               -> return !!(s_terminate ss (Some e))
         | W_App (TFi_Resume ch) -> return !!(s_loop {ss with chat = ch})
-        | _                     -> return !!(s_pause ss)
+        | x                     -> Log.warn $"s_pause: message ignored {x}"
+                                   return !!(s_pause ss)
     }
 
     and s_summarizing ss msg = async {
         match msg with 
-        | W_Err e -> return !!(s_terminate ss (Some e))
-        | W_Reasoner resp -> 
-            let ss =
-                FlResps.extractText resp 
-                |> Option.map (fun txt -> ss.appendMsg (Assistant {id=resp.id; content=txt}))
-                |> Option.defaultValue ss
-            return F(s_terminate ss None, [TFo_Summary ss.chat])
-        | _ -> return !!(s_summarizing ss)
+        | W_Err e         -> return !!(s_terminate ss (Some e))
+        | W_Reasoner resp -> let ss =
+                                FlResps.extractText resp 
+                                |> Option.map (fun txt -> ss.appendMsg (Assistant {id=resp.id; content=txt}))
+                                |> Option.defaultValue ss
+                             return F(s_terminate ss None, [TFo_Summary ss.chat])
+        | x               -> Log.warn $"s_summarizing: message ignored {x}"
+                             return !!(s_summarizing ss)
     }
 
     and s_terminate ss (e:WErrorType option) msg = async {
@@ -146,6 +206,7 @@ obtained thus far, in relation to the task instructions.
             ss.bus.post (TFo_Error e)
             Log.error (string e))
         ss.cts.Cancel()
+        Log.info $"s_terminate: message ignored {msg}"
         return !!(s_terminate ss None)
     }
 

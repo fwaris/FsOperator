@@ -85,7 +85,7 @@ module FlResps =
         sendWithRetry 2 msgWrap replyChannel msg
 
     ///send an initial 'computer tool call' request
-    let sendStartCua replyChannel instructions (sanpshot,width,height,url,environment) =
+    let postStartCua replyChannel instructions (sanpshot,width,height,url,environment) =
        async {
             let contImg = Input_image {|image_url = sanpshot|}
             let input = { Message.Default with content=[contImg]}

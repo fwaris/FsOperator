@@ -464,7 +464,7 @@ module Update =
 
             ///handle messages emitted by a running flow
             | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (TaskFlow.TFo_Paused chat)   ->  {model with flow = model.flow.setChat chat}, Cmd.none
+            | Flow_Msg (TaskFlow.TFo_Paused)   ->  model, Cmd.none
             | Flow_Msg (TaskFlow.TFo_ChatUpdated chat) -> {model with flow = model.flow.setChat chat}, Cmd.none
             | Flow_Msg (TaskFlow.TFo_Error e) -> model, Cmd.ofMsg (StatusMsg_Set (string e))
 
