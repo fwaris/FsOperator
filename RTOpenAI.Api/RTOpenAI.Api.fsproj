@@ -22,7 +22,7 @@
   </ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.34" />
+		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
 		<PackageReference Include="SIPSorcery" Version="8.0.22" />
 		<PackageReference Include="SIPSorceryMedia.Abstractions" Version="8.0.12" />
 		<PackageReference Include="System.Text.Json" Version="9.0.6" />

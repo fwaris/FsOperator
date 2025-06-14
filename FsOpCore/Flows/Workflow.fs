@@ -16,9 +16,9 @@ type W_Msg<'t> =
     | W_Voice of RTOpenAI.Api.Events.ServerEvent
     | W_Err of WErrorType
 
-    ///Reasoner responses should have the correlation id attached for request-response pairing.
-    ///There may be multiple concurrent requests in play.
-    ///Use Workflow.ReasonerMsgWithCorrId function to construct this union case.
+    ///Reasoner responses should have the correlation id attached for request-response pairing;
+    ///a there may be multiple concurrent requests in play.
+    ///Use Workflow.ReasonerMsgWithCorrId function to construct this union case from the raw response.
     | W_Reasoner of (string*FsResponses.Response) 
 
     with 

@@ -15,7 +15,7 @@
   </ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.34" />
+		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
 		<PackageReference Include="System.Text.Json" Version="9.0.6" />
 	</ItemGroup>

@@ -13,6 +13,7 @@
 #r "nuget: System.Management"
 #r "nuget: System.Net.Http"
 #r "nuget: System.Text.RegularExpressions"
+#r "nuget: Microsoft.SemanticKernel"
 //#r "nuget: WindowsInput"
 
 #r @"..\..\RTOpenAI.Api\bin\Debug\net9.0-windows10.0.19041.0\RTOpenAI.Api.dll"
@@ -29,4 +30,5 @@
 #load "..\Flows\Workflow.fs"
 #load "..\Flows\Chat.fs"
 #load "..\Flows\FlowsCommon.fs"
+#load "..\Flows\Plan.fs"
 #load "..\Flows\TaskFlow.fs"
