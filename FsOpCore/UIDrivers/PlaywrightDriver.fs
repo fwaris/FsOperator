@@ -46,6 +46,9 @@ module PlaywrightDriver =
             ctx.Close.Add(disconnectHook)
             ctx.Page.Add(disconnectHookPage)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
+            match _prevUrl.Value with 
+            | Some url -> do! page.GotoAsync(url) |> Async.AwaitTask |> Async.Ignore 
+            | None     -> ()
             do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
             return page
         }

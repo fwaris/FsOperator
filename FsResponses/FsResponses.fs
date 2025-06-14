@@ -226,6 +226,7 @@ type Response = {
     instructions : string option
     max_output_tokens : int option
     model : string
+    metadata : Map<string,string> option
     output : InputOutputItem list
     parallel_tool_calls : bool
     previous_response_id : string option

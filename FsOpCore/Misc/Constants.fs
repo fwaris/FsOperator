@@ -15,3 +15,5 @@ module C =
 
     let VIEWPORT_WIDTH = 1280
     let VIEWPORT_HEIGHT = 768
+
+    let CORR_ID = "correlationId"

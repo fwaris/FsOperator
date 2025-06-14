@@ -12,7 +12,7 @@ module TaskFlow =
         | TFi_Start 
         | TFi_Resume of string
         | TFi_ChatUpdated of Chat
-        | TFi_StopAndSummarize
+        | TFi_EndAndReport
 
     ///messages output by flow
     type TaskFLowMsgOut =
@@ -56,7 +56,7 @@ module TaskFlow =
         return ss,outMsgs,visualState
     }
 
-    let summarizationPrompt taskInstructions = """The user has tasked an automated 'computer assistant'
+    let summarizationPrompt taskInstructions = $"""The user has tasked an automated 'computer assistant'
 to accomplish a task as given in the TASK INSTRUCTIONS below. The computer
 assistant has operated the computer in pursuit of the task. Along the way it has
 taken some screenshots. Give any available message history and the screenshots, summarize the content
@@ -90,7 +90,7 @@ When asking CUA to enter text, suggest type <text> in the <field name>
 
 //BE BRIEF
 
-    let postToReasoner (ss:SubState) reasonerInstructions =
+    let postToReasoner correlationId (ss:SubState) reasonerInstructions  =
         async {
             try
                 let screenshots = ss.snapshots |> List.rev
@@ -105,8 +105,9 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                                     store = false
                                     model=Models.gpt_41
                                     truncation = Some Truncation.auto
+                                    metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                                 }
-                do! FlResps.sendRequest W_Reasoner ss.bus.PostInput req                                    
+                do! FlResps.sendRequest Workflow.ReasonerMsgWithCorrId ss.bus.PostInput req                                    
             with ex ->
                 Log.exn(ex,"summarizeProgressReasoner")
                 return raise ex
@@ -116,13 +117,17 @@ When asking CUA to enter text, suggest type <text> in the <field name>
 
     ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
     let postSummarizeProgress (ss:SubState) = 
+        let id = newId()
         ss.chat.systemMessage
         |> Option.map summarizationPrompt
-        |> postToReasoner ss 
+        |> postToReasoner id ss 
+        id
 
     let postGetRsnrGuidanceForCua ss = 
+        let id = newId()
         Some(reasonerPrompt ss.chat.systemMessage ss.actions)
-        |> postToReasoner ss
+        |> postToReasoner id ss
+        id
 
     ///returns true if no compter call present
     let noCC resp = 
@@ -174,6 +179,17 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch ss.bus.PostInput
 
+    let ignoreMsg s msg name =
+        Log.warn $"{name}: ignored message {msg}"
+        F(s,[])
+
+    ///convenience 'active pattern' to match a W_Reasoner msg
+    ///with the given correlation id
+    let (|Reasoner|_|) corrId msg = 
+        match msg with 
+        | W_Reasoner (id,resp) when id = corrId -> Some resp
+        | _                                     -> None
+
     (* --- states --- *)
 
     let rec s_start ss msg = async {    
@@ -190,56 +206,55 @@ When asking CUA to enter text, suggest type <text> in the <field name>
     and s_loop ss msg = async {
         match msg with 
         | W_Err e                    -> return !!(s_terminate ss (Some e))
-        | W_App TFi_StopAndSummarize -> postSummarizeProgress ss
-                                        return !!(s_summarizing ss) 
+        | W_App TFi_EndAndReport     -> let corrId = postSummarizeProgress ss
+                                        return !!(s_summarizing ss corrId) 
         | W_Cua resp when noCC resp  -> let ss,outMsgs = emitTextAndPrompt ss resp
                                         return F(s_pause ss, outMsgs)
         | W_Cua resp                 -> let ss,outMsgs1 = emitText ss resp
                                         let! ss,outMsgs2,visualState = performCall ss resp
-                                        postGetRsnrGuidanceForCua ss
-                                        return F(s_reasoner ss (visualState,resp),outMsgs1 @ outMsgs2)
-        | x                          -> Log.warn $"s_loop: message ignored {x}"
-                                        return !!(s_loop ss)
+                                        let corrId = postGetRsnrGuidanceForCua ss
+                                        return F(s_reason ss (visualState,resp) corrId,outMsgs1 @ outMsgs2)
+        | x                          -> return ignoreMsg (s_loop ss) x "s_loop"
     }            
 
-    and s_reasoner ss (vs,cuaResp) msg = async {
+    and s_reason ss (vs,cuaResp) corrId msg  = async {
         match msg with 
-        | W_Err e           -> return !!(s_terminate ss (Some e))
-        | W_Reasoner resp   -> let cuaInstr = FlResps.extractText resp  
-                               postCuaNext ss vs cuaResp cuaInstr
-                               return !!(s_loop ss)
-        | x                 -> Log.warn $"s_reasoner message ignored {x}"
-                               return !!(s_reasoner ss (vs,cuaResp))
+        | W_Err e                -> return !!(s_terminate ss (Some e))
+        | W_App TFi_EndAndReport -> let corrId = postSummarizeProgress ss
+                                    return !!(s_summarizing ss corrId) 
+        | Reasoner corrId (resp) -> let cuaInstr = FlResps.extractText resp  
+                                    postCuaNext ss vs cuaResp cuaInstr
+                                    return !!(s_loop ss)
+        | x                       -> return ignoreMsg (s_reason ss (vs,cuaResp) corrId) x "s_reason"
     }
 
     and s_pause ss msg = async {   
         match msg with 
-        | W_Err e               -> return !!(s_terminate ss (Some e))
-        | W_App (TFi_Resume tx) -> let ss = ss.appendMsg (User tx)
-                                   let ss = ss.setPrompt false
-                                   return F(s_loop ss,[TFo_ChatUpdated ss.chat])
-        | x                     -> Log.warn $"s_pause: message ignored {x}"
-                                   return !!(s_pause ss)
+        | W_Err e                -> return !!(s_terminate ss (Some e))
+        | W_App TFi_EndAndReport -> let corrId = postSummarizeProgress ss
+                                    return !!(s_summarizing ss corrId) 
+        | W_App (TFi_Resume tx)  -> let ss = ss.appendMsg (User tx)
+                                    let ss = ss.setPrompt false
+                                    return F(s_loop ss,[TFo_ChatUpdated ss.chat])
+        | x                      -> return ignoreMsg (s_pause ss) x "s_pause"
     }
 
-    and s_summarizing ss msg = async {
+    and s_summarizing ss corrId msg = async {
         match msg with 
-        | W_Err e         -> return !!(s_terminate ss (Some e))
-        | W_Reasoner resp -> let ss =
-                                FlResps.extractText resp 
-                                |> Option.map (fun txt -> ss.appendMsg (Assistant {id=resp.id; content=txt}))
-                                |> Option.defaultValue ss
-                             return F(s_terminate ss None, [TFo_Summary ss.chat])
-        | x               -> Log.warn $"s_summarizing: message ignored {x}"
-                             return !!(s_summarizing ss)
+        | W_Err e                 -> return !!(s_terminate ss (Some e))
+        | Reasoner corrId (resp)  -> let ss = FlResps.extractText resp  
+                                              |> Option.map (fun txt -> ss.appendMsg (Assistant {id=resp.id; content=txt})) 
+                                              |> Option.defaultValue ss
+                                     return F(s_terminate ss None, [TFo_Summary ss.chat])
+        | x                       -> return ignoreMsg (s_summarizing ss corrId) x "s_summarizing"
     }
 
     and s_terminate ss (e:WErrorType option) msg = async {
         e 
         |> Option.iter (fun e -> 
-            ss.bus.post (TFo_Error e)
-            Log.error (string e))
-        ss.cts.Cancel()
+            ss.bus.postOutput (TFo_Error e)
+            Log.error (string e)
+            ss.cts.CancelAfter(1000))
         Log.info $"s_terminate: message ignored {msg}"
         return !!(s_terminate ss None)
     }
@@ -268,9 +283,14 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         //return handler to talk to flow
         {new IFlow<TaskFLowMsgIn> with
 
-            member _.Terminate () = 
-                ss0.cts.Cancel()
-                ss0.bus.inputChannel.Writer.TryComplete() |> ignore
+            member _.Terminate () =                 
+                async {
+                    Log.info "terminating flow ..."
+                    do! Async.Sleep(1000)
+                    ss0.cts.Cancel()
+                    ss0.bus.Close()
+                }
+                |> Async.Start
  
             member _.Post msg = bus.PostInput (W_App msg)
         }

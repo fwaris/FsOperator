@@ -48,13 +48,13 @@ type TextChatView =
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.background Brushes.Transparent
                             Button.fontSize 11.
-                            Button.content (if model.flow.IsFL_Init then Icons.start else Icons.stop )
-                            Button.tip (if model.flow.IsFL_Init  then "Start task" else "Cancel task")
+                            Button.content (if model.flow.state.IsFL_Init then Icons.start else Icons.stop )
+                            Button.tip (if model.flow.state.IsFL_Init  then "Start task" else "Cancel task")
                             Button.onClick (fun _ -> dispatch Flow_StartStop)
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
                         ]
-                        if model.flow.IsFL_Flow || model.flow.IsFL_Flow_Summarizing then 
+                        if model.flow.state.IsFL_Flow || model.flow.state.IsFL_Flow_Summarizing then 
                             Button.create [
                                 Button.background Brushes.Transparent
                                 Button.margin (Thickness(0.,2.,25.,2.))
@@ -62,7 +62,7 @@ type TextChatView =
                                 Button.fontFamily Icons.iconFont
                                 Button.tip "Stop and report"
                                 Button.content Icons.report
-                                Button.isEnabled (model.flow.IsFL_Flow)
+                                Button.isEnabled (model.flow.state.IsFL_Flow)
                                 Button.onClick (fun _ -> dispatch Flow_StopAndSummarize) 
                                 Button.horizontalAlignment HorizontalAlignment.Right
                                 Button.verticalAlignment VerticalAlignment.Top
@@ -81,8 +81,8 @@ type TextChatView =
                             TextBlock.fontWeight FontWeight.Bold
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
-                        match model.flow with 
-                        | FL_Flow f when f.chat.prompt ->
+                        match model.flow.state with 
+                        | FL_Flow f when model.flow.chat.prompt ->
                             Panel.create [
                                 DockPanel.dock Dock.Top
                                 Panel.margin 2

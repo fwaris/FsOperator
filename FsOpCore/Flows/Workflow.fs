@@ -14,30 +14,38 @@ type W_Msg<'t> =
     | W_Cua of FsResponses.Response
     | W_App of 't
     | W_Voice of RTOpenAI.Api.Events.ServerEvent
-    | W_Reasoner of FsResponses.Response
     | W_Err of WErrorType
+
+    ///Reasoner responses should have the correlation id attached for request-response pairing.
+    ///There may be multiple concurrent requests in play.
+    ///Use Workflow.ReasonerMsgWithCorrId function to construct this union case.
+    | W_Reasoner of (string*FsResponses.Response) 
+
     with 
         member this.msgType = 
             match this with 
             | W_Cua _ -> "W_Cua"
             | W_App t -> $"W_App {t}"
             | W_Voice e -> $"W_Voice {e.eventType}"
-            | W_Reasoner _ -> $"W_Reasoner"
+            | W_Reasoner (id,_) -> $"W_Reasoner ({id})"
             | W_Err e -> $"W_Error {e}"        
+            
 
 type WBus<'appIn,'appOut> = 
     {
-        inputChannel  : Channel<W_Msg<'appIn>>
+        ///use PostInput function instead of directly using this property, for consistent logging
+        _inputChannel  : Channel<W_Msg<'appIn>>
         postOutput  : 'appOut -> unit
     }
     with 
         static member Create<'appIn,'appOut> (post:'appOut->unit) = 
             {
-                inputChannel  = Channel.CreateBounded<W_Msg<'appIn>>(10)
+                _inputChannel  = Channel.CreateBounded<W_Msg<'appIn>>(10)
                 postOutput = post
             }
+        member this.Close() = this._inputChannel.Writer.TryComplete() |> ignore
         member this.PostInput msg = 
-            match this.inputChannel.Writer.TryWrite msg with 
+            match this._inputChannel.Writer.TryWrite msg with 
             | false -> Log.warn $"Bus dropped message {msg}"
             | true  -> ()
         
@@ -47,7 +55,13 @@ type WBus<'appIn,'appOut> =
 type F<'Event,'OutEvent> = F of ('Event -> Async<F<'Event,'OutEvent>>)*'OutEvent list
 
 module Workflow =
-
+    let ReasonerMsgWithCorrId (msg:FsResponses.Response) =
+        let corrId = 
+            msg.metadata
+            |> Option.bind (fun m -> m |> Map.tryFind C.CORR_ID)
+            |> Option.defaultValue ""
+        W_Reasoner(corrId,msg)
+   
     ///accepts current state and input event,
     ///returns nextState and publishes any output events
     let private transition bus state event = async {
@@ -58,11 +72,11 @@ module Workflow =
 
     let run (token:CancellationToken) bus initState =
         let runner =  
-            bus.inputChannel.Reader.ReadAllAsync(token)
+            bus._inputChannel.Reader.ReadAllAsync(token)
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.map(fun m -> Log.info $"Workflow message: {m.msgType}"; m)
             |> AsyncSeq.scanAsync (transition bus) initState
-            |> AsyncSeq.iter (fun x -> Log.info ".")
+            |> AsyncSeq.iter (fun x -> ())
 
         let catcher = 
             async {

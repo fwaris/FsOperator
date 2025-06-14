@@ -59,7 +59,7 @@ module Update =
             isFlashing = false
             ui = ui
             driver = ui.driver
-            flow = FL_Init Chat.Default
+            flow = Flow.Default
         }
         model,Cmd.none
 
@@ -389,13 +389,15 @@ module Update =
             | CM_Voice _ -> stopVoiceChat m
             | _          -> m,Cmd.none
 
+    let terminateFlow model = {model with flow = model.flow.Terminate()},Cmd.none
+
     let startFlow model =
         match checkEmpty model.opTask.textModeInstructions, OpTask.isEmptyTarget model.opTask.target with 
         | Some instr, false -> 
             let chat = {Chat.Default with systemMessage = Some instr}
             let ui = PlaywrightDriver.create()
             let flow = TaskFlow.create (Flow_Msg>>model.post) ui.driver chat       
-            let model = {model with flow = FL_Flow {|flow=flow; chat=chat|}}        
+            let model = {model with flow = {model.flow with state=FL_Flow {|flow=flow|}}}        
             async {
                 do! Async.Sleep 100
                 flow.Post TaskFlow.TFi_Start
@@ -404,13 +406,6 @@ module Update =
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
         | None,_ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, no instructions given")
         | _,true -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, target is empty")
-
-    let terminateFlow model = 
-        match model.flow with 
-        | FL_Flow f -> 
-            f.flow.Terminate()
-            {model with flow = model.flow.Terminate()}, Cmd.none
-        | _ -> model,Cmd.none
 
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -458,11 +453,11 @@ module Update =
             | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
             | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
-            | Flow_StartStop when model.flow.IsFL_Flow -> terminateFlow model
+            | Flow_StartStop when model.flow.isRunning -> terminateFlow model
             | Flow_StartStop                           -> startFlow model
             | Flow_StopAndSummarize -> {model with flow = model.flow.stopAndSummarize()},Cmd.none
             | Flow_Resume txt -> model.flow.Post (TaskFlow.TFi_Resume txt); model,Cmd.none
-            | Flow_Terminate -> {model with flow = model.flow.Terminate()}, Cmd.none
+            | Flow_Terminate -> terminateFlow model
 
             ///handle messages emitted by a running flow
             | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)

@@ -40,25 +40,30 @@ with static member Create mailbox =
                 }
 
 type FlowState = 
-    | FL_Init of Chat
-    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat; |}
-    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; chat:Chat; |}
-    with 
-        member this.setChat ch = match this with FL_Flow fs -> FL_Flow {|fs with chat=ch|} | f -> f
-        member this.chat = match this with FL_Init c -> c | FL_Flow f -> f.chat | FL_Flow_Summarizing f -> f.chat
-        member this.messages() = this.chat.messages
-        member this.Post msg = match this with FL_Flow f -> f.flow.Post msg | _ -> ()
-        
-        member this.stopAndSummarize() = 
-            match this with 
-            | FL_Flow fs -> fs.flow.Post TaskFlow.TFi_StopAndSummarize; FL_Flow_Summarizing fs 
-            | x -> x
+    | FL_Init 
+    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; |}
+    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlow.TaskFLowMsgIn> |}
 
+type Flow =
+    {
+        chat : Chat
+        state :  FlowState
+    }
+    with 
+        static member Default = {state = FL_Init; chat=Chat.Default}
+        member this.messages() = this.chat.messages
+        member this.Post msg = match this.state with FL_Flow f | FL_Flow_Summarizing f -> f.flow.Post msg | _ -> ()
+        member this.isRunning = match this.state with FL_Init -> false | _ -> true
+        member this.setChat ch = {this with chat = ch}        
+        member this.stopAndSummarize() = 
+            match this.state with 
+            | FL_Flow f -> this.Post TaskFlow.TFi_EndAndReport; {this with state = FL_Flow_Summarizing f}
+            | x         -> this
         member this.Terminate () = 
-            match this with 
+            match this.state with 
             | FL_Flow f 
-            | FL_Flow_Summarizing f -> f.flow.Terminate(); FL_Init f.chat 
-            | x -> x
+            | FL_Flow_Summarizing f -> f.flow.Terminate(); {this with state = FL_Init}
+            | x -> this
 
 module Bus =
     let postMessage (bus:Bus) msg = bus.mailbox.Writer.TryWrite(msg) |> ignore
@@ -287,7 +292,7 @@ type Model = {
     statusMsg   : (DateTime option*string)
     browserMode : BrowserMode
     isFlashing  : bool
-    flow        : FlowState
+    flow        : Flow
 }
     with member this.post msg = this.mailbox.Writer.TryWrite msg |> ignore
 

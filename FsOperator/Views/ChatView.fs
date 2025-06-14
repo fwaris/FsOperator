@@ -39,7 +39,7 @@ type ChatView =
                                     TextBlock.fontWeight FontWeight.Bold
                                     TextBlock.margin (Thickness(leftMargin,1.,30.,0.))
                                 ]
-                                if model.flow.IsFL_Flow then 
+                                if model.flow.state.IsFL_Flow then 
                                     Lottie.create [
                                         Grid.row 0
                                         Lottie.margin (Thickness(10.,0.,0.,0.))
