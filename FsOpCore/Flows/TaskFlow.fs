@@ -106,12 +106,12 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                                     model=Models.gpt_41
                                     truncation = Some Truncation.auto
                                 }
-                do! FlResps.sendRequest W_Reasoner ss.bus.PostIn req                                    
+                do! FlResps.sendRequest W_Reasoner ss.bus.PostInput req                                    
             with ex ->
                 Log.exn(ex,"summarizeProgressReasoner")
                 return raise ex
         }
-        |> FlResps.catch ss.bus.PostIn
+        |> FlResps.catch ss.bus.PostInput
 
 
     ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
@@ -169,10 +169,10 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            FlResps.sendRequest W_Cua ss.bus.PostIn req
+            FlResps.sendRequest W_Cua ss.bus.PostInput req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
-        |> FlResps.catch ss.bus.PostIn
+        |> FlResps.catch ss.bus.PostInput
 
     (* --- states --- *)
 
@@ -181,7 +181,7 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         | W_Err e         -> return !!(s_terminate ss (Some e))
         | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
                              let ss = ss.appendSnapshot snapshot
-                             FlResps.postStartCua ss.bus.PostIn ss.chat.systemMessage (snapshot,w,h,url,env)
+                             FlResps.postStartCua ss.bus.PostInput ss.chat.systemMessage (snapshot,w,h,url,env)
                              return !!(s_loop ss)
         | x               -> Log.warn $"s_start: expecting {TFi_Start} message to start flow but got {x}"
                              return !!(s_start ss)
@@ -270,8 +270,8 @@ When asking CUA to enter text, suggest type <text> in the <field name>
 
             member _.Terminate () = 
                 ss0.cts.Cancel()
-                ss0.bus.inCh.Writer.TryComplete() |> ignore
+                ss0.bus.inputChannel.Writer.TryComplete() |> ignore
  
-            member _.Post msg = bus.PostIn (W_App msg)
+            member _.Post msg = bus.PostInput (W_App msg)
         }
 

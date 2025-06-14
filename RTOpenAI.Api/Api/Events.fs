@@ -690,6 +690,38 @@ type ServerEvent =
     | ResponseFunctionCallArgumentsDone of ResponseFunctionCallArgumentsDoneEvent
     | RateLimitsUpdated of RateLimitsUpdatedEvent
     | UnknownEvent of string * JsonDocument
+    with 
+        member this.eventType = 
+            match this with 
+            | Error e -> e.``type``
+            | SessionCreated e -> e.``type``
+            | SessionUpdated e -> e.``type``
+            | ConversationCreated e -> e.``type``
+            | ConversationItemCreated e -> e.``type``
+            | ConversationItemInputAudioTranscriptionCompleted e -> e.``type``
+            | ConversationItemInputAudioTranscriptionFailed e -> e.``type``
+            | ConversationItemTruncated e -> e.``type``
+            | ConversationItemDeleted e -> e.``type``
+            | InputAudioBufferCommitted e -> e.``type``
+            | InputAudioBufferCleared e -> e.``type``
+            | InputAudioBufferSpeechStarted e -> e.``type``
+            | InputAudioBufferSpeechStopped e -> e.``type``
+            | ResponseCreated e -> e.``type``
+            | ResponseDone e -> e.``type``
+            | ResponseOutputItemAdded e -> e.``type``
+            | ResponseOutputItemDone e -> e.``type``
+            | ResponseContentPartAdded e -> e.``type``
+            | ResponseContentPartDone e -> e.``type``
+            | ResponseTextDelta e -> e.``type``
+            | ResponseTextDone e -> e.``type``
+            | ResponseAudioTranscriptDelta e -> e.``type``
+            | ResponseAudioTranscriptDone e -> e.``type``
+            | ResponseAudioDelta e -> e.``type``
+            | ResponseAudioDone e -> e.``type``
+            | ResponseFunctionCallArgumentsDelta e -> e.``type``
+            | ResponseFunctionCallArgumentsDone e -> e.``type``
+            | RateLimitsUpdated e -> e.``type``
+            | UnknownEvent (t,_) -> t
 
 
 type ClientEvent =

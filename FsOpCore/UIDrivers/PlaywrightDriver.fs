@@ -1,4 +1,5 @@
 ﻿namespace FsOpCore
+open System.IO
 open Microsoft.Playwright
 open SkiaSharp
 open System.Threading
@@ -20,25 +21,68 @@ module PlaywrightDriver =
         | Some p when System.IO.File.Exists(p) -> Some p
         | _ -> None
 
+    let browserStatePath = lazy(homePath.Value @@ "fsoperator.json")
+    let getStorageStatePath = lazy(if File.Exists browserStatePath.Value then browserStatePath.Value else null)    
+
+    let disconnectHook (ctx:IBrowserContext) = 
+        async{
+            Log.info "Saving browser context state"
+            try
+                let opts = BrowserContextStorageStateOptions()
+                opts.Path <- browserStatePath.Value
+                do! ctx.StorageStateAsync(opts) |> Async.AwaitTask |> Async.Ignore
+            with ex ->
+                Log.warn $"Error encountered when saving browser context state ${ex.Message}"
+        }
+        |> Async.Start
+
+    let disconnectHookPage (page:IPage) = 
+        page.Close.Add(fun p -> disconnectHook p.Context)
+
+    let initContext(browser:IBrowser) = 
+        async {
+            let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value )
+            let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask
+            ctx.Close.Add(disconnectHook)
+            ctx.Page.Add(disconnectHookPage)
+            let! page = ctx.NewPageAsync() |> Async.AwaitTask
+            do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
+            return page
+        }
+
+    let getPage (browser:IBrowser) = 
+        async{
+            let ctx = browser.Contexts |> Seq.tryFind (fun c -> c.Pages.Count > 0)
+            match ctx with 
+            | Some ctx -> 
+                let sortedPages =
+                    ctx.Pages
+                    |> Seq.toList
+                    |> List.rev
+                    |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
+                let page = sortedPages.Head
+                if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
+                    do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
+                return page
+            | None -> return! initContext browser
+        }
+        
     let launch (handle:WaitHandle) (launchHandle:ManualResetEvent) =
         async {
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
-
                 let browserOptions = BrowserTypeLaunchOptions(
                         Headless = false,
-                        ExecutablePath = (edgePath() |> Option.defaultValue null)
-                    )
-                let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask
-                let! page = browser.NewPageAsync() |> Async.AwaitTask
-                do! page.SetViewportSizeAsync(1280, 768) |> Async.AwaitTask //for OpenAI CUA 1280x768 is needed
+                        ExecutablePath = (edgePath() |> Option.defaultValue null))
+                let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
+                let! page = initContext browser
                 page.SetDefaultTimeout(30000f)
                 launchHandle.Set() |> ignore
                 _connection.Value <- Some browser
                 match _prevUrl.Value with
                 | Some url -> do! page.GotoAsync(url) |> Async.AwaitTask |> Async.Ignore
                 | None -> ()
-                let! r = Async.AwaitWaitHandle handle //need to wait on launch thread otherwise the browser closes.
+                let! r = Async.AwaitWaitHandle handle //wait on launch thread else browser closes. (alt. approach use server mode)
                 ()
             with ex ->
                 Log.exn (ex,"Error in launch")
@@ -49,8 +93,8 @@ module PlaywrightDriver =
         async {
             try
                 try
-                    match _waitHandle.Value with  Some w -> w.Set() |> ignore | None -> ()
                     match _connection.Value with Some conn -> conn.CloseAsync() |> ignore| None -> ()
+                    match _waitHandle.Value with  Some w -> w.Set() |> ignore | None -> ()
                 with ex ->
                     Log.exn ( ex,"Error in shutdown")
             finally
@@ -92,20 +136,8 @@ module PlaywrightDriver =
     let page () =
         async {
             let! browser = connection()
-            browser.Contexts.[0].Pages
-            |> Seq.iteri (fun i p ->
-                let vs = p.ViewportSize
-                Log.info $"page {i} {vs.Width}x{vs.Height}"
-            )
-            let sortedPages =
-                browser.Contexts.[0].Pages
-                |> Seq.toList
-                |> List.rev
-                |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
-
-            let page = sortedPages.Head
-
-            Log.info "got pages; waiting for network idle ..."
+            let! page = getPage browser
+            Log.info "got page; waiting for network idle ..."
             let! c = Async.StartChild(waitForIdle page, 1500)
             try do! c with ex -> Log.info $"waitForIdle failed"
             if isProperUrl page.Url then
