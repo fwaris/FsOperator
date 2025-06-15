@@ -1,8 +1,10 @@
 ﻿namespace FsOpCore
 open System
+open Microsoft.SemanticKernel
 open System.Threading
 open System.Threading.Channels
 open FSharp.Control
+open FsResponses
 
 type IFlow<'inMsg> = 
     abstract member Post : 'inMsg -> unit

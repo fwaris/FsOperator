@@ -1,6 +1,7 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
 open System.ComponentModel
+open FsResponses
 
 type OPlanMemory() =
     let mutable map = Map.empty
@@ -32,6 +33,7 @@ type OTask = {
     cua         : string option
     reasoner    : string option
     voice       : string option
+    tools       : FsResponses.Tool list
 }
     with 
         static member Default =  {
@@ -40,6 +42,7 @@ type OTask = {
                 cua = None
                 reasoner = None
                 voice = None
+                tools = []
             }
       
 
@@ -65,30 +68,65 @@ type OTaskRun = {
 }
 
 module OPlan =
-  let sample = 
-    let ln = 
-        { OTask.Default with
-            target = OLink "https://www.linkedin.com"
-            description = "find people who post about generative ai"
-            cua = Some """find individuals who have original posts
+    let functionMetadata<'t> () =
+        let b = Kernel.CreateBuilder()
+        b.Plugins.AddFromType<'t>() |> ignore
+        let k = b.Build()
+        let fs = k.Plugins.GetFunctionsMetadata()
+        fs
+
+    let toFunction (metadata:KernelFunctionMetadata) =     
+        {Function.Default with 
+            name = metadata.Name
+            description = metadata.Description
+            parameters = 
+                {Parameters.Default with 
+                    properties = 
+                        metadata.Parameters
+                        |> Seq.map (fun (mp:KernelParameterMetadata)  -> 
+                            mp.Name,
+                            {
+                                Property.``type`` = mp.ParameterType.Name.ToLower()
+                                Property.description = mp.Description |> checkEmpty
+                            }
+                        )
+                        |> Map.ofSeq           
+                    required = 
+                        metadata.Parameters 
+                        |> Seq.choose (fun p -> if p.IsRequired then Some p.Name else None)
+                        |> Seq.toList
+                }        
+        }
+        |> Tool_Function
+
+    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunction |> Seq.toList
+
+    let sample = 
+        let ln = 
+            { OTask.Default with
+                target = OLink "https://www.linkedin.com"
+                description = "find people who post about generative ai"
+                tools = makeFunctionTools<OPlanMemory>()
+                cua = Some """find individuals who have original posts
 related to generative AI and record there linkedin names and profile links.
 Use the save_memory function to record each name as you find it.
 """
-        }
-    let tw = 
-        { OTask.Default with
-            target = OLink "https://www.twitter.com"
-            description = "retrieve linkedIn people info from memory and get twitter handles"
-            cua = Some """
+                }
+        let tw = 
+            { OTask.Default with
+                target = OLink "https://www.twitter.com"
+                tools = makeFunctionTools<OPlanMemory>()
+                description = "retrieve linkedIn people info from memory and get twitter handles"
+                cua = Some """
 list of names and linked in profile links. Search each name on twitter and obtain their
 twitter handle. 
 Use save_memory function to save each person's linked-in and twitter data
-"""        
-        }
-    let plan = 
-        { OPlan.Default with
-            description = "take linkedin people and find their twitter handle"
-        }
-    plan
-    
+    """        
+            }
+        let plan = 
+            { OPlan.Default with
+                description = "take linkedin people and find their twitter handle"
+            }
+        plan
+   
     
