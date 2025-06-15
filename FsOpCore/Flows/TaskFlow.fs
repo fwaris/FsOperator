@@ -97,8 +97,8 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                 let messages = ss.chat.messages |> FlResps.toMessages |> FlResps.truncateHistory 
                 let imgs = screenshots |> List.map(fun i -> Content.Input_image {|image_url=i|})
                 let msg = {Message.Default with content = imgs}//contImgs}
-                let chatHistory = messages |> List.map InputOutputItem.Message
-                let msgInput = InputOutputItem.Message msg
+                let chatHistory = messages |> List.map IOitem.Message
+                let msgInput = IOitem.Message msg
                 let req = {Request.Default with
                                     input = chatHistory @ [msgInput];
                                     instructions = reasonerInstructions
@@ -156,16 +156,16 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                 {
                     call_id = cc.call_id
                     acknowledged_safety_checks = FlResps.safetyChecks cuaResp
-                    output = Computer_creenshot {|image_url = snapshot |}
+                    output = Computer_screenshot {|image_url = snapshot |}
                     current_url = url
                 }
-                |> Computer_call_output
+                |> IOitem.Computer_call_output
             let input = 
                 match cuaInstr with 
                 | Some text ->  
                     Log.info $"Reasoner guidance: `{text}`"
                     let textMsg = {Message.Default with content = [Content.Input_text {|text=text|}]}
-                    [cc_out;InputOutputItem.Message textMsg]
+                    [cc_out;IOitem.Message textMsg]
                 | None -> [cc_out]            
             let req = {Request.Default with
                             input = input; tools=[tool]

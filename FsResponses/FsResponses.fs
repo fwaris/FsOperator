@@ -1,5 +1,4 @@
-﻿
-namespace FsResponses
+﻿namespace FsResponses
 open System
 open System.Net.Http.Headers
 open System.Threading.Tasks
@@ -80,9 +79,33 @@ module Buttons =
     let [<Literal>] Right = "right"
     let [<Literal>] Middle = "middle"
 
+type Property =
+    {
+        ``type``: string
+        description: string option
+    }    
+
+type Parameters =
+    {
+        ``type``: string
+        properties: Map<string, Property>
+        required: string list
+    }
+    static member Default = { ``type`` = "object"; properties = Map.empty; required = [] }
+
+type Function =
+    {
+        ``type``: string
+        name: string
+        description: string
+        parameters: Parameters
+    }
+    static member Default = { ``type`` = "function"; name = ""; description = ""; parameters = Parameters.Default }
+
+
 type Tool = 
   | [<JsonName "file_search" >] Tool_File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
-  | [<JsonName "function" >] Tool_Function of {|name:string; description:string; parameters:JsonElement; strict : bool|}  
+  | [<JsonName "function" >] Tool_Function of Function
   | [<JsonName "web_search_preview" >] Tool_Web_search of {|search_context_size : string; user_location : User_Location option|}
   | [<JsonName "computer_use_preview" >] Tool_Computer_use of {|display_height : int; display_width: int; environment:string;|}
 with
@@ -94,10 +117,10 @@ type OutputText = {
 }
 
 type Content = 
-  | [<JsonPropertyName "output_text">] Output_text of OutputText // {|text : string; annotations : JsonElement option|}
-  | [<JsonPropertyName "input_text">] Input_text of {|text : string|}
-  | [<JsonPropertyName "refusal">] Refusal of {|refusal:string;|}
-  | [<JsonPropertyName "input_image">] Input_image of {|image_url:string|}
+  | [<JsonName "output_text">] Output_text of OutputText // {|text : string; annotations : JsonElement option|}
+  | [<JsonName "input_text">] Input_text of {|text : string|}
+  | [<JsonName "refusal">] Refusal of {|refusal:string;|}
+  | [<JsonName "input_image">] Input_image of {|image_url:string|}
   
 type Message = {
     id : string option
@@ -119,8 +142,8 @@ type SafetyCheck = {
 }
 
 type OutputDetail = 
-    | [<JsonPropertyName "input_image">] Computer_creenshot of {|image_url:string|}
-    | [<JsonPropertyName "not_used">] DoNotUse of {|text:string|} //this is only to make this multi-case union so that serializaton adds the type tag
+    | [<JsonPropertyName "input_image">] Computer_screenshot of {|image_url:string|}
+    | [<JsonPropertyName "not_used">] DoNotUse of {|text:string|} //this is only to make this a multi-case union so that serializaton adds the type tag
 
 [<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
 type ComputerCallOutput = {
@@ -145,15 +168,15 @@ type Path = {
 } 
 
 type Action = 
-    | [<JsonPropertyName "click">] Click of {| button:string; x:int; y:int|}
-    | [<JsonPropertyName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
-    | [<JsonPropertyName "keypress">] Keypress of {| keys:string list;|} //ctrl, alt, shift
-    | [<JsonPropertyName "type">] Type of {| text:string|}
-    | [<JsonPropertyName "wait">] Wait 
-    | [<JsonPropertyName "screenshot">] Screenshot 
-    | [<JsonPropertyName "double_click">] Double_click of {|x:int; y:int|}
-    | [<JsonPropertyName "drag">] Drag of Path
-    | [<JsonPropertyName "move">] Move of {| x:int; y:int |}
+    | [<JsonName "click">] Click of {| button:string; x:int; y:int|}
+    | [<JsonName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
+    | [<JsonName "keypress">] Keypress of {| keys:string list;|} //ctrl, alt, shift
+    | [<JsonName "type">] Type of {| text:string|}
+    | [<JsonName "wait">] Wait 
+    | [<JsonName "screenshot">] Screenshot 
+    | [<JsonName "double_click">] Double_click of {|x:int; y:int|}
+    | [<JsonName "drag">] Drag of Path
+    | [<JsonName "move">] Move of {| x:int; y:int |}
 
 
 type ComputerCall = {
@@ -164,7 +187,8 @@ type ComputerCall = {
     pending_safety_checks : SafetyCheck list
 }
 
-type InputOutputItem = 
+[<RequireQualifiedAccess>]
+type IOitem = 
   | [<JsonName "message" >] Message of Message
   | [<JsonName "image" >] Image of {|image: string; annotations: JsonElement option|}
   | [<JsonName "file" >] File of {|file: string; annotations: JsonElement option|}
@@ -177,7 +201,7 @@ type InputOutputItem =
 
 type Request = {
     model : string
-    input : InputOutputItem list
+    input : IOitem list
     instructions : string option
     max_output_tokens : int option
     metadata : Map<string,string> option
@@ -227,7 +251,7 @@ type Response = {
     max_output_tokens : int option
     model : string
     metadata : Map<string,string> option
-    output : InputOutputItem list
+    output : IOitem list
     parallel_tool_calls : bool
     previous_response_id : string option
     reasoning : Reasoning option
@@ -253,12 +277,12 @@ module RUtils =
 
     let trimScreenshot (cco:OutputDetail) =
         match cco with 
-        | Computer_creenshot i -> Computer_creenshot {|image_url=shortenN i.image_url 20|}
+        | Computer_screenshot i -> Computer_screenshot {|image_url=shortenN i.image_url 20|}
         | x -> x
     
     let trimImage = function
-        | Computer_call_output cco -> Computer_call_output {cco with output = trimScreenshot cco.output}
-        | Image i ->  Image {|image = shorten i.image; annotations=i.annotations|}
+        | IOitem.Computer_call_output cco -> IOitem.Computer_call_output {cco with output = trimScreenshot cco.output}
+        | IOitem.Image i ->  IOitem.Image {|i with image = shorten i.image |}
         | x -> x
         
     ///trim the large image base64 encoded string (to reduce log sizes)
@@ -273,7 +297,7 @@ module RUtils =
         [
             for r in resp.output do
             match r with 
-            | Message m -> 
+            | IOitem.Message m -> 
                 for c in m.content do
                     match c with 
                     | Output_text t -> yield t.text
@@ -340,7 +364,7 @@ module Api =
         create 
             ({Request.Default with 
                 input=[
-                   Message {Message.Default with content=[Input_text {|text=input|}]}
+                   IOitem.Message {Message.Default with content=[Input_text {|text=input|}]}
                 ]}) 
             (defaultClient())
 

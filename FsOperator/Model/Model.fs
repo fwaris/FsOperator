@@ -1,6 +1,7 @@
 ﻿namespace rec FsOperator
 open System
 open System.Threading.Channels
+open FsResponses
 open FsOpCore
 
 ///computer use assistant states
@@ -244,7 +245,7 @@ module TaskState =
         |> Option.bind (fun rs ->
             rs.lastCuaResponse.Value
             |> Option.bind (fun r ->
-                r.output |> List.tryPick (function FsResponses.Computer_call cb -> Some cb | _ -> None)))
+                r.output |> List.tryPick (function IOitem.Computer_call cb -> Some cb | _ -> None)))
 
     let stop (taskState:TaskState option ) =
         match taskState with

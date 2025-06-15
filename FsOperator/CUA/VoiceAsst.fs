@@ -47,7 +47,7 @@ module VoiceAsst =
                 let img = Content.Input_image {|image_url=image|}
                 let txt = Content.Input_text {|text = "describe the image"|}
                 let msg = {Message.Default with content = [txt; img]} 
-                let msgInput = InputOutputItem.Message msg
+                let msgInput = IOitem.Message msg
                 let req = {Request.Default with 
                                     input = [msgInput]
                                     store = false

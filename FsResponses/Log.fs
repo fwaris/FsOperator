@@ -5,6 +5,7 @@ open Microsoft.Extensions.Logging
 type Log = class end
 
 module Log =
+    ///allow for turning message loggin on/off at runtime
     let mutable debug_logging = false
     let mutable private _log : ILogger<Log> = LoggerFactory.Create(fun x -> x.AddConsole() |> ignore).CreateLogger<Log>()
     let info  (msg:string) = _log.LogInformation(msg)

@@ -66,7 +66,7 @@ module ComputerUse =
                 let input = { Message.Default with content=[contImg]}
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 let req = {Request.Default with
-                                input = [Message input]; tools=[tool]
+                                input = [IOitem.Message input]; tools=[tool]
                                 instructions = Some instructions
                                 previous_response_id = None
                                 store = true
@@ -84,7 +84,7 @@ module ComputerUse =
                 let! imgUrl,(w,h) = driver.snapshot()
                 let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                 //let contMsg = Message {id = None; role="user"; content = [Input_text {|text = message|}] ; status = None}
-                let messages = messages |>  List.map InputOutputItem.Message
+                let messages = messages |>  List.map IOitem.Message
                 let req = {Request.Default with
                                 input = messages; tools=[tool]
                                 previous_response_id = None
@@ -103,10 +103,10 @@ module ComputerUse =
     let getResponseIdsAndChecks (taskState:TaskState) =
         taskState.lastCuaResponse.Value
         |> Option.bind (fun r ->
-            let safetyChecks = r.output |> List.choose (function Computer_call cb -> Some cb.pending_safety_checks | _ -> None) |> List.concat
+            let safetyChecks = r.output |> List.choose (function IOitem.Computer_call cb -> Some cb.pending_safety_checks | _ -> None) |> List.concat
             r.output
             |> List.choose (function
-                | Computer_call cb -> Some cb.call_id
+                | IOitem.Computer_call cb -> Some cb.call_id
                 | _ -> None)
             |> List.rev
             |> List.tryHead
@@ -130,8 +130,8 @@ obtained thus far, in relation to the task instructions.
                 let txt = Content.Input_text {|text = "Summarize and report"|}
                 let imgs = screenshots |> List.map(fun i -> Content.Input_image {|image_url=i|})
                 let msg = {Message.Default with content = [txt] @ imgs}//contImgs}
-                let chatHistory = messages |> List.map InputOutputItem.Message
-                let msgInput = InputOutputItem.Message msg
+                let chatHistory = messages |> List.map IOitem.Message
+                let msgInput = IOitem.Message msg
                 let req = {Request.Default with
                                     input = chatHistory @ [msgInput];
                                     instructions = instructions |> Option.map summarizationPrompt
@@ -163,16 +163,16 @@ obtained thus far, in relation to the task instructions.
                     let txt = Content.Input_text {|text = "Summarize and report the current results"|}
                     let tool = Tool_Computer_use {|display_height = h; display_width = w; environment = ComputerEnvironment.browser|}
                     let msg = {Message.Default with content = txt::[]}//contImgs}
-                    let msgInput = InputOutputItem.Message msg
+                    let msgInput = IOitem.Message msg
                     let! url = driver.url()
                     let cc_out = {
                         call_id = lastCallId
                         acknowledged_safety_checks = safetyChecks                                 //these should come from human acknowlegedgement
-                        output = Computer_creenshot {|image_url = imgUrl |}
+                        output = Computer_screenshot {|image_url = imgUrl |}
                         current_url = url
                     }
                     let req = {Request.Default with
-                                        input = [Computer_call_output cc_out; msgInput]; tools=[tool]
+                                        input = [IOitem.Computer_call_output cc_out; msgInput]; tools=[tool]
                                         store = false
                                         previous_response_id = Some prevId
                                         model=Models.computer_use_preview
@@ -202,11 +202,11 @@ obtained thus far, in relation to the task instructions.
                 let cc_out = {
                     call_id = lastCallId
                     acknowledged_safety_checks = safetyChecks                                 //these should come from human acknowlegedgement
-                    output = Computer_creenshot {|image_url = imgUrl |}
+                    output = Computer_screenshot {|image_url = imgUrl |}
                     current_url = url
                 }
                 let req = {Request.Default with
-                                input = [Computer_call_output cc_out]; tools=[tool]
+                                input = [IOitem.Computer_call_output cc_out]; tools=[tool]
                                 previous_response_id = Some prevId
                                 store = true
                                 model=Models.computer_use_preview
@@ -226,7 +226,7 @@ obtained thus far, in relation to the task instructions.
                         let mutable hasComputerCall = false
                         for o in response.output do
                             match o with
-                            | Computer_call cb ->
+                            | IOitem.Computer_call cb ->
                                 hasComputerCall <- true
                                 cb.pending_safety_checks |> List.map _.message |> String.concat "," |> shorten 200 |> Bus.postWarning taskState.bus
                                 cb.action |> Actions.actionToString |> Bus.postAction taskState.bus
@@ -234,7 +234,7 @@ obtained thus far, in relation to the task instructions.
                                 do! Actions.doAction 2 driver cb.action
                                 //do! Async.Sleep 1000
                                 do! computerCallResponse driver taskState
-                            | Message m ->
+                            | IOitem.Message m ->
                                 let outputText = RUtils.outputText response
                                 let msg = Assistant {id = response.id; content = outputText}
                                 Chat_Append msg |> Bus.postMessage taskState.bus

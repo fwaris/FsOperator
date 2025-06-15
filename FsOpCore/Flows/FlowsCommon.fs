@@ -46,7 +46,7 @@ module FlResps =
     let computerCall (response:FsResponses.Response) = 
         response.output
         |> List.choose (function 
-            | Computer_call cb -> Some cb
+            | IOitem.Computer_call cb -> Some cb
             | _                -> None)
         |> List.tryHead
 
@@ -54,14 +54,14 @@ module FlResps =
     let lastCallId (resp:FsResponses.Response) =
         resp.output
         |> List.choose (function
-            | Computer_call cb -> Some cb.call_id
+            | IOitem.Computer_call cb -> Some cb.call_id
             | _ -> None)
         |> List.rev
         |> List.tryHead        
 
     let safetyChecks (resp:FsResponses.Response) = 
         resp.output 
-        |> List.choose (function Computer_call cb -> Some cb.pending_safety_checks | _ -> None) 
+        |> List.choose (function IOitem.Computer_call cb -> Some cb.pending_safety_checks | _ -> None) 
         |> List.concat
 
 
@@ -91,7 +91,7 @@ module FlResps =
             let input = { Message.Default with content=[contImg]}
             let tool = Tool_Computer_use {|display_height = height; display_width = width; environment = environment|}
             let req = {Request.Default with
-                            input = [Message input]; tools=[tool]
+                            input = [IOitem.Message input]; tools=[tool]
                             instructions = instructions
                             previous_response_id = None
                             store = true
@@ -113,11 +113,11 @@ module FlResps =
             let cc_out = {
                 call_id = lastCallId
                 acknowledged_safety_checks = safetyChecks  //these should come from human acknowlegedgement
-                output = Computer_creenshot {|image_url = sanpshot |}
+                output = Computer_screenshot {|image_url = sanpshot |}
                 current_url = url
             }
             let req = {Request.Default with
-                            input = [Computer_call_output cc_out]; tools=[tool]
+                            input = [IOitem.Computer_call_output cc_out]; tools=[tool]
                             previous_response_id = Some prevResp.id
                             store = true
                             model=Models.computer_use_preview
