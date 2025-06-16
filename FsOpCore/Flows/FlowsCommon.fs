@@ -1,5 +1,7 @@
 ﻿namespace FsOpCore
 open System.Threading
+open Microsoft.SemanticKernel
+open FsResponses
 
 module FlUtils = 
     ///utility operator to create default workflow states
@@ -10,6 +12,54 @@ module FlUtils =
         let! url = driver.url()
         return (snapshot,w,h,url,driver.environment)
     }
+
+    /// <summary>
+    /// Convert metadata to 'function' tool for use with <see cref="FsResponses.Request" />.
+    /// Also see <see cref="FlUtils.functionMetadata" />.
+    /// </summary>
+    let toFunction (metadata:KernelFunctionMetadata) =     
+        {Function.Default with 
+            name = metadata.Name
+            description = metadata.Description
+            parameters = 
+                {Parameters.Default with 
+                    properties = 
+                        metadata.Parameters
+                        |> Seq.map (fun (mp:KernelParameterMetadata)  -> 
+                            mp.Name,
+                            {
+                                Property.``type`` = mp.ParameterType.Name.ToLower()
+                                Property.description = mp.Description |> checkEmpty
+                            }
+                        )
+                        |> Map.ofSeq           
+                    required = 
+                        metadata.Parameters 
+                        |> Seq.choose (fun p -> if p.IsRequired then Some p.Name else None)
+                        |> Seq.toList
+                }        
+        }
+        |> Tool_Function
+
+    ///<summary>
+    ///Extract function metadata from a properly annotated type.<br />
+    ///Members tagged with KernelFunction("...") attributes are included.<br />
+    ///Use <see cref="FlUtils.toFunction"/> to convert metadata to 'function' tool.
+    ///</summary>
+    let functionMetadata<'t> () =
+        let b = Kernel.CreateBuilder()
+        b.Plugins.AddFromType<'t>() |> ignore
+        let k = b.Build()
+        let fs = k.Plugins.GetFunctionsMetadata()
+        fs
+
+    ///<summary>
+    ///Make a list of 'function' tools that can be used with a <see cref="FsResponses.Request" /><br />
+    ///The functions are extracted from a properly annotated type.<br />
+    ///See <see cref="FlUtils.functionMetadata"/>.
+    ///</summary>
+    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunction |> Seq.toList
+
 
 //utility functions for working Responses API messsages
 module FlResps =
