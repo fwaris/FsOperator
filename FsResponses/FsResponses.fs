@@ -1,10 +1,9 @@
 ﻿namespace FsResponses
 open System
 open System.Net.Http.Headers
-open System.Threading.Tasks
 open System.Text.Json
-open System.Text.Json.Serialization
 open System.Text.Json.Nodes
+open System.Text.Json.Serialization
 open System.Net.Http
 
 type ResponseError = {
@@ -41,7 +40,7 @@ with
 
 type TextOutputFormat = 
     | [<JsonName "text" >] Text
-    | [<JsonName "json_schema" >] Json_schema of {| name : string ; schema : JsonElement; strict: bool |}
+    | [<JsonName "json_schema" >] Json_schema of {| name : string ; schema : JsonNode; strict: bool |}
 
 type TextOutput = {
     format : TextOutputFormat  
@@ -95,13 +94,12 @@ type Parameters =
 
 type Function =
     {
-        ``type``: string
         name: string
         description: string
         parameters: Parameters
+        strict : bool
     }
-    static member Default = { ``type`` = "function"; name = ""; description = ""; parameters = Parameters.Default }
-
+    static member Default = {name = ""; description = ""; parameters = Parameters.Default; strict=true}
 
 type Tool = 
   | [<JsonName "file_search" >] Tool_File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
@@ -178,7 +176,6 @@ type Action =
     | [<JsonName "drag">] Drag of Path
     | [<JsonName "move">] Move of {| x:int; y:int |}
 
-
 type ComputerCall = {
     id : string
     status : string
@@ -187,12 +184,25 @@ type ComputerCall = {
     pending_safety_checks : SafetyCheck list
 }
 
+type FunctionCall = {
+    id : string
+    call_id : string
+    name : string
+    arguments: string
+}
+
+type FunctionCallOutput = {
+    call_id : string
+    output  : string    
+}
+
 [<RequireQualifiedAccess>]
 type IOitem = 
   | [<JsonName "message" >] Message of Message
   | [<JsonName "image" >] Image of {|image: string; annotations: JsonElement option|}
   | [<JsonName "file" >] File of {|file: string; annotations: JsonElement option|}
-  | [<JsonName "function_call" >] Function_call of {|name:string; arguments:string|}
+  | [<JsonName "function_call" >] Function_call of FunctionCall
+  | [<JsonName "function_call_output" >] Function_call_output of FunctionCallOutput
   | [<JsonName "web_search" >] Web_search of {|search_context_size : string; user_location : User_Location option|}
   | [<JsonName "computer_use_preview" >] Computer_use of {|display_height : int; display_width: int; environment:string;|}
   | [<JsonName "reasoning" >] Reasoning of ReasoningOutput
@@ -266,14 +276,29 @@ type Response = {
     user : string option
 }
 
-
-//let runT (t:Task<'t>) = t.Result
-
 exception ApiError of ResponseErrorObj
 
 module RUtils =
+    open System.Text.Json.Schema
     let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
     let private shorten (s:string) = shortenN s 100
+
+    let structuredFormat (t:Type) = 
+        let opts = JsonSerializerOptions.Default       
+        let schema = opts.GetJsonSchemaAsNode(t)        
+        {format = Json_schema {|name=t.Name; schema=schema; strict=true|}}
+
+    let parseContent<'t> (resp:Response) =        
+        resp.output 
+        |> List.tryPick(function IOitem.Message m -> Some m | _ -> None)
+        |> Option.bind(fun m -> 
+            m.content 
+            |> List.tryPick (function 
+                | Content.Refusal r -> Some (Choice2Of2 r.refusal)
+                | Content.Output_text otxt ->
+                    let t:'t = JsonSerializer.Deserialize<'t>(otxt.text)
+                    Some(Choice1Of2 t)
+                | _ -> None))
 
     let trimScreenshot (cco:OutputDetail) =
         match cco with 

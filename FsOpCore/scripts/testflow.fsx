@@ -3,6 +3,8 @@ open FsResponses
 open FsOpCore
 open Microsoft.SemanticKernel
 
+1855.00 - 285.00
+
 let testWorkFlow() = 
     let post x = printfn "%A" x
     let ui = PlaywrightDriver.create()

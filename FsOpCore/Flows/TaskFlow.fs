@@ -114,7 +114,6 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         }
         |> FlResps.catch ss.bus.PostInput
 
-
     ///if the cua model is not able to produce a summary, use the reasoner model to do the same, as a fallback
     let postSummarizeProgress (ss:SubState) = 
         let id = newId()
@@ -179,6 +178,14 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch ss.bus.PostInput
 
+    let postResumeCua ss snapshot =
+        async {
+            let chatHistory = FlResps.truncatedChatHistory ss.chat.messages
+            FlResps.postStartCua ss.bus.PostInput ss.chat.systemMessage snapshot chatHistory
+        }
+        |> FlResps.catch ss.bus.PostInput 
+
+
     let ignoreMsg s msg name =
         Log.warn $"{name}: ignored message {msg}"
         F(s,[])
@@ -197,7 +204,7 @@ When asking CUA to enter text, suggest type <text> in the <field name>
         | W_Err e         -> return !!(s_terminate ss (Some e))
         | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
                              let ss = ss.appendSnapshot snapshot
-                             FlResps.postStartCua ss.bus.PostInput ss.chat.systemMessage (snapshot,w,h,url,env)
+                             FlResps.postStartCua ss.bus.PostInput ss.chat.systemMessage (snapshot,w,h,url,env) []
                              return !!(s_loop ss)
         | x               -> Log.warn $"s_start: expecting {TFi_Start} message to start flow but got {x}"
                              return !!(s_start ss)
@@ -235,6 +242,8 @@ When asking CUA to enter text, suggest type <text> in the <field name>
                                     return !!(s_summarizing ss corrId) 
         | W_App (TFi_Resume tx)  -> let ss = ss.appendMsg (User tx)
                                     let ss = ss.setPrompt false
+                                    let! snapshot = FlUtils.snapshot(ss.driver)
+                                    postResumeCua ss snapshot //resume chat with (note no previous history save on server)
                                     return F(s_loop ss,[TFo_ChatUpdated ss.chat])
         | x                      -> return ignoreMsg (s_pause ss) x "s_pause"
     }

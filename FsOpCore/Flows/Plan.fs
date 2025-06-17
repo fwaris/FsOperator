@@ -1,7 +1,6 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
 open System.ComponentModel
-open FsResponses
 
 type OPlanMemory() =
     let mutable map = Map.empty
@@ -179,7 +178,6 @@ Use save_memory function to save each person's linked-in and twitter data
         | Choice3Of3 (ONode.Choose c)  -> return! transition c.transition planRun
         | x                            -> return failwith $"unexpected response in transitionToNext '{x}'"
     }
-
 
     let appendTask (tr:OTaskRun option) ts =  tr |> Option.map (fun t -> t::ts) |> Option.defaultValue ts
 

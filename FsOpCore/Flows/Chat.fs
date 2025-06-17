@@ -1,11 +1,14 @@
 ﻿namespace FsOpCore
+open FsResponses
 
 type AsstMsg = {
     id      : string    
     content : string
 }
 
-type ChatMsg = User of string | Assistant of AsstMsg
+type ChatMsg = 
+    | User of string 
+    | Assistant of AsstMsg 
 
 type Chat = { systemMessage:string option; question:string option; messages:ChatMsg list ; prompt:bool}
     with static member Default = { systemMessage = None; question = None; messages = [] ; prompt=false}

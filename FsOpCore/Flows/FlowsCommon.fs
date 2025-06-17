@@ -78,6 +78,8 @@ module FlResps =
         |> List.truncate C.MAX_MESSAGE_HISTORY
         |> List.rev
 
+    let truncatedChatHistory = toMessages >> truncateHistory
+
     ///general exception handler for async computations - traps and posts error as W_Err message to input channel
     let catch replyChannel (comp:Async<'t>) =   
         async{
@@ -134,42 +136,24 @@ module FlResps =
     let sendRequest msgWrap replyChannel msg = 
         sendWithRetry 2 msgWrap replyChannel msg
 
+    let hasFunction (resp:Response) =
+        resp.output
+        |> List.exists (fun x -> x.IsFunction_call)
+
     ///send an initial 'computer tool call' request
-    let postStartCua replyChannel instructions (sanpshot,width,height,url,environment) =
+    let postStartCua replyChannel instructions (sanpshot,width,height,url,environment) chatHistory =
        async {
             let contImg = Input_image {|image_url = sanpshot|}
             let input = { Message.Default with content=[contImg]}
-            let tool = Tool_Computer_use {|display_height = height; display_width = width; environment = environment|}
+            let cuaTool = Tool_Computer_use {|display_height = height; display_width = width; environment = environment|}
             let req = {Request.Default with
-                            input = [IOitem.Message input]; tools=[tool]
+                            input = [IOitem.Message input] @ (chatHistory |> List.map IOitem.Message)
+                            tools= [cuaTool]
                             instructions = instructions
                             previous_response_id = None
                             store = true
                             temperature = temperature
                             reasoning = Some {Reasoning.Default with effort=Some Reasoning.Medium}
-                            model=Models.computer_use_preview
-                            truncation = Some Truncation.auto
-                        }
-            do! sendRequest W_Cua replyChannel req 
-        }
-        |> catch replyChannel
-
-    ///send the 'computer call' result back to the CUA model
-    let continueCua replyChannel (prevResp:FsResponses.Response) (sanpshot,width,height,url,environment) =
-       async {
-            let tool = Tool_Computer_use {|display_height = height; display_width = width; environment = environment|}            
-            let lastCallId = lastCallId prevResp |> Option.defaultWith(fun _ -> failwith $"call_id not found in previous response")
-            let safetyChecks = safetyChecks prevResp 
-            let cc_out = {
-                call_id = lastCallId
-                acknowledged_safety_checks = safetyChecks  //these should come from human acknowlegedgement
-                output = Computer_screenshot {|image_url = sanpshot |}
-                current_url = url
-            }
-            let req = {Request.Default with
-                            input = [IOitem.Computer_call_output cc_out]; tools=[tool]
-                            previous_response_id = Some prevResp.id
-                            store = true
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
