@@ -33,6 +33,15 @@ module PlanFlow =
         kernel          : Kernel
     }
     with 
+        static member Create cuaPrompt reasonerPrompt tools kernel = 
+                            {
+                               cuaMessages = []
+                               cuaPrompt = cuaPrompt
+                               reasonerPrompt = reasonerPrompt
+                               tools = tools
+                               kernel = kernel
+                               reasonerState = []
+                            }
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerState items = {this with reasonerState = items @ this.reasonerState |> List.truncate MAX_REASONER_STATE}
 
@@ -70,9 +79,8 @@ module PlanFlow =
         ///call an indivudal function
         let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
             let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
-            let args = args |> Map.toSeq |> Prompts.kernelArgs
-            let plugin,functionName = let xs = name.Split('.') in xs.[0], xs.[1]
-            let! rslt = kernel.InvokeAsync(pluginName=plugin,functionName=functionName,arguments=args) |> Async.AwaitTask
+            let args = args |> Map.toSeq |> Prompts.kernelArgs          
+            let! rslt = kernel.InvokeAsync(pluginName=null,functionName=name,arguments=args) |> Async.AwaitTask
             let rsltStr = JsonSerializer.Serialize(rslt)
             return rsltStr
         }
@@ -280,6 +288,7 @@ module PlanFlow =
         (* --- states --- *)
 
         let rec s_start ss msg = async {    
+            Log.info $"in s_start"
             match msg with 
             | W_Err e         -> return !!(s_terminate ss (Some e))
             | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
@@ -291,6 +300,7 @@ module PlanFlow =
         }
 
         and s_loop ss msg = async {
+            Log.info $"in s_loop"
             match msg with 
             | W_Err e                    -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport     -> let corrId = Rsnr.earlyTerminate ss
@@ -304,11 +314,13 @@ module PlanFlow =
                                                 let corrId = Rsnr.postGetRsnrGuidanceForCua ss ss.task.reasonerPrompt.Value
                                                 return F(s_reason ss (visualState,resp) corrId,outMsgs2)
                                             else 
+                                                Cua.postCuaNext ss visualState resp None
                                                 return F(s_loop ss,outMsgs2)
             | x                          -> return ignoreMsg (s_loop ss) x "s_loop"
         }            
 
         and s_reason ss (vs,cuaResp) corrId msg  = async {
+            Log.info $"in s_reason"
             match msg with 
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.earlyTerminate ss
@@ -332,6 +344,7 @@ module PlanFlow =
         }
 
         and s_pause ss corrId msg = async {   
+            Log.info $"in s_pause"
             match msg with 
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.earlyTerminate ss
@@ -349,6 +362,7 @@ module PlanFlow =
         }
 
         and s_summarizing ss corrId msg = async {
+            Log.info $"in s_summarizing"
             match msg with 
             | W_Err e                 -> return !!(s_terminate ss (Some e))
             | Reasoner corrId (resp)  -> let ss = FlResps.extractText resp  
@@ -359,6 +373,7 @@ module PlanFlow =
         }
 
         and s_terminate ss (e:WErrorType option) msg = async {
+            Log.info $"in s_terminate"
             e 
             |> Option.iter (fun e -> 
                 ss.bus.postOutput (TFo_Error e)

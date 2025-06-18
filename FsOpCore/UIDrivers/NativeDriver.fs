@@ -2,6 +2,29 @@
 open System
 open System.IO
 open SkiaSharp
+open System.Diagnostics
+
+#if WINDOWS 
+open System
+open System.Runtime.InteropServices
+
+module CmdSplit =
+    [<DllImport("shell32.dll", SetLastError=true)>]
+    extern IntPtr CommandLineToArgvW(
+        [<MarshalAs(UnmanagedType.LPWStr)>] string cmdLine, int& argc)
+
+    let split (cmdLine: string) : string[] =
+        let mutable argc = 0
+        let argv = CommandLineToArgvW(cmdLine, &argc)
+        if argv = IntPtr.Zero then raise (new System.ComponentModel.Win32Exception())
+        try
+            Array.init argc (fun i ->
+                let ptr = Marshal.ReadIntPtr(argv, i * IntPtr.Size)
+                Marshal.PtrToStringUni(ptr))
+        finally
+            Marshal.FreeHGlobal(argv)
+
+#endif 
 
 module NativeDriver = 
 #if WINDOWS 
@@ -51,6 +74,20 @@ module NativeDriver =
         return imgUrl,(bmp.Width, bmp.Height)
     }
 
+    let startProcess (cmd:string) = async {
+        let xs = CmdSplit.split cmd
+        let exe,args = if xs.Length > 0 then xs.[0], Some (xs.[1]) else cmd,None
+        let pi = ProcessStartInfo()
+        pi.FileName <- exe
+        match args with Some args -> pi.Arguments <- args | _ -> ()
+        let p = new Process()
+        p.StartInfo <- pi
+        if p.Start() then 
+            Log.info $"Process start '{cmd}', pid = {p.Id}"
+       else 
+            Log.error $"Process start '{cmd}'"
+    }
+
 #endif
 
     let create (name:string) (arg:string option) = 
@@ -71,6 +108,7 @@ module NativeDriver =
                 member _.typeText text = WDriver.typeText text
                 member _.url () = async{ return None}
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.windows
+                member _.start cmd = startProcess cmd
             }
         Na {|driver=userInteraction; processName = name; arg=arg|}        
 

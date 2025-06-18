@@ -320,6 +320,15 @@ module PlaywrightDriver =
         ()
     }
 
+    let goToPage (url:string) = async {
+        let! p = page()
+        let! r = p.GotoAsync(url) |> Async.AwaitTask
+        if not r.Ok then 
+            Log.warn $"unable to load page {url}"
+        let! p' = page() //wait for new page to settle
+        return ()
+    }
+
     let goForward() = async {
         let! page = page()
         let! _  = page.GoForwardAsync() |> Async.AwaitTask
@@ -352,5 +361,6 @@ module PlaywrightDriver =
                 member _.typeText text = typeText text
                 member _.url () = url()
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.browser
+                member _.start (arg: string) = goToPage arg
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

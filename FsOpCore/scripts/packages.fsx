@@ -27,7 +27,7 @@
 #load "..\UIDrivers\UITypes.fs"
 //#load "..\UIDrivers\NativeDriver.fs" 
 #load "..\UIDrivers\PlaywrightDriver.fs"
-#load "..\Prompts.fs"
+#load "..\Flows\Prompts.fs"
 #load "..\Flows\Actions.fs"
 #load "..\Flows\Workflow.fs"
 #load "..\Flows\Chat.fs"

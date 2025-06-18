@@ -10,8 +10,8 @@
 
 	<ItemGroup>
 		<None Include="scripts\packages.fsx" />
-		<None Include="scripts\testplanflow.fsx" />
 		<None Include="scripts\testflow.fsx" />
+		<None Include="scripts\testplanflow.fsx" />
 		<Compile Include="Misc\Constants.fs" />
 		<Compile Include="Misc\Log.fs" />
 		<Compile Include="Misc\Utils.fs" />

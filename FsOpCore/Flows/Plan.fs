@@ -1,6 +1,7 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
 open System.ComponentModel
+open System.Threading
 
 type OPlanMemory() =
     let mutable map = Map.empty
@@ -27,6 +28,7 @@ type OTask = {
     reasoner    : string option
     voice       : string option
     tools       : FsResponses.Tool list
+    allowedSec  : int 
 }
     with 
         ///creates a new empty task with unique id assigned
@@ -38,6 +40,7 @@ type OTask = {
                 reasoner = None
                 voice = None
                 tools = []
+                allowedSec = 60*2
             }
 
 type OTaskTransition = 
@@ -107,10 +110,18 @@ type OPlanRun = {
     completedTasks : OTaskRun list
     currentTask : OTaskRun option
 }
+with 
+    static member Create plan kernel = 
+                    {
+                        plan = plan
+                        kernel = kernel
+                        completedTasks = []
+                        currentTask = None
+                    }
 
 module OPlan =
 
-    let sample = 
+    let sample() = 
         let ln = 
             { OTask.Create() with
                 target = OLink "https://www.linkedin.com"
@@ -164,7 +175,6 @@ Use save_memory function to save each person's linked-in and twitter data
             |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
             |> Option.defaultValue (Choice1Of3 ())                
 
-
     let transition (txn:OTaskTransition) (planRun:OPlanRun) = async {
         //TODO
         return None
@@ -181,9 +191,43 @@ Use save_memory function to save each person's linked-in and twitter data
 
     let appendTask (tr:OTaskRun option) ts =  tr |> Option.map (fun t -> t::ts) |> Option.defaultValue ts
 
+    let startTimer (n:int) (f:IFlow<_>) = 
+        async {
+            do! Async.Sleep n
+            f.Post PlanFlow.TFi_EndAndReport
+        }
+        |> Async.Start
+
     let runCurrentTask (planRun:OPlanRun) = async{
-        //TODO
-        return planRun
+        match planRun.currentTask with 
+        | Some ot -> 
+            let rt = PlanFlow.TaskState.Create 
+                                            ot.task.cua.Value
+                                            ot.task.reasoner
+                                            ot.task.tools
+                                            planRun.kernel
+
+            let completedTask = ref None
+            use h = new ManualResetEvent(false)
+            let post = fun p -> 
+                printfn "%A" p
+                match p with 
+                | PlanFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
+                | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | PlanFlow.TFo_Action a -> printfn "%A" a
+                | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
+            let driver = (PlaywrightDriver.create().driver)
+            match ot.task.target with 
+            | OLink url -> do! driver.start url
+            | OProcess (a,b) -> ()
+            let flow = PlanFlow.create post (PlaywrightDriver.create().driver) rt
+            flow.Post PlanFlow.TFi_Start
+            startTimer ot.task.allowedSec flow
+            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3)      
+            match completedTask.Value with 
+            | Some t -> return {ot with messages = t.cuaMessages} 
+            | None   -> return failwith "no output from step"            
+        | None -> return failwith $"no task to run"        
     }
    
     let step planRun = async {
@@ -200,6 +244,7 @@ Use save_memory function to save each person's linked-in and twitter data
                             currentTask = Some tr
                             completedTasks = appendTask planRun.currentTask planRun.completedTasks
                          }
-                return! runCurrentTask planRun 
+                let! tr' = runCurrentTask planRun
+                return {planRun with currentTask = Some tr'}                
     }
 
