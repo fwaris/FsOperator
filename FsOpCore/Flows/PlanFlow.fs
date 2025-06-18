@@ -318,9 +318,16 @@ module PlanFlow =
                                         let corrId = Rsnr.postGetRsnrGuidanceForCua ss ss.task.reasonerPrompt.Value //continue after func. calls
                                         return !!(s_reason ss (vs,cuaResp) corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
-                                        let cuaInstr = FlResps.extractText resp                                      
-                                        Cua.postCuaNext ss vs cuaResp cuaInstr
-                                        return !!(s_loop ss)
+                                        let resp = RUtils.parseContent<Rsnr.CuaInstructionsResponse> resp //get structured output
+                                        match resp with 
+                                        | None -> return failwith $"reasoner model did not send appropriate resp. for cua guidance"
+                                        | Some (Choice2Of2 e) -> return failwith $"reaonser model refused to provide structured output '{e}'"
+                                        | Some (Choice1Of2 cuaInstr) ->
+                                            if cuaInstr.cua_achieved_task then 
+                                                return F(s_terminate ss None, [TFo_Done ss.task])
+                                            else
+                                                Cua.postCuaNext ss vs cuaResp (Some cuaInstr.cua_guidance)
+                                                return !!(s_loop ss)
             | x                      -> return ignoreMsg (s_reason ss (vs,cuaResp) corrId) x "s_reason"
         }
 
