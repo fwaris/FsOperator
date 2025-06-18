@@ -379,6 +379,7 @@ module Api =
                 return JsonSerializer.Deserialize<Response>(str,options=serOpts)            
             else 
                 let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"{str} "
                 let err = 
                     try 
                         let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)                        

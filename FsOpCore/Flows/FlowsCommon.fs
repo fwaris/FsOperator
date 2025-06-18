@@ -132,6 +132,7 @@ module FlResps =
             with ex ->
                 if count < 2 then
                     logApiException ex
+                    do! Async.Sleep 2000
                     return! sendWithRetry (count + 1) msgWrap replyChannel req
                 else
                     Log.error $"responses api unable to reconnect aborting"
@@ -140,7 +141,7 @@ module FlResps =
 
     ///post request to respones api
     let sendRequest msgWrap replyChannel msg = 
-        sendWithRetry 2 msgWrap replyChannel msg
+        sendWithRetry 0 msgWrap replyChannel msg
 
     let hasFunction (resp:Response) =
         resp.output

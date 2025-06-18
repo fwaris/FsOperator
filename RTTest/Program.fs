@@ -4,6 +4,7 @@ open FsOpCore
 
 let s1 = OPlan.sample()
 
+//FsResponses.Log.debug_logging <- true
 let kernel = 
     let b = Kernel.CreateBuilder()
     b.Plugins.AddFromType<OPlanMemory>() |>  ignore

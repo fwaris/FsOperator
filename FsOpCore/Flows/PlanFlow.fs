@@ -317,6 +317,7 @@ module PlanFlow =
                                                 let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value
                                                 return F(s_reason ss (visualState,resp) corrId,outMsgs2)
                                             else 
+                                                Log.info $"****** cua response id {resp.id}"
                                                 Cua.postCuaNext ss visualState resp None
                                                 return F(s_loop ss,outMsgs2)
             | x                          -> return ignoreMsg (s_loop ss) x "s_loop"
