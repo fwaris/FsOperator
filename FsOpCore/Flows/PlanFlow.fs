@@ -9,7 +9,7 @@ open System.Text.Json.Schema
 
 module PlanFlow =
     let MAX_SNAPSHOTS = 3
-    let MAX_REASONER_STATE = 6
+    let MAX_REASONER_STATE = 10
     
     ///flow input messages
     type PlanFLowMsgIn =
@@ -43,7 +43,22 @@ module PlanFlow =
                                reasonerState = []
                             }
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
-        member this.prependReasonerState items = {this with reasonerState = items @ this.reasonerState |> List.truncate MAX_REASONER_STATE}
+        member this.prependReasonerState items = 
+            let items =  items @ this.reasonerState |> List.truncate MAX_REASONER_STATE
+            let funcCallIds = 
+                items 
+                |> List.choose (function 
+                    | IOitem.Function_call f -> Some f.call_id 
+                    | IOitem.Function_call_output f -> Some f.call_id 
+                    | _ -> None)
+            let unpairedFuncs = funcCallIds |> List.countBy id |> List.filter (fun (i,c) -> c <> 2) |> List.map fst |> set
+            let items = 
+                items 
+                |> List.filter(function 
+                    | IOitem.Function_call f -> unpairedFuncs.Contains f.call_id |> not
+                    | IOitem.Function_call_output f -> unpairedFuncs.Contains f.call_id |> not
+                    | _ -> true)
+            {this with reasonerState = items @ this.reasonerState |> List.truncate MAX_REASONER_STATE}
 
     type SubState = {
         cts          : CancellationTokenSource

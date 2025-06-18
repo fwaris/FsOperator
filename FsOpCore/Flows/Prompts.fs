@@ -38,39 +38,6 @@ module Prompts =
     /// - <see cref="Vars.actionHistory" />
     /// - <see cref="Vars.cuaMessageHistory" />
     ///</summary> 
-    let ``reasoner prompt for cua guidance orig`` = $"""
-The 'computer use agent' (CUA) model is given instructions [CUA_INSTRUCTIONS] to accomplish a task.
-
-CUA 'looks' at screenshots and issues computer commands such as, 'click', 'move', 'type text', etc. to achieve its goal.
-However the CUA model is not good at following instructions sometimes. 
-Look at the [CUA_MESSAGE_HISTORY] and [ACTION_HISTORY]; and generate additional guidance that 
-may be provided to the CUA model *after* the current given command has been performed and *before* CUA is ready to generate the next command.
-
-Note: Sometimes CUA has trouble performing scrolling using the simple 'scroll' command. If CUA seems stuck,
-suggest alternative scroll commands e.g. 'wheel' and PAGEUP/PAGEDOWN keystrokes.
-
-When asking CUA to enter text, suggest type <text> in the <field name>
-
-Just give the immediate next step to follow. Dont' give multi-step instructions. 
-
-BE BRIEF
-
-[CUA_INSTRUCTIONS]
-{{{{${Vars.cuaInstructions}}}}}
-
-[CUA_MESSAGE_HISTORY]
-{{{{${Vars.cuaMessageHistory}}}}}
-
-[ACTION_HISTROY]
-{{{{${Vars.actionHistory}}}}}
-"""
-
-    ///<summary>
-    ///variables: <br />
-    /// - <see cref="Vars.cuaInstructions" /><br />
-    /// - <see cref="Vars.actionHistory" />
-    /// - <see cref="Vars.cuaMessageHistory" />
-    ///</summary> 
     let ``reasoner prompt for cua guidance`` = $"""
 The Computer Use Agent (CUA) follows a set of instructions [CUA_INSTRUCTIONS] to complete a task by issuing commands like click, move, or type text based on screenshots.
 
@@ -92,6 +59,9 @@ Be concise.
 Only provide the immediate next step to help the CUA continue.
 
 CUA cannot call functions - so you have invoke the functions instead of asking CUA.
+
+The CUA achieves accomplishes the task when all steps done. 
+Make sure to check if all steps are done before telling CUA that the task is done.
 
 [CUA_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}

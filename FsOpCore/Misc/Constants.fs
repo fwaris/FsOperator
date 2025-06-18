@@ -17,3 +17,5 @@ module C =
     let VIEWPORT_HEIGHT = 768
 
     let CORR_ID = "correlationId"
+
+    let PLAYWRIGHT_DEFAULT_TIMEOUT = 60000f

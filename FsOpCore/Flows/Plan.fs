@@ -225,7 +225,7 @@ Use save_memory function to save each person's linked-in and twitter data
                 match p with 
                 | PlanFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
                 | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | PlanFlow.TFo_Action a -> printfn "%A" a
+                | PlanFlow.TFo_Action a -> ()//printfn "%A" a
                 | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
             let driver = (PlaywrightDriver.create().driver)
             match ot.task.target with 

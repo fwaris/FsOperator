@@ -36,15 +36,19 @@ module PlaywrightDriver =
         }
         |> Async.Start
 
-    let disconnectHookPage (page:IPage) = 
-        page.Close.Add(fun p -> disconnectHook p.Context)
+    let newPageHandler (page:IPage) = 
+        task {
+            do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH, C.VIEWPORT_HEIGHT)
+            page.Close.Add(fun p -> disconnectHook p.Context)
+        }
+        |> ignore
 
     let initContext(browser:IBrowser) = 
         async {
             let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value )
-            let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask
+            let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask            
             ctx.Close.Add(disconnectHook)
-            ctx.Page.Add(disconnectHookPage)
+            ctx.Page.Add(newPageHandler)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
             match _prevUrl.Value with 
             | Some url -> do! page.GotoAsync(url) |> Async.AwaitTask |> Async.Ignore 
@@ -63,6 +67,7 @@ module PlaywrightDriver =
                     |> Seq.toList
                     |> List.rev
                     |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
+                sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
                 let page = sortedPages.Head
                 if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
                     do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
@@ -79,7 +84,7 @@ module PlaywrightDriver =
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
                 let! page = initContext browser
-                page.SetDefaultTimeout(30000f)
+                page.SetDefaultTimeout(C.PLAYWRIGHT_DEFAULT_TIMEOUT)
                 launchHandle.Set() |> ignore
                 _connection.Value <- Some browser
                 match _prevUrl.Value with
