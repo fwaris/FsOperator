@@ -193,7 +193,7 @@ Use save_memory function to save each person's linked-in and twitter data
 
     let startTimer (n:int) (f:IFlow<_>) = 
         async {
-            do! Async.Sleep n
+            do! Async.Sleep (n * 1000)
             f.Post PlanFlow.TFi_EndAndReport
         }
         |> Async.Start

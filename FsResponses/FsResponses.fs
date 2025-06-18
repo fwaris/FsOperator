@@ -283,9 +283,14 @@ module RUtils =
     let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
     let private shorten (s:string) = shortenN s 100
 
+    ///Convert a type to JsonSchema and package it as `structured format`.
+    ///Use a simple type structure for reliablilty
     let structuredFormat (t:Type) = 
         let opts = JsonSerializerOptions.Default       
-        let schema = opts.GetJsonSchemaAsNode(t)        
+        let schema = opts.GetJsonSchemaAsNode(t)  
+        match schema with 
+        | :? JsonObject as j -> j.["type"] <- "object"
+        | _ -> ()
         {format = Json_schema {|name=t.Name; schema=schema; strict=true|}}
 
     let parseContent<'t> (resp:Response) =        

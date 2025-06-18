@@ -116,6 +116,12 @@ module FlResps =
         |> List.choose (function IOitem.Computer_call cb -> Some cb.pending_safety_checks | _ -> None) 
         |> List.concat
 
+    let private logApiException (ex:System.Exception) =
+        let errMsg = "api send error, retrying ..."
+        if ex.InnerException <> null then
+            Log.exn(ex.InnerException, errMsg )
+        else
+            Log.exn(ex, errMsg)
 
     ///send a request to the responses api (with retry) and post response back to input channel
     let rec private sendWithRetry<'t> count msgWrap (replyChannel:W_Msg<'t>->unit) (req:Request) =
@@ -125,7 +131,7 @@ module FlResps =
                 replyChannel (msgWrap response) 
             with ex ->
                 if count < 2 then
-                    Log.warn $"responses api send error: retry {count + 1}"
+                    logApiException ex
                     return! sendWithRetry (count + 1) msgWrap replyChannel req
                 else
                     Log.error $"responses api unable to reconnect aborting"

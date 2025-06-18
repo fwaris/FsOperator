@@ -56,13 +56,13 @@ Just give the immediate next step to follow. Dont' give multi-step instructions.
 BE BRIEF
 
 [CUA_INSTRUCTIONS]
-{{{{{Vars.cuaInstructions}}}}}
+{{{{${Vars.cuaInstructions}}}}}
 
 [CUA_MESSAGE_HISTORY]
-{{{{{Vars.cuaMessageHistory}}}}}
+{{{{${Vars.cuaMessageHistory}}}}}
 
 [ACTION_HISTROY]
-{{{{{Vars.actionHistory}}}}}
+{{{{${Vars.actionHistory}}}}}
 """
 
     ///<summary>
@@ -92,13 +92,13 @@ Be concise.
 Only provide the immediate next step to help the CUA continue.
 
 [CUA_INSTRUCTIONS]
-{{{{{Vars.cuaInstructions}}}}}
+{{{{${Vars.cuaInstructions}}}}}
 
 [CUA_MESSAGE_HISTORY]
-{{{{{Vars.cuaMessageHistory}}}}}
+{{{{${Vars.cuaMessageHistory}}}}}
 
 [ACTION_HISTROY]
-{{{{{Vars.actionHistory}}}}}
+{{{{${Vars.actionHistory}}}}}
 """
 
     let ``resume cua after pause`` = $"""
@@ -115,13 +115,13 @@ If the task has not be accomplished, issue brief instructions so that cua an con
 
 
 [CUA_INSTRUCTIONS]
-{{{{{Vars.cuaInstructions}}}}}
+{{{{${Vars.cuaInstructions}}}}}
 
 [CUA_MESSAGE_HISTORY]
-{{{{{Vars.cuaMessageHistory}}}}}
+{{{{${Vars.cuaMessageHistory}}}}}
 
 [ACTION_HISTROY]
-{{{{{Vars.actionHistory}}}}}
+{{{{${Vars.actionHistory}}}}}
 """
 
     ///<summary>
@@ -134,6 +134,6 @@ taken some screenshots. Give any available message history and the screenshots, 
 obtained thus far, in relation to the task instructions.
 
 # TASK INSTRUCTIONS
-{{{{{Vars.taskInstructions}}}}}
+{{{{${Vars.taskInstructions}}}}}
 """
 

@@ -53,10 +53,12 @@ module PlanFlow =
         actions      : string list
     }
         with 
-            member this.prependSnapshot snapshot = [IOitem.Image {|annotations=None; image=snapshot|}] |> this.prependReasonerState
             member this.prependCuaMessage msg = {this with task = this.task.prependCuaMessage msg}
             member this.prependAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
             member this.prependReasonerState items = {this with task = this.task.prependReasonerState items}
+            member this.prependSnapshot snapshot = 
+                let imageCntnt = Content.Input_image {|image_url = snapshot|}
+                [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerState
             member this.actionsString() = 
                 this.actions 
                 |> List.rev 
@@ -128,7 +130,7 @@ module PlanFlow =
             |> FlResps.catch ss.bus.PostInput
 
         ///cua may be stuck; use this to terminate early and summarize the progress the plan can continue
-        let earlyTerminate (ss:SubState) = 
+        let stopAndSummarize (ss:SubState) = 
             let id = newId()        
             Prompts.kernelArgs [Vars.taskInstructions,ss.task.cuaPrompt] 
             |> Prompts.renderPrompt Prompts.``cua early termination prompt``
@@ -137,7 +139,7 @@ module PlanFlow =
             id
 
         ///send messaage to reasoner to get guidance for cua for the next action
-        let postGetRsnrGuidanceForCua ss reasonerPrompt = 
+        let getGuidanceForCuaNextAction ss reasonerPrompt = 
             let id = newId()
             async {
                 let cuaMessageHistory = 
@@ -160,7 +162,7 @@ module PlanFlow =
             id
 
         ///ask reasoner to respond to cua as a user would, to continue cua after pause
-        let postGetCuaContinueGuidance ss = 
+        let getGuidanceAfterCuaPause ss = 
             let id = newId()
             async {
                 let cuaMessageHistory = 
@@ -218,6 +220,7 @@ module PlanFlow =
 
         ///send the results of performing action to cua (along with optional additional guidance)
         let postCuaNext ss vs (cuaResp:Response) cuaInstr = 
+
             match vs, FlResps.computerCall cuaResp with 
             | Some (snapshot,w,h,url,env), Some cc ->            
                 let cuaTool = Tool_Computer_use {|display_height = h; display_width = w; environment = env|}
@@ -303,15 +306,15 @@ module PlanFlow =
             Log.info $"in s_loop"
             match msg with 
             | W_Err e                    -> return !!(s_terminate ss (Some e))
-            | W_App TFi_EndAndReport     -> let corrId = Rsnr.earlyTerminate ss
+            | W_App TFi_EndAndReport     -> let corrId = Rsnr.stopAndSummarize ss
                                             return !!(s_summarizing ss corrId) 
             | W_Cua resp when noCC resp  -> let ss = Cua.prependAsstMsg ss resp    //cua not asking for comptuer call
-                                            let corrId = Rsnr.postGetCuaContinueGuidance ss 
+                                            let corrId = Rsnr.getGuidanceAfterCuaPause ss 
                                             return !!(s_pause ss corrId)
             | W_Cua resp                 -> let ss = Cua.prependAsstMsg ss resp
                                             let! ss,outMsgs2,visualState = Cua.performComputerCall ss resp
                                             if ss.task.reasonerPrompt.IsSome then  //get reasoner guidance if prompt set
-                                                let corrId = Rsnr.postGetRsnrGuidanceForCua ss ss.task.reasonerPrompt.Value
+                                                let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value
                                                 return F(s_reason ss (visualState,resp) corrId,outMsgs2)
                                             else 
                                                 Cua.postCuaNext ss visualState resp None
@@ -323,11 +326,11 @@ module PlanFlow =
             Log.info $"in s_reason"
             match msg with 
             | W_Err e                -> return !!(s_terminate ss (Some e))
-            | W_App TFi_EndAndReport -> let corrId = Rsnr.earlyTerminate ss
+            | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
                                         return !!(s_summarizing ss corrId) 
             | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let! ss = Rsnr.callFunctions ss resp
-                                        let corrId = Rsnr.postGetRsnrGuidanceForCua ss ss.task.reasonerPrompt.Value //continue after func. calls
+                                        let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value //continue after func. calls
                                         return !!(s_reason ss (vs,cuaResp) corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let resp = RUtils.parseContent<Rsnr.CuaInstructionsResponse> resp //get structured output
@@ -347,13 +350,17 @@ module PlanFlow =
             Log.info $"in s_pause"
             match msg with 
             | W_Err e                -> return !!(s_terminate ss (Some e))
-            | W_App TFi_EndAndReport -> let corrId = Rsnr.earlyTerminate ss
+            | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
                                         return !!(s_summarizing ss corrId) 
             | W_App (TFi_Resume tx)  -> let ss = ss.prependCuaMessage (User tx)
                                         let! (sn,_,_,_,_) as snapshot = FlUtils.snapshot(ss.driver)
                                         let ss = ss.prependSnapshot sn
                                         Cua.postResumeCua ss snapshot //resume chat with (note no previous history save on server)
                                         return !!(s_loop ss)
+            | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
+                                        let! ss = Rsnr.callFunctions ss resp
+                                        let corrId = Rsnr.getGuidanceAfterCuaPause ss 
+                                        return !!(s_pause ss corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let text = RUtils.outputText resp
                                         ss.bus.PostInput (W_App (TFi_Resume text))
@@ -365,6 +372,10 @@ module PlanFlow =
             Log.info $"in s_summarizing"
             match msg with 
             | W_Err e                 -> return !!(s_terminate ss (Some e))
+            | FuncCall corrId (resp)  -> let ss = ss.prependReasonerState resp.output
+                                         let! ss = Rsnr.callFunctions ss resp
+                                         let corrId = Rsnr.stopAndSummarize ss
+                                         return !!(s_summarizing ss corrId)
             | Reasoner corrId (resp)  -> let ss = FlResps.extractText resp  
                                                   |> Option.map (fun txt -> ss.prependCuaMessage (Assistant {id=resp.id; content=txt})) 
                                                   |> Option.defaultValue ss
