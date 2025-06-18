@@ -103,13 +103,6 @@ module PlanFlow =
             return ss
         }
 
-        //
-        let structuredFormat (t:Type) = 
-            let opts = JsonSerializerOptions.Default
-            let schema = opts.GetJsonSchemaAsNode(t)        
-            {format = Json_schema {|name=t.Name; schema=schema; strict=true|}}
-
-
         ///<summary>
         ///Send a request to the reasoner model with the give correlationId (returned in response).<br />
         ///The request 'input' items are obtained from <see cref="TaskState.reasonerState" />
@@ -121,7 +114,7 @@ module PlanFlow =
                                     instructions = reasonerInstructions
                                     store = false
                                     model=Models.gpt_41
-                                    text = responseFormat |> Option.map structuredFormat
+                                    text = responseFormat |> Option.map RUtils.structuredFormat
                                     truncation = Some Truncation.auto
                                     metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                                 }
@@ -317,7 +310,6 @@ module PlanFlow =
                                                 let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value
                                                 return F(s_reason ss (visualState,resp) corrId,outMsgs2)
                                             else 
-                                                Log.info $"****** cua response id {resp.id}"
                                                 Cua.postCuaNext ss visualState resp None
                                                 return F(s_loop ss,outMsgs2)
             | x                          -> return ignoreMsg (s_loop ss) x "s_loop"

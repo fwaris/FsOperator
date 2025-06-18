@@ -2,8 +2,8 @@
 open System
 open System.Net.Http.Headers
 open System.Text.Json
-open System.Text.Json.Nodes
 open System.Text.Json.Serialization
+open Microsoft.Extensions.AI
 open System.Net.Http
 
 type ResponseError = {
@@ -40,7 +40,7 @@ with
 
 type TextOutputFormat = 
     | [<JsonName "text" >] Text
-    | [<JsonName "json_schema" >] Json_schema of {| name : string ; schema : JsonNode; strict: bool |}
+    | [<JsonName "json_schema" >] Json_schema of {| name : string ; schema : JsonElement; strict: bool |}
 
 type TextOutput = {
     format : TextOutputFormat  
@@ -272,7 +272,7 @@ type Response = {
     tools : Tool list
     top_p : float32
     truncation : string option //auto, disabled
-    usage : JsonObject option
+    usage : JsonElement option
     user : string option
 }
 
@@ -283,14 +283,22 @@ module RUtils =
     let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
     let private shorten (s:string) = shortenN s 100
 
+    let schema(t:Type): JsonElement =    
+        let createOptions = 
+            AIJsonSchemaCreateOptions(
+                TransformOptions = AIJsonSchemaTransformOptions(DisallowAdditionalProperties = true))
+
+        AIJsonUtilities.CreateJsonSchema(
+            t,
+            description = t.Name, 
+            serializerOptions = AIJsonUtilities.DefaultOptions, 
+            inferenceOptions = createOptions)
+    
+
     ///Convert a type to JsonSchema and package it as `structured format`.
     ///Use a simple type structure for reliablilty
     let structuredFormat (t:Type) = 
-        let opts = JsonSerializerOptions.Default       
-        let schema = opts.GetJsonSchemaAsNode(t)  
-        match schema with 
-        | :? JsonObject as j -> j.["type"] <- "object"
-        | _ -> ()
+        let schema = schema t
         {format = Json_schema {|name=t.Name; schema=schema; strict=true|}}
 
     let parseContent<'t> (resp:Response) =        

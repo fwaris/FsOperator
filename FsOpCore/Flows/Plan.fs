@@ -131,6 +131,7 @@ module OPlan =
 related to generative AI and record there linkedin names and profile links.
 Use the save_memory function to record each name as you find it.
 """
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
                 }
         let tw = 
             { OTask.Create() with
@@ -142,6 +143,7 @@ list of names and linked in profile links. Search each name on twitter and obtai
 twitter handle. 
 Use save_memory function to save each person's linked-in and twitter data
     """        
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
             }
         let plan = 
             { OPlan.Default with
