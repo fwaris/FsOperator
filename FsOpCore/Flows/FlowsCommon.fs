@@ -2,6 +2,7 @@
 open System.Threading
 open Microsoft.SemanticKernel
 open FsResponses
+open System.Text.Json
 
 module FlUtils = 
     ///utility operator to create default workflow states
@@ -29,7 +30,7 @@ module FlUtils =
                             mp.Name,
                             {
                                 Property.``type`` = mp.ParameterType.Name.ToLower()
-                                Property.description = mp.Description |> checkEmpty
+                                Property.description = mp.Description |> checkEmpty |> Option.defaultValue ""
                             }
                         )
                         |> Map.ofSeq           
@@ -60,6 +61,17 @@ module FlUtils =
     ///</summary>
     let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunction |> Seq.toList
 
+
+    ///call an indivudal function
+    let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
+        let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
+        let args = args |> Map.toSeq |> Prompts.kernelArgs          
+        let! rslt = kernel.InvokeAsync(pluginName=null,functionName=name,arguments=args) |> Async.AwaitTask
+        let str = rslt.GetValue()
+        let rsltStr = JsonSerializer.Serialize(str)
+        Log.info $"Call {name},{args} --> {rsltStr}"
+        return rsltStr
+    }        
 
 //utility functions for working Responses API messsages
 module FlResps =

@@ -81,7 +81,7 @@ module Buttons =
 type Property =
     {
         ``type``: string
-        description: string option
+        description: string
     }    
 
 type Parameters =
@@ -89,8 +89,9 @@ type Parameters =
         ``type``: string
         properties: Map<string, Property>
         required: string list
+        additionalProperties : bool
     }
-    static member Default = { ``type`` = "object"; properties = Map.empty; required = [] }
+    static member Default = { ``type`` = "object"; properties = Map.empty; required = []; additionalProperties = false }
 
 type Function =
     {

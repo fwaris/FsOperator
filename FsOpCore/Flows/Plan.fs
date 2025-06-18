@@ -8,15 +8,23 @@ type OPlanMemory() =
 
     [<KernelFunction("save_memory")>]
     [<Description("Save a key-value pair for later retrieval")>]
-    member this.save_memory(key:string, value:string) = map <- map |> Map.add key value
+    member this.save_memory(key:string, value:string) = 
+        Log.info $"save_memory:{key} = {value}"
+        map <- map |> Map.add key value
 
     [<KernelFunction("get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
-    member this.get_all_keys() = map.Keys |> Seq.toList
+    member this.get_all_keys() = 
+        let ks = map.Keys |> Seq.toList
+        Log.info $"get_all_keys: {ks}"
+        ks
 
     [<KernelFunction("get_memory")>]
     [<Description("retrieve a value for the given key")>]
-    member this.get_memory(key:string) = map |> Map.tryFind key
+    member this.get_memory(key:string) = 
+        let v = map |> Map.tryFind key
+        Log.info $"get_memory {key} = {v}"
+        v
         
 type OTaskTarget = OProcess of string*string option | OLink of string
 
@@ -40,7 +48,7 @@ type OTask = {
                 reasoner = None
                 voice = None
                 tools = []
-                allowedSec = 60*2
+                allowedSec = 60*10
             }
 
 type OTaskTransition = 
@@ -130,6 +138,7 @@ module OPlan =
                 cua = Some """find individuals who have original posts
 related to generative AI and record there linkedin names and profile links.
 Use the save_memory function to record each name as you find it.
+Make sure to collect at least 5 names.
 """
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``            
                 }

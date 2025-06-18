@@ -17,4 +17,7 @@ let s1r = OPlanRun.Create s1 kernel
 
 let t1 = OPlan.step s1r |> Async.RunSynchronously
 
+for m in t1.currentTask.Value.messages do   
+    printfn "%A" m
+
 let i = 1

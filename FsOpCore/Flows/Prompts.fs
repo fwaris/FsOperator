@@ -91,6 +91,8 @@ Be concise.
 
 Only provide the immediate next step to help the CUA continue.
 
+CUA cannot call functions - so you have invoke the functions instead of asking CUA.
+
 [CUA_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
 

@@ -77,15 +77,6 @@ module PlanFlow =
             cua_achieved_task : bool
             cua_guidance : string
         }
-
-        ///call an indivudal function
-        let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
-            let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
-            let args = args |> Map.toSeq |> Prompts.kernelArgs          
-            let! rslt = kernel.InvokeAsync(pluginName=null,functionName=name,arguments=args) |> Async.AwaitTask
-            let rsltStr = JsonSerializer.Serialize(rslt)
-            return rsltStr
-        }
         
         ///handle all the functions calls found response message
         let callFunctions ss resp = async {
@@ -96,7 +87,7 @@ module PlanFlow =
                     | _                       -> None)
             let mutable fouts = []
             for f in fns do
-                let! rslt = invokeFunction ss.task.kernel f.name f.arguments
+                let! rslt = FlUtils.invokeFunction ss.task.kernel f.name f.arguments
                 let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
                 fouts <- fout::fouts               
             let ss = ss.prependReasonerState fouts
@@ -112,6 +103,7 @@ module PlanFlow =
                 let req = {Request.Default with
                                     input = List.rev ss.task.reasonerState
                                     instructions = reasonerInstructions
+                                    tools = ss.task.tools
                                     store = false
                                     model=Models.gpt_41
                                     text = responseFormat |> Option.map RUtils.structuredFormat
@@ -211,6 +203,35 @@ module PlanFlow =
             return ss,outMsgs,visualState
         }
 
+        ///handle all the functions calls found response message
+        let callFunctions ss resp = async {
+            let fns = 
+                resp.output 
+                |> List.choose (function 
+                    | IOitem.Function_call fn -> Some fn
+                    | _                       -> None)
+            let mutable fouts = []
+            for f in fns do
+                let! rslt = FlUtils.invokeFunction ss.task.kernel f.name f.arguments
+                let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
+                fouts <- fout::fouts                           
+            return fouts
+        }
+
+        let postFunctionResults ss cuaResp fnouts = 
+            async {
+                let req = {Request.Default with
+                                input = fnouts
+                                previous_response_id = Some cuaResp.id
+                                store = true
+                                model=Models.computer_use_preview
+                                truncation = Some Truncation.auto
+                            }
+                do! FlResps.sendRequest W_Cua ss.bus.PostInput req
+            }
+            |> FlResps.catch ss.bus.PostInput
+
+
         ///send the results of performing action to cua (along with optional additional guidance)
         let postCuaNext ss vs (cuaResp:Response) cuaInstr = 
 
@@ -277,9 +298,13 @@ module PlanFlow =
         let (|FuncCall|_|) corrId msg = 
             match msg with 
             | Reasoner corrId (resp) when FlResps.hasFunction resp -> Some resp
-            | _                                     -> None
+            | _                                                    -> None
 
-        let hasFn = FlResps.hasFunction
+        ///convenience 'active pattern' to match a W_Reasoner msg
+        ///with the given correlation id and with at least one function call 
+        let (|Cua_FuncCall|_|) = function
+            | W_Cua (resp) when FlResps.hasFunction resp -> Some resp
+            | _                                                    -> None
 
         (* --- states --- *)
 
@@ -301,6 +326,9 @@ module PlanFlow =
             | W_Err e                    -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport     -> let corrId = Rsnr.stopAndSummarize ss
                                             return !!(s_summarizing ss corrId) 
+            | Cua_FuncCall (resp)        -> let! fouts = Cua.callFunctions ss resp
+                                            Cua.postFunctionResults ss resp fouts
+                                            return !!(s_loop ss)
             | W_Cua resp when noCC resp  -> let ss = Cua.prependAsstMsg ss resp    //cua not asking for comptuer call
                                             let corrId = Rsnr.getGuidanceAfterCuaPause ss 
                                             return !!(s_pause ss corrId)
