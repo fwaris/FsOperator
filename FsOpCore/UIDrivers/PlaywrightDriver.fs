@@ -120,7 +120,7 @@ module PlaywrightDriver =
                 _waitHandle.Value <- Some (new ManualResetEvent(false))
                 use whLaunch = new ManualResetEvent(false)
                 do Async.Start(launch _waitHandle.Value.Value whLaunch)
-                let! r = Async.AwaitWaitHandle(whLaunch, 30000)
+                let! r = Async.AwaitWaitHandle(whLaunch, int C.PLAYWRIGHT_DEFAULT_TIMEOUT)
                 if r then
                     Log.info "browser launched"
                     return _connection.Value.Value

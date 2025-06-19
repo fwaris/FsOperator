@@ -7,7 +7,7 @@ module Samples =
     let sample() = 
         let ln = 
             { OTask.Create() with
-                target = OLink "https://jirasw.t-mobile.com/secure/Tempo.jspa#/my-work/timesheet?worker=JIRAUSER71672&dateDisplayType=weeks&periodType=FIXED&subPeriodType=MONTH&viewType=TIMESHEET&order=ASCENDING&sortBy=TITLE_COLUMN&columns=WORKED_COLUMN&groupBy=issue&from=2025-06-15&to=2025-06-21"
+                target = OLink "https://jirasw.t-mobile.com/secure/Tempo.jspa#/my-work/timesheet?worker=JIRAUSER71672&dateDisplayType=days&periodType=FIXED&subPeriodType=MONTH&viewType=TIMESHEET&order=ASCENDING&sortBy=TITLE_COLUMN&columns=WORKED_COLUMN&groupBy=issue&from=2025-06-15&to=2025-06-21"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 cua = Some """Your task is to record my work hours from Jira’s Tempo for the week, capturing the required details for each task.
 
@@ -17,8 +17,6 @@ Task ID or Key: (e.g., AGAP-XXXX)
 Daily Hours: Hours worked each day of the week for this task
 
 Capability ID: (Starts with ‘CAP’)
-
-Note: Use the ‘Weeks’ view on the Tempo page to find daily hours for each task.
 
 How to Find the Capability ID:
 Open Task Details:
@@ -37,7 +35,12 @@ On the story page, click on the Feature Link.
 Get Capability ID:
 On the feature page, locate the Capability ID (it starts with “CAP”).
 
-Store all collected data in memory for each task in Tempo. This information will be used for a later, downstream task."""
+Store all collected data in memory for each task in Tempo. This information will be used for a later, downstream task.
+
+Note you can use the 'back' button to go back, if lost.
+
+Only gather the data needed. Make no other changes.
+"""
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``            
                 }
         let tw = 

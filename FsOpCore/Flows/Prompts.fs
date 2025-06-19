@@ -60,8 +60,10 @@ Only provide the immediate next step to help the CUA continue.
 
 CUA cannot call functions - so you have invoke the functions instead of asking CUA.
 
-The CUA achieves accomplishes the task when all steps done. 
-Make sure to check if all steps are done before telling CUA that the task is done.
+**Check to make sure that all steps of the Task are done.
+If done, you may instruct CUA that the task is complete.
+
+Note: Don't call the save_memory function repeatedly for the same basic information. 
 
 [CUA_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
