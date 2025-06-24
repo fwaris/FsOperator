@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
+open Microsoft.SemanticKernel.Plugins.Core
 
 module Vars =
     let cuaInstructions = "cuaInstructions"
@@ -24,7 +25,9 @@ module Prompts =
     ///with the values held in the given KernelArguments
     let renderPrompt (promptTemplate:string) (args:KernelArguments) =
         (task {
-            let k = Kernel.CreateBuilder().Build()
+            let b = Kernel.CreateBuilder()
+            b.Plugins.AddFromType<TimePlugin>("time") |> ignore
+            let k = b.Build()
             let fac = KernelPromptTemplateFactory()
             let cfg = PromptTemplateConfig(template = promptTemplate)
             let pt = fac.Create(cfg)
@@ -39,11 +42,13 @@ module Prompts =
     /// - <see cref="Vars.cuaMessageHistory" />
     ///</summary>
     let ``reasoner prompt for cua guidance`` = $"""
-The Computer Use Agent (CUA) follows a set of instructions [CUA_INSTRUCTIONS] to complete a task by issuing commands like click, move, or type text based on screenshots.
+The Computer Use Agent (CUA) follows a set of instructions to complete a task by issuing commands like click, move, or type text based on screenshots.
 
 CUA may not always follow instructions accurately.
 
 Your task:
+Drive CUA to accomplish the task described in [TASK_INSTRUCTIONS].
+
 Review the [CUA_MESSAGE_HISTORY]; [ACTION_HISTORY]; the previous screenshots in the context; and generate brief, single-step guidance that can be shown to the CUA after its most recent action and before it generates its next command.
 
 Guidance rules:
@@ -58,17 +63,14 @@ Be concise.
 
 Only provide the immediate next step to help the CUA continue.
 
-# CUA CANNOT CALL FUNCTIONS. DO NOT ISSUE INSTRUCTIONS TO CUDA TO CALL FUNCTIONS. ONLY ISSUE COMPUTER ACTION GUIDANCE
 To save and retrieve memory directly use the functions provided.
-You may use screenshot text for saving to memory.
-
+Extract relevant textual information from the screenshots images provided.
 
 **Check to make sure that all steps of the Task are done.
-If done, you may instruct CUA that the task is complete.
+If the is complete, respond accordingly.
 
-Note: Don't call the save_memory function repeatedly for the same basic information.
 
-[CUA_INSTRUCTIONS]
+[TASK_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
 
 [CUA_MESSAGE_HISTORY]
@@ -76,6 +78,8 @@ Note: Don't call the save_memory function repeatedly for the same basic informat
 
 [ACTION_HISTROY]
 {{{{${Vars.actionHistory}}}}}
+
+Today is {{time.today}}
 """
 
     let ``resume cua after pause`` = $"""
@@ -99,6 +103,8 @@ If the task has not be accomplished, issue brief instructions so that cua an con
 
 [ACTION_HISTROY]
 {{{{${Vars.actionHistory}}}}}
+
+Today is {{time.today}}
 """
 
     ///<summary>

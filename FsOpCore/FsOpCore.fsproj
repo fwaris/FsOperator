@@ -36,12 +36,13 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.6" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.4.25258.110" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
-		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.56.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.57.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.57.0-preview" />
 		<PackageReference Include="SkiaSharp" Version="3.119.0" />
 		<PackageReference Include="System.Text.Json" Version="9.0.6" />
 		<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
 	</ItemGroup>
-	
+
 	<ItemGroup>
 		<ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 		<ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
@@ -53,7 +54,7 @@
 
 	<ItemGroup>
 	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
-		
+
 	</ItemGroup>
 
 </Project>

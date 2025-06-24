@@ -25,6 +25,7 @@ module PlanFlow =
         | TFo_Done of TaskState
 
     and TaskState = {
+        id              : string
         cuaMessages     : ChatMsg list
         cuaPrompt       : string
         reasonerState   : IOitem list
@@ -33,8 +34,9 @@ module PlanFlow =
         kernel          : Kernel
     }
     with
-        static member Create cuaPrompt reasonerPrompt tools kernel =
+        static member Create id cuaPrompt reasonerPrompt tools kernel =
                             {
+                               id = id
                                cuaMessages = []
                                cuaPrompt = cuaPrompt
                                reasonerPrompt = reasonerPrompt
@@ -45,6 +47,7 @@ module PlanFlow =
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerState items =
             let items = items @ this.reasonerState
+            let items = items |> List.filter (function IOitem.Reasoning _ -> false | _ -> true) //presence of Reasoning items causes issues
             let keep,drop =
                 if List.length items <= MAX_REASONER_STATE then
                     items,[]
@@ -89,13 +92,9 @@ module PlanFlow =
 
     //functions for Reasonser model
     module Rsnr =
-        type CuaContinueResponse = {
-            cua_should_continue : bool
-            message : string
-        }
 
         type CuaInstructionsResponse = {
-            cua_achieved_task : bool
+            task_complete : bool
             cua_guidance : string
         }
 
@@ -185,10 +184,21 @@ module PlanFlow =
                             Vars.cuaMessageHistory,cuaMessageHistory
                         ]
                 let instructions = Prompts.renderPrompt Prompts.``resume cua after pause`` args
-                postToReasoner id ss (Some typeof<CuaContinueResponse>) (Some instructions)
+                postToReasoner id ss (Some typeof<CuaInstructionsResponse>) (Some instructions)
             }
             |> FlResps.catch ss.bus.PostInput
             id
+
+        let reasonerGuidance resp =
+            let resp = RUtils.parseContent<CuaInstructionsResponse> resp //get structured output
+            match resp with
+            | None -> failwith $"reasoner model did not send appropriate resp. for cua guidance"
+            | Some (Choice2Of2 e) -> failwith $"reasoner model refused to provide structured output '{e}'"
+            | Some (Choice1Of2 cuaInstr) ->
+                if cuaInstr.task_complete then
+                    None
+                else
+                    Some cuaInstr.cua_guidance
 
     //functions for Cua model
     module Cua =
@@ -240,7 +250,7 @@ module PlanFlow =
         }
 
         ///send the function call results back to CUA model
-        let postCuaFuncResults ss cuaResp fnouts =
+        let postCuaFuncResults ss (cuaResp:FsResponses.Response) fnouts =
             async {
                 let req = {Request.Default with
                                 input = fnouts
@@ -297,6 +307,7 @@ module PlanFlow =
             }
             |> FlResps.catch ss.bus.PostInput
 
+
     //state machine
     module States =
         ///returns true if no compter call present
@@ -333,7 +344,7 @@ module PlanFlow =
         (* --- states --- *)
 
         let rec s_start ss msg = async {
-            Log.info $"in s_start"
+            Log.info $"in s_start {ss.task.id}"
             match msg with
             | W_Err e         -> return !!(s_terminate ss (Some e))
             | W_App TFi_Start -> let! (snapshot,w,h,url,env) as sn = snapshot ss.driver
@@ -345,7 +356,7 @@ module PlanFlow =
         }
 
         and s_loop ss msg = async {
-            Log.info $"in s_loop"
+            Log.info $"in s_loop {ss.task.id}"
             match msg with
             | W_Err e                    -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport     -> let corrId = Rsnr.stopAndSummarize ss
@@ -368,7 +379,7 @@ module PlanFlow =
         }
 
         and s_reason ss (vs,cuaResp) corrId msg  = async {
-            Log.info $"in s_reason"
+            Log.info $"in s_reason {ss.task.id}"
             match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
@@ -378,21 +389,18 @@ module PlanFlow =
                                         let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value //continue after func. calls
                                         return !!(s_reason ss (vs,cuaResp) corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
-                                        let resp = RUtils.parseContent<Rsnr.CuaInstructionsResponse> resp //get structured output
-                                        match resp with
-                                        | None -> return failwith $"reasoner model did not send appropriate resp. for cua guidance"
-                                        | Some (Choice2Of2 e) -> return failwith $"reaonser model refused to provide structured output '{e}'"
-                                        | Some (Choice1Of2 cuaInstr) ->
-                                            if cuaInstr.cua_achieved_task then
+                                        match Rsnr.reasonerGuidance resp with
+                                        | None ->
+                                                Log.info $"task {ss.task.id} completed"
                                                 return F(s_terminate ss None, [TFo_Done ss.task])
-                                            else
-                                                Cua.postCuaNext ss vs cuaResp (Some cuaInstr.cua_guidance)
+                                        | Some guidance ->
+                                                Cua.postCuaNext ss vs cuaResp (Some guidance)
                                                 return !!(s_loop ss)
             | x                      -> return ignoreMsg (s_reason ss (vs,cuaResp) corrId) x "s_reason"
         }
 
         and s_pause ss corrId msg = async {
-            Log.info $"in s_pause"
+            Log.info $"in s_pause {ss.task.id}"
             match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
@@ -407,14 +415,19 @@ module PlanFlow =
                                         let corrId = Rsnr.getGuidanceAfterCuaPause ss
                                         return !!(s_pause ss corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
-                                        let text = RUtils.outputText resp
-                                        ss.bus.PostInput (W_App (TFi_Resume text))
-                                        return !!(s_pause ss corrId)
+                                        match Rsnr.reasonerGuidance resp with
+                                        | None ->
+                                                Log.info $"task {ss.task.id} completed"
+                                                return F(s_terminate ss None, [TFo_Done ss.task])
+                                        | Some guidance ->
+                                                ss.bus.PostInput (W_App (TFi_Resume guidance))
+                                                return !!(s_pause ss "")
+
             | x                       -> return ignoreMsg (s_pause ss corrId) x "s_pause"
         }
 
         and s_summarizing ss corrId msg = async {
-            Log.info $"in s_summarizing"
+            Log.info $"in s_summarizing {ss.task.id}"
             match msg with
             | W_Err e                 -> return !!(s_terminate ss (Some e))
             | FuncCall corrId (resp)  -> let ss = ss.prependReasonerState resp.output
@@ -429,7 +442,7 @@ module PlanFlow =
         }
 
         and s_terminate ss (e:WErrorType option) msg = async {
-            Log.info $"in s_terminate"
+            Log.info $"in s_terminate {ss.task.id}"
             e
             |> Option.iter (fun e ->
                 ss.bus.postOutput (TFo_Error e)

@@ -3,6 +3,7 @@ open Microsoft.SemanticKernel
 open System.ComponentModel
 open System.Threading
 
+///semantic kernel 'plugin' class that implements memory functions
 type OPlanMemory() =
     let mutable map = Map.empty
 
@@ -36,8 +37,10 @@ type OPlanMemory() =
         Log.info $"get_memory {key} = {v}"
         v
 
+///represents the target computer environment (browser url or windows exe) for a task
 type OTaskTarget = OProcess of string*string option | OLink of string
 
+///definition of a single unit of work in a plan
 type OTask = {
     id          : string
     target      : OTaskTarget
@@ -61,6 +64,8 @@ type OTask = {
                 allowedSec = 60*10
             }
 
+///Prompts to help transition to the next task after completion of the current task.
+///Note the 'next' task could be one of the available task choices
 type OTaskTransition =
     {
         ///<summary>
@@ -76,6 +81,7 @@ type OTaskTransition =
 
     }
 
+///Represents a 'choice' task node. One task of the available task is to be selected.
 and Choose = {
     transition:OTaskTransition
 
@@ -84,6 +90,7 @@ and Choose = {
     description:string option
 }
 
+///represents a sequence of task nodes that are to be completed in order
 and All = {
     nodes : ONode list
 
@@ -92,6 +99,7 @@ and All = {
     description:string option
 }
 
+///task node tree structure
 and [<RequireQualifiedAccess>] ONode =
     | One of OTask      //Leaf node containing the task
     | Choose of Choose  //execute one of many sub nodes - based on LLM decision involving transition prompt
@@ -105,7 +113,7 @@ and [<RequireQualifiedAccess>] ONode =
                 | Choose {transition={nodes=ns}} -> (acc,ns) ||> List.fold loop
             loop [] this
 
-
+///A collection of one or more tasks organized in a tree
 type OPlan = {
     description : string
     root  : ONode
@@ -116,12 +124,14 @@ type OPlan = {
                         root = ONode.All {nodes=[]; description=None}
                     }
 
+///run time state required to run a task
 type OTaskRun = {
     task     : OTask
     driver   : IUIDriver
     messages : ChatMsg list
 }
 
+///runtime state required to run a plan
 type OPlanRun = {
     plan : OPlan
     kernel : Kernel
@@ -138,7 +148,7 @@ with
                     }
 
 module OPlan =
-
+    ///minimal 2-task sample plan
     let sample() =
         let ln =
             { OTask.Create() with
@@ -196,13 +206,15 @@ Use save_memory function to save each person's linked-in and twitter data
             |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
             |> Option.defaultValue (Choice1Of3 ())
 
+    ///transition to the next task in the play
     let transition (txn:OTaskTransition) (planRun:OPlanRun) = async {
         //TODO
         return None
     }
 
     let rec transitionToNext (planRun:OPlanRun)  = async {
-        let doneSet = planRun.completedTasks |> List.map (fun tr -> tr.task.id) |> set
+        let doneTasks = match planRun.currentTask with | Some t -> t::planRun.completedTasks | _ -> planRun.completedTasks
+        let doneSet = doneTasks |> List.map (fun tr -> tr.task.id) |> set
         match findNext doneSet planRun.plan.root with
         | Choice1Of3 _                 -> return None
         | Choice2Of3 t                 -> return Some t
@@ -219,10 +231,13 @@ Use save_memory function to save each person's linked-in and twitter data
         }
         |> Async.Start
 
+
     let runCurrentTask (planRun:OPlanRun) = async{
         match planRun.currentTask with
+        | None -> return failwith $"no task to run"
         | Some ot ->
             let rt = PlanFlow.TaskState.Create
+                                            ot.task.id
                                             ot.task.cua.Value
                                             ot.task.reasoner
                                             ot.task.tools
@@ -241,14 +256,13 @@ Use save_memory function to save each person's linked-in and twitter data
             match ot.task.target with
             | OLink url -> do! driver.start url
             | OProcess (a,b) -> ()
-            let flow = PlanFlow.create post (PlaywrightDriver.create().driver) rt
+            let flow = PlanFlow.create post driver rt
             flow.Post PlanFlow.TFi_Start
             startTimer ot.task.allowedSec flow
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3)
             match completedTask.Value with
             | Some t -> return {ot with messages = t.cuaMessages}
             | None   -> return failwith "no output from step"
-        | None -> return failwith $"no task to run"
     }
 
     let step planRun = async {
@@ -269,3 +283,10 @@ Use save_memory function to save each person's linked-in and twitter data
                 return {planRun with currentTask = Some tr'}
     }
 
+    let rec run planRun = async {
+        let! planRun = step planRun
+        if planRun.currentTask.IsSome then
+            return! run planRun
+        else
+            return planRun
+    }

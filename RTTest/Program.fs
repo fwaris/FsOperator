@@ -11,19 +11,21 @@ module Samples =
                 target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
-                cua = Some """Your task is to record my work hours from Jira’s Timesheet for the week, capturing the required details for each task.
+                cua = Some """Your task is to record task ids and associated daily hours
+from Jira’s Timesheet view for the current week
 
-Required Fields for Each Task:
-Task ID or Key: (e.g., AGAP-XXXX)
+Select the current week from the time selector.
 
-Daily Hours: Hours worked each day of the week for this task for each day of the week
+Note down the task id, date and hours and save them to memory.
 
-Save the task id, date and hours into memory for use in a later task.
+Extract the information from the screenshots provided and invoke the save_memory function to save the data into memory.
 
-The information you need should all be available on a single page but scroll if needed.
+*** ALL information you need should all be available on a SINGLE PAGE.
+If a horizontal or vertical scroll bar is visible for the Timesheet view, scroll appropriately to see all data.
 
-Note: If need, use Faisal.Waris1@t-mobile.com as login email id.
+Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 
+End the task when the relevant data has been saved.
 """
                 }
 
@@ -59,6 +61,8 @@ Note you can use the 'back' button to go back, if lost.
 
 Only gather the data needed. Make no other changes.
 
+End task when all task-hours for the week have been saved.
+
 """
                 }
         let t_tTime =
@@ -90,14 +94,14 @@ let kernel =
     b.Plugins.AddFromType<OPlanMemory>() |>  ignore
     b.Build()
 
-
 //kernel.Plugins.GetFunctionsMetadata() |> Seq.iter (fun x-> printfn "%s.%s" x.PluginName x.Name)
 //kernel.Plugins.GetFunction("OPlanMemory", "save_memory")
 let s1r = OPlanRun.Create s1 kernel
 
-let t1 = OPlan.step s1r |> Async.RunSynchronously
+let t1 = OPlan.run s1r |> Async.RunSynchronously
 
-for m in t1.currentTask.Value.messages do
-    printfn "%A" m
+for t in t1.completedTasks do
+    for m in t.messages do
+        printfn "%A" m
 
 let i = 1
