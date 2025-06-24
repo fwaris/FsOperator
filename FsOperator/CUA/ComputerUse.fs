@@ -136,7 +136,7 @@ obtained thus far, in relation to the task instructions.
                                     input = chatHistory @ [msgInput];
                                     instructions = instructions |> Option.map summarizationPrompt
                                     store = false
-                                    model=Models.gpt_41
+                                    model=Models.o4_mini
                                     truncation = Some Truncation.auto
                                 }
                 let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask

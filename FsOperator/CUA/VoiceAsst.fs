@@ -10,7 +10,7 @@ open FsResponses
 
 module VoiceAsst =
 
-    let sendInitResp conn = 
+    let sendInitResp conn =
         (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
                                         event_id = Api.Utils.newId()
                                         response.instructions = Some "Announce that you will me accomplish tasks via the 'computer assistant'"
@@ -25,8 +25,8 @@ module VoiceAsst =
                                         //response.modalities = Some [M_AUDIO; M_TEXT]
                                         })
         |> Api.Connection.sendClientEvent conn
-    
-        
+
+
     let inline sendFunctionResponse conn (callId:string) result =
         let outEv =
             { ConversationItemCreateEvent.Default with
@@ -34,24 +34,24 @@ module VoiceAsst =
                       { ConversationItem.Default with
                           ``type`` = ConversationItemType.Function_call_output
                           call_id = Some callId
-                          output = Some (JsonSerializer.Serialize(result))                                      
+                          output = Some (JsonSerializer.Serialize(result))
                       }
             }
             |> ConversationItemCreate
         Api.Connection.sendClientEvent conn outEv  //send prolog query results (or error)
         sendResponseCreate conn                    //prompt the LLM to respond now
-        
+
     let getImageDesc (image:string) =
         async {
             try
                 let img = Content.Input_image {|image_url=image|}
                 let txt = Content.Input_text {|text = "describe the image"|}
-                let msg = {Message.Default with content = [txt; img]} 
+                let msg = {Message.Default with content = [txt; img]}
                 let msgInput = IOitem.Message msg
-                let req = {Request.Default with 
+                let req = {Request.Default with
                                     input = [msgInput]
                                     store = false
-                                    model=Models.gpt_41
+                                    model=Models.o4_mini
                                     truncation = Some Truncation.auto
                               }
                 let! resp = Api.create req (Api.defaultClient()) |> Async.AwaitTask
@@ -61,7 +61,7 @@ module VoiceAsst =
                     Log.exn(ex,"getImageDesc")
                     return raise ex
         }
-        
+
     let sendFunctionResponseWithImage conn (callId:string) (cuaResult:string) (image:string option) =
         async {
             match image with
@@ -71,28 +71,28 @@ module VoiceAsst =
                 do sendFunctionResponse conn callId resp
             | None -> sendFunctionResponse conn callId cuaResult
         }
-    
+
     let MAX_RETRY = 2
 
-    let getArg (argName:string) (jsonStr:string) =    
+    let getArg (argName:string) (jsonStr:string) =
         let jargs = JsonSerializer.Deserialize<JsonObject>(jsonStr)
-        jargs.[argName].ToString()    
+        jargs.[argName].ToString()
 
     let rec sendInstructions (taskState:TaskState) (ev:ResponseOutputItemDoneEvent) =
         async {
-            try                                                 
-                let instructions = ev.item.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
+            try
+                let instructions = ev.item.arguments |> Option.map (getArg "instructions") |> Option.defaultWith (fun _ -> failwith "function call argument not found")
                 Bus.postMessage taskState.bus (ClientMsg.VoiceChat_RunInstructions (instructions,ev.item.call_id))
                 Bus.postLog taskState.bus $"<-- voice instr. {instructions}"
             with ex ->
                 Bus.postWarning taskState.bus ex.Message
                 Log.error $"Error in sendInstructions: {ex.Message}"
-        }        
+        }
 
     let rec setGotoUrl (taskState:TaskState) (ev:ResponseOutputItemDoneEvent) =
         async {
-            try                                                 
-                let url = ev.item.arguments |> Option.map (getArg "url") |> Option.defaultWith (fun _ -> failwith "function call argument not found")                
+            try
+                let url = ev.item.arguments |> Option.map (getArg "url") |> Option.defaultWith (fun _ -> failwith "function call argument not found")
                 Bus.postMessage taskState.bus (ClientMsg.OpTask_SetTarget (url))
                 Bus.postLog taskState.bus $"<-- goto url {url}"
                 let conn = TaskState.voiceConnection (Some taskState)
@@ -101,32 +101,32 @@ module VoiceAsst =
             with ex ->
                 Bus.postWarning taskState.bus ex.Message
                 Log.error $"Error in setGotoUrl: {ex.Message}"
-        }    
+        }
 
-module VoiceMachine =    
+module VoiceMachine =
     let ASST_INSTRUCTIONS_FUNCTION = "assistantInstructions"
     let GOTO_URL_FUNCTION = "gotoUrl"
     let M_AUDIO = "audio"
     let M_TEXT = "text"
     let FUNCTION_CALL = "function_call"
     let FUNCTION_CALL_OUTPUT = "function_call_output"
-    
+
     type State = {
         initialized : bool
-        currentSession : Session  }      
+        currentSession : Session  }
     with static member Default = {
              initialized=false
              currentSession = Session.Default
              }
-                            
+
     let ssInit = State.Default          //initial state for server event handling
-        
-    //take an existing session and 'update' it to new settings       
+
+    //take an existing session and 'update' it to new settings
     let reconfigure instructions (s:Session) =
         { s with
             id = None                               //*** set 'id' and 'object' to None when updating an existing session
-            object = None   
-                                                    // set, unset, or override other fields as needed 
+            object = None
+                                                    // set, unset, or override other fields as needed
             instructions = instructions
             tool_choice = Some "auto"
             tools = [
@@ -137,8 +137,8 @@ module VoiceMachine =
                     parameters =
                         {
                             ``type`` = "object"
-                            properties = Map.ofList ["instructions", {``type``= "string"; description= Some "detailed steps in English"}] 
-                            required = ["instructions"]                            
+                            properties = Map.ofList ["instructions", {``type``= "string"; description= Some "detailed steps in English"}]
+                            required = ["instructions"]
                         }
                 }
                 {
@@ -148,81 +148,81 @@ module VoiceMachine =
                     parameters =
                         {
                             ``type`` = "object"
-                            properties = Map.ofList ["url", {``type``= "string"; description= Some "valid web url"}] 
-                            required = ["url"]                            
+                            properties = Map.ofList ["url", {``type``= "string"; description= Some "valid web url"}]
+                            required = ["url"]
                         }
                 }
-            ]                
+            ]
         }
-        
+
     let toUpdateEvent (s:Session) =
         { SessionUpdateEvent.Default with
             event_id = Api.Utils.newId()
             session = s}
         |> SessionUpdate
-            
+
     let sendUpdateSession instructions conn session =
         session
         |> reconfigure instructions
         |> toUpdateEvent
         |> Api.Connection.sendClientEvent conn
-            
+
     let  isInstructionsCall (ev:ResponseOutputItemDoneEvent) =
         ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
-        
+
     let  getInstructions (ev:ResponseOutputItemDoneEvent) =
-        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then  
+        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION then
             ev.item.arguments
         else
             Some "no instructions found"
 
     let  isGotoUrlCall (ev:ResponseOutputItemDoneEvent) =
         ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some GOTO_URL_FUNCTION
-        
+
     let  getUrl (ev:ResponseOutputItemDoneEvent) =
-        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some GOTO_URL_FUNCTION then  
+        if ev.item.``type`` = FUNCTION_CALL && ev.item.name = Some GOTO_URL_FUNCTION then
             ev.item.arguments
         else
             Some "no instructions found"
-                   
+
     let  isFunctionCallResult (ev:ResponseOutputItemDoneEvent) =
-        ev.item.``type`` = FUNCTION_CALL_OUTPUT && 
+        ev.item.``type`` = FUNCTION_CALL_OUTPUT &&
             (ev.item.name = Some ASST_INSTRUCTIONS_FUNCTION
             || ev.item.name = Some GOTO_URL_FUNCTION)
-                       
+
     // accepts old state and next event - returns new state
     let update (taskState:TaskState) conn (st:State) ev =
         async {
             match ev with
-            | SessionCreated s when not st.initialized ->  sendUpdateSession (Some(TaskState.voiceAsstInstructions (Some taskState))) conn s.session; return {st with initialized = true} 
+            | SessionCreated s when not st.initialized ->  sendUpdateSession (Some(TaskState.voiceAsstInstructions (Some taskState))) conn s.session; return {st with initialized = true}
             | SessionCreated s -> return {st with currentSession = s.session }
             | SessionUpdated s -> VoiceAsst.sendInitResp conn; return {st with currentSession = s.session }
-            | ResponseOutputItemDone ev when isInstructionsCall ev  -> 
+            | ResponseOutputItemDone ev when isInstructionsCall ev  ->
                 Log.info $"<-- function call {ev.item.name}"
-                if (TaskState.functionId ASST_INSTRUCTIONS_FUNCTION taskState).IsSome then 
+                if (TaskState.functionId ASST_INSTRUCTIONS_FUNCTION taskState).IsSome then
                     Log.info $"Ignoring function call {ev.item.name} as we are already processing a {ASST_INSTRUCTIONS_FUNCTION} function call"
                 else
                     VoiceAsst.sendInstructions taskState ev |> Async.Start
                 return st
-            | ResponseOutputItemDone ev when isGotoUrlCall ev  -> 
+            | ResponseOutputItemDone ev when isGotoUrlCall ev  ->
                 Log.info $"<-- function call {ev.item.name}"
-                if (TaskState.functionId GOTO_URL_FUNCTION taskState).IsSome then 
+                if (TaskState.functionId GOTO_URL_FUNCTION taskState).IsSome then
                     Log.info $"Ignoring function call {ev.item.name} as we are already processing {GOTO_URL_FUNCTION} function call"
-                else                    
+                else
                     VoiceAsst.setGotoUrl taskState ev |> Async.Start
                 return st
-            | ResponseOutputItemDone ev when isFunctionCallResult ev  -> return  st            
+            | ResponseOutputItemDone ev when isFunctionCallResult ev  -> return  st
             | ResponseTextDelta ev -> Bus.postLog taskState.bus $"text delta {ev}"; return st
             | ResponseAudioDelta _
             | ResponseAudioTranscriptDelta _
-            | ResponseFunctionCallArgumentsDelta _ -> return st // suppress logging 'delta' events 
+            | ResponseFunctionCallArgumentsDelta _ -> return st // suppress logging 'delta' events
             | other -> (* Log.info $"unhandled event: {other}"; *) return st //log other events
         }
-        
-    let private startReader (taskState:TaskState) (conn:RTOpenAI.Api.Connection) = 
+
+    let private startReader (taskState:TaskState) (conn:RTOpenAI.Api.Connection) =
         let task =
             async {
-                let comp = 
+                let comp =
                     conn.WebRtcClient.OutputChannel.Reader.ReadAllAsync(taskState.tokenSource.Token)
                         |> AsyncSeq.ofAsyncEnum
                         |> AsyncSeq.map Api.Exts.toEvent
@@ -235,15 +235,15 @@ module VoiceMachine =
         Async.Start(task, taskState.tokenSource.Token)
 
     let stopVoiceMachine (connection:Ref<Api.Connection option>) =
-        match connection.Value with 
-        | Some conn -> 
+        match connection.Value with
+        | Some conn ->
             RTOpenAI.Api.Connection.close conn
             connection.Value <- None
         | None -> ()
-            
+
     let startVoiceMachine (taskState:TaskState) =
         async {
-            let connection = TaskState.voiceConnection (Some taskState)            
+            let connection = TaskState.voiceConnection (Some taskState)
             stopVoiceMachine connection
             let conn = RTOpenAI.Api.Connection.create()
             let keyReq = {Api.Exts.KeyReq.Default with model = C.OPENAI_RT_MODEL_GPT4O}

@@ -1,7 +1,7 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
 
-module Vars = 
+module Vars =
     let cuaInstructions = "cuaInstructions"
     let cuaMessageHistory = "cuaMessageHistory"
     let actionHistory = "actionHistory"
@@ -19,8 +19,8 @@ module Prompts =
             kargs.Add(k,v)
         kargs
 
-    ///render a prompt template by replacing 
-    ///variable place holders in the template 
+    ///render a prompt template by replacing
+    ///variable place holders in the template
     ///with the values held in the given KernelArguments
     let renderPrompt (promptTemplate:string) (args:KernelArguments) =
         (task {
@@ -37,7 +37,7 @@ module Prompts =
     /// - <see cref="Vars.cuaInstructions" /><br />
     /// - <see cref="Vars.actionHistory" />
     /// - <see cref="Vars.cuaMessageHistory" />
-    ///</summary> 
+    ///</summary>
     let ``reasoner prompt for cua guidance`` = $"""
 The Computer Use Agent (CUA) follows a set of instructions [CUA_INSTRUCTIONS] to complete a task by issuing commands like click, move, or type text based on screenshots.
 
@@ -58,12 +58,15 @@ Be concise.
 
 Only provide the immediate next step to help the CUA continue.
 
-CUA cannot call functions - so you have invoke the functions instead of asking CUA.
+# CUA CANNOT CALL FUNCTIONS. DO NOT ISSUE INSTRUCTIONS TO CUDA TO CALL FUNCTIONS. ONLY ISSUE COMPUTER ACTION GUIDANCE
+To save and retrieve memory directly use the functions provided.
+You may use screenshot text for saving to memory.
+
 
 **Check to make sure that all steps of the Task are done.
 If done, you may instruct CUA that the task is complete.
 
-Note: Don't call the save_memory function repeatedly for the same basic information. 
+Note: Don't call the save_memory function repeatedly for the same basic information.
 
 [CUA_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
@@ -78,12 +81,12 @@ Note: Don't call the save_memory function repeatedly for the same basic informat
     let ``resume cua after pause`` = $"""
 The Computer Use Agent (CUA) follows a set of instructions [CUA_INSTRUCTIONS] to complete a task by issuing commands like click, move, or type text based on screenshots.
 
-The CUA models has moved through multiple turns but now not issued a new command, indicating 
+The CUA models has moved through multiple turns but now not issued a new command, indicating
 that it might be done.
 
 Your task:
-Review the [CUA_MESSAGE_HISTORY]; [ACTION_HISTORY]; the previous screenshots in the context; and determine if the 
-task as stated in [CUA_INSTRUCTIONS] has been accomplised.
+Review the [CUA_MESSAGE_HISTORY]; [ACTION_HISTORY]; the previous screenshots in the context; and determine if the
+task as stated in [CUA_INSTRUCTIONS] has been accomplished.
 
 If the task has not be accomplished, issue brief instructions so that cua an continue forward to accomplish the task.
 

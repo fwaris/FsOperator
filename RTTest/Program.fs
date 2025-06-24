@@ -2,21 +2,39 @@
 open Microsoft.SemanticKernel
 open FsOpCore
 
-module Samples = 
+module Samples =
 
-    let sample() = 
-        let ln = 
+    let sample() =
+        let tHours =
             { OTask.Create() with
-                target = OLink "https://jirasw.t-mobile.com/secure/Tempo.jspa#/my-work/timesheet?worker=JIRAUSER71672&dateDisplayType=days&periodType=FIXED&subPeriodType=MONTH&viewType=TIMESHEET&order=ASCENDING&sortBy=TITLE_COLUMN&columns=WORKED_COLUMN&groupBy=issue&from=2025-06-15&to=2025-06-21"
+                description = "save task and daily hours from jira"
+                target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
-                cua = Some """Your task is to record my work hours from Jira’s Tempo for the week, capturing the required details for each task.
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """Your task is to record my work hours from Jira’s Timesheet for the week, capturing the required details for each task.
 
 Required Fields for Each Task:
 Task ID or Key: (e.g., AGAP-XXXX)
 
-Daily Hours: Hours worked each day of the week for this task
+Daily Hours: Hours worked each day of the week for this task for each day of the week
 
-Capability ID: (Starts with ‘CAP’)
+Save the task id, date and hours into memory for use in a later task.
+
+The information you need should all be available on a single page but scroll if needed.
+
+Note: If need, use Faisal.Waris1@t-mobile.com as login email id.
+
+"""
+                }
+
+        let tCapability =
+            { OTask.Create() with
+                description = "get capability ids for each task in jira"
+                target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
+                tools = FlUtils.makeFunctionTools<OPlanMemory>()
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """Retrieve the task ids and hours from memory that were saved by a previous task.
+Your goal is to record the Capability ID: (Starts with ‘CAP’) for each task
 
 How to Find the Capability ID:
 Open Task Details:
@@ -40,32 +58,34 @@ Store all collected data in memory for each task in Tempo. This information will
 Note you can use the 'back' button to go back, if lost.
 
 Only gather the data needed. Make no other changes.
+
 """
-                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
                 }
-        let tw = 
+        let t_tTime =
             { OTask.Create() with
-                target = OLink "https://www.twitter.com"
+                target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
-                description = "retrieve linkedIn people info from memory and get twitter handles"
-                cua = Some """
-list of names and linked in profile links. Search each name on twitter and obtain their
-twitter handle. 
-Use save_memory function to save each person's linked-in and twitter data
-    """        
-                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
+                description = "Enter capability hours into T-Time"
+                cua = Some """Retrieve the Capability Ids and hours from memory.
+    Calculate the total hours for each Capability for each day.
+    Enter the search for the capability in "Capability" search box.
+    If the capability exist the enter the hours for each day for that capability.
+    Save the T-Time hours.
+    Do not "Submit", just "Save".
+    """
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
             }
-        let plan = 
+        let plan =
             { OPlan.Default with
-                description = "take linkedin people and find their twitter handle"
-                root = ONode.All {nodes= [ONode.One ln; ONode.One tw]; description=None}
+                description = "Take hours from jira and enter them into t-time"
+                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
             }
         plan
 
 let s1 = Samples.sample()
 
 //FsResponses.Log.debug_logging <- true
-let kernel = 
+let kernel =
     let b = Kernel.CreateBuilder()
     b.Plugins.AddFromType<OPlanMemory>() |>  ignore
     b.Build()
@@ -77,7 +97,7 @@ let s1r = OPlanRun.Create s1 kernel
 
 let t1 = OPlan.step s1r |> Async.RunSynchronously
 
-for m in t1.currentTask.Value.messages do   
+for m in t1.currentTask.Value.messages do
     printfn "%A" m
 
 let i = 1

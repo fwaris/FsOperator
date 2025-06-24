@@ -24,10 +24,10 @@ type IncompleteDetails = {
 [<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
 type Reasoning = {
   effort : string option
-  summary : string option    
+  summary : string option
   generate_summary : string option
 }
-with 
+with
     static member Default = {
         effort = None
         summary = None
@@ -38,39 +38,40 @@ with
     static member Low = "low"
 
 
-type TextOutputFormat = 
+type TextOutputFormat =
     | [<JsonName "text" >] Text
     | [<JsonName "json_schema" >] Json_schema of {| name : string ; schema : JsonElement; strict: bool |}
 
 type TextOutput = {
-    format : TextOutputFormat  
+    format : TextOutputFormat
 }
 
 type User_Location = {
   ``type`` : string
   city : string option
   country : string option
-  region : string option 
+  region : string option
   timezone : string option
 }
 
-module SearchSizeContextSize = 
-    let low = "low" 
+module SearchSizeContextSize =
+    let low = "low"
     let medium = "medium"
     let high = "high"
 
-module ComputerEnvironment = 
+module ComputerEnvironment =
     let browser = "browser"
     let mac = "mac"
     let windows = "windows"
     let ubuntu = "ubuntu"
 
-module Truncation = 
+module Truncation =
     let auto = "auto"
     let disabled = "disabled"
 
-module Models = 
+module Models =
     let gpt_41 = "gpt-4.1"
+    let o4_mini = "o4-mini"
     let computer_use_preview = "computer-use-preview"
 
 module Buttons =
@@ -82,7 +83,7 @@ type Property =
     {
         ``type``: string
         description: string
-    }    
+    }
 
 type Parameters =
     {
@@ -102,7 +103,7 @@ type Function =
     }
     static member Default = {name = ""; description = ""; parameters = Parameters.Default; strict=true}
 
-type Tool = 
+type Tool =
   | [<JsonName "file_search" >] Tool_File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
   | [<JsonName "function" >] Tool_Function of Function
   | [<JsonName "web_search_preview" >] Tool_Web_search of {|search_context_size : string; user_location : User_Location option|}
@@ -115,12 +116,12 @@ type OutputText = {
     annotations : JsonElement option
 }
 
-type Content = 
+type Content =
   | [<JsonName "output_text">] Output_text of OutputText // {|text : string; annotations : JsonElement option|}
   | [<JsonName "input_text">] Input_text of {|text : string|}
   | [<JsonName "refusal">] Refusal of {|refusal:string;|}
   | [<JsonName "input_image">] Input_image of {|image_url:string|}
-  
+
 type Message = {
     id : string option
     status : string option
@@ -140,14 +141,14 @@ type SafetyCheck = {
     message : string
 }
 
-type OutputDetail = 
+type OutputDetail =
     | [<JsonPropertyName "input_image">] Computer_screenshot of {|image_url:string|}
     | [<JsonPropertyName "not_used">] DoNotUse of {|text:string|} //this is only to make this a multi-case union so that serializaton adds the type tag
 
 [<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
 type ComputerCallOutput = {
     call_id : string
-    acknowledged_safety_checks : SafetyCheck list    
+    acknowledged_safety_checks : SafetyCheck list
     output : OutputDetail
     current_url : string option
 }
@@ -164,15 +165,15 @@ type ReasoningOutput = {
 type Point = {x:int; y:int}
 type Path = {
     path : Point list
-} 
+}
 
-type Action = 
+type Action =
     | [<JsonName "click">] Click of {| button:string; x:int; y:int|}
     | [<JsonName "scroll">] Scroll of {|x:int; y:int; scroll_x:int; scroll_y:int|}
     | [<JsonName "keypress">] Keypress of {| keys:string list;|} //ctrl, alt, shift
     | [<JsonName "type">] Type of {| text:string|}
-    | [<JsonName "wait">] Wait 
-    | [<JsonName "screenshot">] Screenshot 
+    | [<JsonName "wait">] Wait
+    | [<JsonName "screenshot">] Screenshot
     | [<JsonName "double_click">] Double_click of {|x:int; y:int|}
     | [<JsonName "drag">] Drag of Path
     | [<JsonName "move">] Move of {| x:int; y:int |}
@@ -194,11 +195,11 @@ type FunctionCall = {
 
 type FunctionCallOutput = {
     call_id : string
-    output  : string    
+    output  : string
 }
 
 [<RequireQualifiedAccess>]
-type IOitem = 
+type IOitem =
   | [<JsonName "message" >] Message of Message
   | [<JsonName "image" >] Image of {|image: string; annotations: JsonElement option|}
   | [<JsonName "file" >] File of {|file: string; annotations: JsonElement option|}
@@ -284,30 +285,30 @@ module RUtils =
     let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
     let private shorten (s:string) = shortenN s 100
 
-    let schema(t:Type): JsonElement =    
-        let createOptions = 
+    let schema(t:Type): JsonElement =
+        let createOptions =
             AIJsonSchemaCreateOptions(
                 TransformOptions = AIJsonSchemaTransformOptions(DisallowAdditionalProperties = true))
 
         AIJsonUtilities.CreateJsonSchema(
             t,
-            description = t.Name, 
-            serializerOptions = AIJsonUtilities.DefaultOptions, 
+            description = t.Name,
+            serializerOptions = AIJsonUtilities.DefaultOptions,
             inferenceOptions = createOptions)
-    
+
 
     ///Convert a type to JsonSchema and package it as `structured format`.
     ///Use a simple type structure for reliablilty
-    let structuredFormat (t:Type) = 
+    let structuredFormat (t:Type) =
         let schema = schema t
         {format = Json_schema {|name=t.Name; schema=schema; strict=true|}}
 
-    let parseContent<'t> (resp:Response) =        
-        resp.output 
+    let parseContent<'t> (resp:Response) =
+        resp.output
         |> List.tryPick(function IOitem.Message m -> Some m | _ -> None)
-        |> Option.bind(fun m -> 
-            m.content 
-            |> List.tryPick (function 
+        |> Option.bind(fun m ->
+            m.content
+            |> List.tryPick (function
                 | Content.Refusal r -> Some (Choice2Of2 r.refusal)
                 | Content.Output_text otxt ->
                     let t:'t = JsonSerializer.Deserialize<'t>(otxt.text)
@@ -315,30 +316,30 @@ module RUtils =
                 | _ -> None))
 
     let trimScreenshot (cco:OutputDetail) =
-        match cco with 
+        match cco with
         | Computer_screenshot i -> Computer_screenshot {|image_url=shortenN i.image_url 20|}
         | x -> x
-    
+
     let trimImage = function
         | IOitem.Computer_call_output cco -> IOitem.Computer_call_output {cco with output = trimScreenshot cco.output}
         | IOitem.Image i ->  IOitem.Image {|i with image = shorten i.image |}
         | x -> x
-        
+
     ///trim the large image base64 encoded string (to reduce log sizes)
     let trimResponse (resp:Response) =
         {resp with output = resp.output |> List.map trimImage}
-        
+
     ///trim the large image base64 encoded string (to reduce log sizes)
     let trimRequest (req:Request) =
         {req with input = req.input |> List.map trimImage}
-        
-    let outputText (resp:Response) = 
+
+    let outputText (resp:Response) =
         [
             for r in resp.output do
-            match r with 
-            | IOitem.Message m -> 
+            match r with
+            | IOitem.Message m ->
                 for c in m.content do
-                    match c with 
+                    match c with
                     | Output_text t -> yield t.text
                     | _ -> ()
             | _ -> ()
@@ -350,13 +351,13 @@ module RUtils =
         $"data:image/png;base64,{imageBytes}"
 
 module Api =
-    let serOpts = 
-        let opts = 
+    let serOpts =
+        let opts =
             JsonFSharpOptions.Default()
                 .WithUnionInternalTag()
                 .WithUnionTagName("type")
                 .WithUnionUnwrapRecordCases()
-                .WithUnionTagCaseInsensitive()     
+                .WithUnionTagCaseInsensitive()
                 .WithAllowNullFields()
                 .WithAllowOverride()
                 .ToJsonSerializerOptions()
@@ -365,46 +366,46 @@ module Api =
 
     //let testRespos = JsonSerializer.Deserialize<Response>(jsonObt, options=serOpts)
 
-    let newClient(key:string) = 
+    let newClient(key:string) =
         let client = new HttpClient()
         client.BaseAddress <- Uri "https://api.openai.com/v1"
-        client.DefaultRequestHeaders.Authorization <- new Headers.AuthenticationHeaderValue("Bearer",key)        
+        client.DefaultRequestHeaders.Authorization <- new Headers.AuthenticationHeaderValue("Bearer",key)
         client
 
     let defaultClient() = newClient(Environment.GetEnvironmentVariable("OPENAI_API_KEY"))
 
-    let create (req:Request) (client:#HttpClient) =         
-        task {            
+    let create (req:Request) (client:#HttpClient) =
+        task {
             let builder = UriBuilder(client.BaseAddress)
             builder.Path <- builder.Path + "/responses"
             let reqstr = JsonSerializer.Serialize(req,options=serOpts)
-            if Log.debug_logging then Log.info $"Request: {reqstr} "            
+            if Log.debug_logging then Log.info $"Request: {reqstr} "
             //use! resp = client.PostAsJsonAsync(builder.Uri, req,options=serOpts)
             use strContent = new StringContent(reqstr,MediaTypeHeaderValue("application/json"))
             use! resp = client.PostAsync(builder.Uri,strContent)
-            if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then 
+            if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then
                 let! str = resp.Content.ReadAsStringAsync()
                 if Log.debug_logging then Log.info $"Response: {str} "
-                return JsonSerializer.Deserialize<Response>(str,options=serOpts)            
-            else 
+                return JsonSerializer.Deserialize<Response>(str,options=serOpts)
+            else
                 let! str = resp.Content.ReadAsStringAsync()
                 if Log.debug_logging then Log.info $"{str} "
-                let err = 
-                    try 
-                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)                        
+                let err =
+                    try
+                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
                         Some (ApiError err)
-                    with ex -> 
-                        None 
-                match err with 
+                    with ex ->
+                        None
+                match err with
                 | Some e -> return raise e
                 | None  -> return failwith $"{str}"
         }
 
-    let createWithDefaults (input:string) = 
-        create 
-            ({Request.Default with 
+    let createWithDefaults (input:string) =
+        create
+            ({Request.Default with
                 input=[
                    IOitem.Message {Message.Default with content=[Input_text {|text=input|}]}
-                ]}) 
+                ]})
             (defaultClient())
 

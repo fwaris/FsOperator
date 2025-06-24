@@ -8,24 +8,34 @@ type OPlanMemory() =
 
     [<KernelFunction("save_memory")>]
     [<Description("Save a key-value pair for later retrieval")>]
-    member this.save_memory(key:string, value:string) = 
+    member this.save_memory(key:string, value:string) =
         Log.info $"save_memory:{key} = {value}"
         map <- map |> Map.add key value
 
+    [<KernelFunction("dump_memory")>]
+    [<Description("Retrieve all key value pairs saved in memory")>]
+    member this.dump_memory() =
+        Log.info $"dump_memory()"
+        let memory =
+            map |> Map.toSeq |> Seq.map (fun (k,v) -> $"[{k}]=```{v}```")
+            |> String.concat "\r\n"
+        Log.info $"dump_memory()"
+        memory
+
     [<KernelFunction("get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
-    member this.get_all_keys() = 
+    member this.get_all_keys() =
         let ks = map.Keys |> Seq.toList
         Log.info $"get_all_keys: {ks}"
         ks
 
     [<KernelFunction("get_memory")>]
     [<Description("retrieve a value for the given key")>]
-    member this.get_memory(key:string) = 
+    member this.get_memory(key:string) =
         let v = map |> Map.tryFind key
         Log.info $"get_memory {key} = {v}"
         v
-        
+
 type OTaskTarget = OProcess of string*string option | OLink of string
 
 type OTask = {
@@ -36,9 +46,9 @@ type OTask = {
     reasoner    : string option
     voice       : string option
     tools       : FsResponses.Tool list
-    allowedSec  : int 
+    allowedSec  : int
 }
-    with 
+    with
         ///creates a new empty task with unique id assigned
         static member Create() =  {
                 id = newId()
@@ -51,16 +61,16 @@ type OTask = {
                 allowedSec = 60*10
             }
 
-type OTaskTransition = 
+type OTaskTransition =
     {
         ///<summary>
         ///Prompt template to decide which one of the available tasks to run next.<br />
-        ///Must be a SK prompt template with the following variable slots:<br /> 
+        ///Must be a SK prompt template with the following variable slots:<br />
         /// - {{taskDescriptions}} - will be used to supply the subtask descriptions<br />
         /// - {{context}} - will be filled with message history from previous task
         ///</summary>
-        transitionPrompt : string 
-        
+        transitionPrompt : string
+
         ///list of available tasks to choose from
         nodes            : ONode list
 
@@ -82,25 +92,25 @@ and All = {
     description:string option
 }
 
-and [<RequireQualifiedAccess>] ONode = 
+and [<RequireQualifiedAccess>] ONode =
     | One of OTask      //Leaf node containing the task
     | Choose of Choose  //execute one of many sub nodes - based on LLM decision involving transition prompt
     | All of All        //execute all sub nodes in sequence
-    with 
+    with
         member this.allSubtasks() =
-            let rec loop acc n = 
+            let rec loop acc n =
                 match n with
-                | One t -> (t::acc) 
+                | One t -> (t::acc)
                 | All all -> (acc,all.nodes) ||> List.fold loop
                 | Choose {transition={nodes=ns}} -> (acc,ns) ||> List.fold loop
             loop [] this
-    
+
 
 type OPlan = {
     description : string
     root  : ONode
 }
-    with 
+    with
         static member Default = {
                         description = ""
                         root = ONode.All {nodes=[]; description=None}
@@ -109,7 +119,7 @@ type OPlan = {
 type OTaskRun = {
     task     : OTask
     driver   : IUIDriver
-    messages : ChatMsg list    
+    messages : ChatMsg list
 }
 
 type OPlanRun = {
@@ -118,8 +128,8 @@ type OPlanRun = {
     completedTasks : OTaskRun list
     currentTask : OTaskRun option
 }
-with 
-    static member Create plan kernel = 
+with
+    static member Create plan kernel =
                     {
                         plan = plan
                         kernel = kernel
@@ -129,8 +139,8 @@ with
 
 module OPlan =
 
-    let sample() = 
-        let ln = 
+    let sample() =
+        let ln =
             { OTask.Create() with
                 target = OLink "https://www.linkedin.com"
                 description = "find people who post about generative ai"
@@ -140,21 +150,21 @@ related to generative AI and record there linkedin names and profile links.
 Use the save_memory function to record each name as you find it.
 Make sure to collect at least 5 names.
 """
-                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 }
-        let tw = 
+        let tw =
             { OTask.Create() with
                 target = OLink "https://www.twitter.com"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 description = "retrieve linkedIn people info from memory and get twitter handles"
                 cua = Some """
 list of names and linked in profile links. Search each name on twitter and obtain their
-twitter handle. 
+twitter handle.
 Use save_memory function to save each person's linked-in and twitter data
-    """        
-                reasoner = Some Prompts.``reasoner prompt for cua guidance``            
+    """
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
             }
-        let plan = 
+        let plan =
             { OPlan.Default with
                 description = "take linkedin people and find their twitter handle"
                 root = ONode.All {nodes= [ONode.One ln; ONode.One tw]; description=None}
@@ -166,34 +176,34 @@ Use save_memory function to save each person's linked-in and twitter data
     ///Choices:<br />
     /// - 1of3 - nothing more to do<br />
     /// - 2of3 - execute the OTask<br />
-    /// - 3of3 - transition to a Choose child 
+    /// - 3of3 - transition to a Choose child
     /// </summary>
-    let rec findNext (doneSet:Set<string>) = function 
+    let rec findNext (doneSet:Set<string>) = function
         | ONode.One t -> if doneSet.Contains t.id then Choice1Of3 () else Choice2Of3 t
-        | ONode.Choose {transition={nodes=ts}} as cts -> 
+        | ONode.Choose {transition={nodes=ts}} as cts ->
             let subIds = cts.allSubtasks() |> List.map _.id |> set
             let subsDone = Set.intersect doneSet subIds
-            if subsDone.Count = 0 then 
+            if subsDone.Count = 0 then
                 Choice3Of3 cts //none of the child tasks are yet done so need to make a transition here
             else
-                ts 
+                ts
                 |> List.map (findNext doneSet)
                 |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
-                |> Option.defaultValue (Choice1Of3 ())                
+                |> Option.defaultValue (Choice1Of3 ())
         | ONode.All {nodes=ts} ->
-            ts 
+            ts
             |> List.map (findNext doneSet)
             |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
-            |> Option.defaultValue (Choice1Of3 ())                
+            |> Option.defaultValue (Choice1Of3 ())
 
     let transition (txn:OTaskTransition) (planRun:OPlanRun) = async {
         //TODO
         return None
     }
-    
+
     let rec transitionToNext (planRun:OPlanRun)  = async {
         let doneSet = planRun.completedTasks |> List.map (fun tr -> tr.task.id) |> set
-        match findNext doneSet planRun.plan.root with 
+        match findNext doneSet planRun.plan.root with
         | Choice1Of3 _                 -> return None
         | Choice2Of3 t                 -> return Some t
         | Choice3Of3 (ONode.Choose c)  -> return! transition c.transition planRun
@@ -202,7 +212,7 @@ Use save_memory function to save each person's linked-in and twitter data
 
     let appendTask (tr:OTaskRun option) ts =  tr |> Option.map (fun t -> t::ts) |> Option.defaultValue ts
 
-    let startTimer (n:int) (f:IFlow<_>) = 
+    let startTimer (n:int) (f:IFlow<_>) =
         async {
             do! Async.Sleep (n * 1000)
             f.Post PlanFlow.TFi_EndAndReport
@@ -210,9 +220,9 @@ Use save_memory function to save each person's linked-in and twitter data
         |> Async.Start
 
     let runCurrentTask (planRun:OPlanRun) = async{
-        match planRun.currentTask with 
-        | Some ot -> 
-            let rt = PlanFlow.TaskState.Create 
+        match planRun.currentTask with
+        | Some ot ->
+            let rt = PlanFlow.TaskState.Create
                                             ot.task.cua.Value
                                             ot.task.reasoner
                                             ot.task.tools
@@ -220,42 +230,42 @@ Use save_memory function to save each person's linked-in and twitter data
 
             let completedTask = ref None
             use h = new ManualResetEvent(false)
-            let post = fun p -> 
+            let post = fun p ->
                 printfn "%A" p
-                match p with 
+                match p with
                 | PlanFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
                 | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
                 | PlanFlow.TFo_Action a -> ()//printfn "%A" a
                 | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
             let driver = (PlaywrightDriver.create().driver)
-            match ot.task.target with 
+            match ot.task.target with
             | OLink url -> do! driver.start url
             | OProcess (a,b) -> ()
             let flow = PlanFlow.create post (PlaywrightDriver.create().driver) rt
             flow.Post PlanFlow.TFi_Start
             startTimer ot.task.allowedSec flow
-            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3)      
-            match completedTask.Value with 
-            | Some t -> return {ot with messages = t.cuaMessages} 
-            | None   -> return failwith "no output from step"            
-        | None -> return failwith $"no task to run"        
+            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3)
+            match completedTask.Value with
+            | Some t -> return {ot with messages = t.cuaMessages}
+            | None   -> return failwith "no output from step"
+        | None -> return failwith $"no task to run"
     }
-   
+
     let step planRun = async {
         match! transitionToNext planRun with
-        | None -> 
+        | None ->
             return
-                {planRun with 
+                {planRun with
                     currentTask = None
                     completedTasks = appendTask planRun.currentTask planRun.completedTasks}
         | Some t ->
                 let tr = {task = t; driver = PlaywrightDriver.create().driver; messages=[]}
-                let planRun = 
-                        {planRun with 
+                let planRun =
+                        {planRun with
                             currentTask = Some tr
                             completedTasks = appendTask planRun.currentTask planRun.completedTasks
                          }
                 let! tr' = runCurrentTask planRun
-                return {planRun with currentTask = Some tr'}                
+                return {planRun with currentTask = Some tr'}
     }
 

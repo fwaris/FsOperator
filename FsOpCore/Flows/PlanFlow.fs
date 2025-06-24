@@ -10,10 +10,10 @@ open System.Text.Json.Schema
 module PlanFlow =
     let MAX_SNAPSHOTS = 3
     let MAX_REASONER_STATE = 10
-    
+
     ///flow input messages
     type PlanFLowMsgIn =
-        | TFi_Start 
+        | TFi_Start
         | TFi_Resume of string
         | TFi_EndAndReport
 
@@ -32,8 +32,8 @@ module PlanFlow =
         tools           : Tool list
         kernel          : Kernel
     }
-    with 
-        static member Create cuaPrompt reasonerPrompt tools kernel = 
+    with
+        static member Create cuaPrompt reasonerPrompt tools kernel =
                             {
                                cuaMessages = []
                                cuaPrompt = cuaPrompt
@@ -43,46 +43,52 @@ module PlanFlow =
                                reasonerState = []
                             }
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
-        member this.prependReasonerState items = 
-            let items =  items @ this.reasonerState |> List.truncate MAX_REASONER_STATE
-            let funcCallIds = 
-                items 
-                |> List.choose (function 
-                    | IOitem.Function_call f -> Some f.call_id 
-                    | IOitem.Function_call_output f -> Some f.call_id 
+        member this.prependReasonerState items =
+            let items = items @ this.reasonerState
+            let keep,drop =
+                if List.length items <= MAX_REASONER_STATE then
+                    items,[]
+                else
+                    List.take MAX_REASONER_STATE items, List.skip MAX_REASONER_STATE items
+            let funcCallIds = //any function calls in drop?
+                drop
+                |> List.choose (function
+                    | IOitem.Function_call f -> Some f.call_id
+                    | IOitem.Function_call_output f -> Some f.call_id
                     | _ -> None)
             let unpairedFuncs = funcCallIds |> List.countBy id |> List.filter (fun (i,c) -> c <> 2) |> List.map fst |> set
-            let items = 
-                items 
-                |> List.filter(function 
+            let items =
+                keep //remove function call items that are related to dropped items
+                |> List.filter(function
                     | IOitem.Function_call f -> unpairedFuncs.Contains f.call_id |> not
                     | IOitem.Function_call_output f -> unpairedFuncs.Contains f.call_id |> not
                     | _ -> true)
-            {this with reasonerState = items @ this.reasonerState |> List.truncate MAX_REASONER_STATE}
+            {this with reasonerState = items}
 
     type SubState = {
         cts          : CancellationTokenSource
         task         : TaskState
-        driver       : IUIDriver       
+        driver       : IUIDriver
         bus          : WBus<PlanFLowMsgIn,PlanFLowMsgOut>
         actions      : string list
     }
-        with 
+        with
             member this.prependCuaMessage msg = {this with task = this.task.prependCuaMessage msg}
             member this.prependAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
             member this.prependReasonerState items = {this with task = this.task.prependReasonerState items}
-            member this.prependSnapshot snapshot = 
+            member this.prependSnapshot snapshot =
                 let imageCntnt = Content.Input_image {|image_url = snapshot|}
                 [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerState
-            member this.actionsString() = 
-                this.actions 
-                |> List.rev 
-                |> List.indexed 
-                |> List.map (fun (i,x) -> $"{i}: {x}") 
+            member this.actionsString() =
+                this.actions
+                |> List.rev
+                |> List.indexed
+                |> List.map (fun (i,x) -> $"{i}: {x}")
                 |> String.concat ","
+            member this.dfltCuaReq = lazy(CuaReq.Default) //lazy({CuaReq.Default with nonCuaTools = this.task.tools})
 
     //functions for Reasonser model
-    module Rsnr = 
+    module Rsnr =
         type CuaContinueResponse = {
             cua_should_continue : bool
             message : string
@@ -92,19 +98,19 @@ module PlanFlow =
             cua_achieved_task : bool
             cua_guidance : string
         }
-        
+
         ///handle all the functions calls found response message
         let callFunctions ss resp = async {
-            let fns = 
-                resp.output 
-                |> List.choose (function 
+            let fns =
+                resp.output
+                |> List.choose (function
                     | IOitem.Function_call fn -> Some fn
                     | _                       -> None)
             let mutable fouts = []
             for f in fns do
                 let! rslt = FlUtils.invokeFunction ss.task.kernel f.name f.arguments
                 let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
-                fouts <- fout::fouts               
+                fouts <- fout::fouts
             let ss = ss.prependReasonerState fouts
             return ss
         }
@@ -120,37 +126,37 @@ module PlanFlow =
                                     instructions = reasonerInstructions
                                     tools = ss.task.tools
                                     store = false
-                                    model=Models.gpt_41
+                                    model=Models.o4_mini
                                     text = responseFormat |> Option.map RUtils.structuredFormat
                                     truncation = Some Truncation.auto
                                     metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                                 }
-                do! FlResps.sendRequest Workflow.ReasonerMsgWithCorrId ss.bus.PostInput req                                    
+                do! FlResps.sendRequest Workflow.ReasonerMsgWithCorrId ss.bus.PostInput req
             }
             |> FlResps.catch ss.bus.PostInput
 
         ///cua may be stuck; use this to terminate early and summarize the progress the plan can continue
-        let stopAndSummarize (ss:SubState) = 
-            let id = newId()        
-            Prompts.kernelArgs [Vars.taskInstructions,ss.task.cuaPrompt] 
+        let stopAndSummarize (ss:SubState) =
+            let id = newId()
+            Prompts.kernelArgs [Vars.taskInstructions,ss.task.cuaPrompt]
             |> Prompts.renderPrompt Prompts.``cua early termination prompt``
             |> Some
             |> postToReasoner id ss None
             id
 
-        ///send messaage to reasoner to get guidance for cua for the next action
-        let getGuidanceForCuaNextAction ss reasonerPrompt = 
+        ///send message to reasoner to get guidance for cua for the next action
+        let getGuidanceForCuaNextAction ss reasonerPrompt =
             let id = newId()
             async {
-                let cuaMessageHistory = 
-                    ss.task.cuaMessages 
+                let cuaMessageHistory =
+                    ss.task.cuaMessages
                     |> List.map (function
                         | User c -> $"user: {c}"
                         | Assistant m -> $"assistant: {m.content}")
                     |> String.concat System.Environment.NewLine
-                let args = 
-                    Prompts.kernelArgs 
-                        [ 
+                let args =
+                    Prompts.kernelArgs
+                        [
                             Vars.cuaInstructions, ss.task.cuaPrompt
                             Vars.actionHistory,ss.actionsString()
                             Vars.cuaMessageHistory,cuaMessageHistory
@@ -162,18 +168,18 @@ module PlanFlow =
             id
 
         ///ask reasoner to respond to cua as a user would, to continue cua after pause
-        let getGuidanceAfterCuaPause ss = 
+        let getGuidanceAfterCuaPause ss =
             let id = newId()
             async {
-                let cuaMessageHistory = 
-                    ss.task.cuaMessages 
+                let cuaMessageHistory =
+                    ss.task.cuaMessages
                     |> List.map (function
                         | User c -> $"user: {c}"
                         | Assistant m -> $"assistant: {m.content}")
                     |> String.concat System.Environment.NewLine
-                let args = 
-                    Prompts.kernelArgs 
-                        [ 
+                let args =
+                    Prompts.kernelArgs
+                        [
                             Vars.cuaInstructions, ss.task.cuaPrompt
                             Vars.actionHistory,ss.actionsString()
                             Vars.cuaMessageHistory,cuaMessageHistory
@@ -185,25 +191,25 @@ module PlanFlow =
             id
 
     //functions for Cua model
-    module Cua = 
+    module Cua =
         ///if there is text content in resp then add that to chat history
-        let prependAsstMsg (ss:SubState) resp = 
-            FlResps.extractText resp 
+        let prependAsstMsg (ss:SubState) resp =
+            FlResps.extractText resp
             |> Option.map (fun text -> ss.prependCuaMessage (Assistant {id=resp.id; content=text}))
             |> Option.defaultValue ss
 
         ///if there is text content in resp then add that to chat history
-        let prependUserMsg (ss:SubState) resp = 
-            FlResps.extractText resp 
+        let prependUserMsg (ss:SubState) resp =
+            FlResps.extractText resp
             |> Option.map (fun text -> ss.prependCuaMessage (User text))
             |> Option.defaultValue ss
 
         ///handle Cua respones to potentially perform a computer call
         let performComputerCall (ss:SubState) resp = async {
             //process computer call
-            let! (ss,outMsgs,visualState) = 
+            let! (ss,outMsgs,visualState) =
                 match FlResps.computerCall resp with
-                | Some cb -> 
+                | Some cb ->
                     async {
                         do! Actions.doAction 2 ss.driver cb.action
                         let! visualState = snapshot ss.driver
@@ -218,22 +224,23 @@ module PlanFlow =
             return ss,outMsgs,visualState
         }
 
-        ///handle all the functions calls found response message
+        ///handle all the functions calls found in the response message
         let callFunctions ss resp = async {
-            let fns = 
-                resp.output 
-                |> List.choose (function 
+            let fns =
+                resp.output
+                |> List.choose (function
                     | IOitem.Function_call fn -> Some fn
                     | _                       -> None)
             let mutable fouts = []
             for f in fns do
                 let! rslt = FlUtils.invokeFunction ss.task.kernel f.name f.arguments
                 let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
-                fouts <- fout::fouts                           
+                fouts <- fout::fouts
             return fouts
         }
 
-        let postFunctionResults ss cuaResp fnouts = 
+        ///send the function call results back to CUA model
+        let postCuaFuncResults ss cuaResp fnouts =
             async {
                 let req = {Request.Default with
                                 input = fnouts
@@ -248,12 +255,12 @@ module PlanFlow =
 
 
         ///send the results of performing action to cua (along with optional additional guidance)
-        let postCuaNext ss vs (cuaResp:Response) cuaInstr = 
+        let postCuaNext ss vs (cuaResp:Response) cuaInstr =
 
-            match vs, FlResps.computerCall cuaResp with 
-            | Some (snapshot,w,h,url,env), Some cc ->            
+            match vs, FlResps.computerCall cuaResp with
+            | Some (snapshot,w,h,url,env), Some cc ->
                 let cuaTool = Tool_Computer_use {|display_height = h; display_width = w; environment = env|}
-                let cc_out = 
+                let cc_out =
                     {
                         call_id = cc.call_id
                         acknowledged_safety_checks = FlResps.safetyChecks cuaResp
@@ -261,13 +268,13 @@ module PlanFlow =
                         current_url = url
                     }
                     |> IOitem.Computer_call_output
-                let input = 
-                    match cuaInstr with 
-                    | Some text ->  
+                let input =
+                    match cuaInstr with
+                    | Some text ->
                         Log.info $"Reasoner guidance: `{text}`"
                         let textMsg = {Message.Default with content = [Content.Input_text {|text=text|}]}
                         [cc_out;IOitem.Message textMsg]
-                    | None -> [cc_out]            
+                    | None -> [cc_out]
                 let req = {Request.Default with
                                 input = input; tools=[cuaTool]
                                 previous_response_id = Some cuaResp.id
@@ -280,19 +287,21 @@ module PlanFlow =
             | _,None -> async {return failwith "no computer call output found in response"}
             |> FlResps.catch ss.bus.PostInput
 
+
+
         ///resume with a new cua loop (after the old loop ended with no 'computer call')
         let postResumeCua ss snapshot =
             async {
                 let chatHistory = FlResps.truncatedChatHistory ss.task.cuaMessages
-                FlResps.postStartCua ss.bus.PostInput (Some ss.task.cuaPrompt) snapshot chatHistory
+                FlResps.postStartCua ss.bus.PostInput {ss.dfltCuaReq.Value with instructions=(Some ss.task.cuaPrompt); snapshot=snapshot; chatHistory=chatHistory}
             }
-            |> FlResps.catch ss.bus.PostInput 
+            |> FlResps.catch ss.bus.PostInput
 
     //state machine
-    module States = 
+    module States =
         ///returns true if no compter call present
-        let noCC resp = 
-            let cc = FlResps.computerCall resp        
+        let noCC resp =
+            let cc = FlResps.computerCall resp
             cc |> Option.isNone
 
 
@@ -303,33 +312,33 @@ module PlanFlow =
 
         ///convenience 'active pattern' to match a W_Reasoner msg
         ///with the given correlation id
-        let (|Reasoner|_|) corrId msg = 
-            match msg with 
+        let (|Reasoner|_|) corrId msg =
+            match msg with
             | W_Reasoner (id,resp) when id = corrId -> Some resp
             | _ -> None
 
         ///convenience 'active pattern' to match a W_Reasoner msg
-        ///with the given correlation id and with at least one function call 
-        let (|FuncCall|_|) corrId msg = 
-            match msg with 
+        ///with the given correlation id and with at least one function call
+        let (|FuncCall|_|) corrId msg =
+            match msg with
             | Reasoner corrId (resp) when FlResps.hasFunction resp -> Some resp
             | _                                                    -> None
 
         ///convenience 'active pattern' to match a W_Reasoner msg
-        ///with the given correlation id and with at least one function call 
+        ///with the given correlation id and with at least one function call
         let (|Cua_FuncCall|_|) = function
             | W_Cua (resp) when FlResps.hasFunction resp -> Some resp
-            | _                                                    -> None
+            | _                                          -> None
 
         (* --- states --- *)
 
-        let rec s_start ss msg = async {    
+        let rec s_start ss msg = async {
             Log.info $"in s_start"
-            match msg with 
+            match msg with
             | W_Err e         -> return !!(s_terminate ss (Some e))
-            | W_App TFi_Start -> let! (snapshot,w,h,url,env) = snapshot ss.driver
+            | W_App TFi_Start -> let! (snapshot,w,h,url,env) as sn = snapshot ss.driver
                                  let ss = ss.prependSnapshot snapshot //save for reasoner
-                                 FlResps.postStartCua ss.bus.PostInput (Some ss.task.cuaPrompt) (snapshot,w,h,url,env) [] 
+                                 FlResps.postStartCua ss.bus.PostInput {ss.dfltCuaReq.Value with instructions=(Some ss.task.cuaPrompt); snapshot=sn}
                                  return !!(s_loop ss)
             | x               -> Log.warn $"s_start: expecting {TFi_Start} message to start flow but got {x}"
                                  return !!(s_start ss)
@@ -337,44 +346,44 @@ module PlanFlow =
 
         and s_loop ss msg = async {
             Log.info $"in s_loop"
-            match msg with 
+            match msg with
             | W_Err e                    -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport     -> let corrId = Rsnr.stopAndSummarize ss
-                                            return !!(s_summarizing ss corrId) 
+                                            return !!(s_summarizing ss corrId)
             | Cua_FuncCall (resp)        -> let! fouts = Cua.callFunctions ss resp
-                                            Cua.postFunctionResults ss resp fouts
+                                            Cua.postCuaFuncResults ss resp fouts
                                             return !!(s_loop ss)
             | W_Cua resp when noCC resp  -> let ss = Cua.prependAsstMsg ss resp    //cua not asking for comptuer call
-                                            let corrId = Rsnr.getGuidanceAfterCuaPause ss 
+                                            let corrId = Rsnr.getGuidanceAfterCuaPause ss
                                             return !!(s_pause ss corrId)
             | W_Cua resp                 -> let ss = Cua.prependAsstMsg ss resp
                                             let! ss,outMsgs2,visualState = Cua.performComputerCall ss resp
                                             if ss.task.reasonerPrompt.IsSome then  //get reasoner guidance if prompt set
                                                 let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value
                                                 return F(s_reason ss (visualState,resp) corrId,outMsgs2)
-                                            else 
+                                            else
                                                 Cua.postCuaNext ss visualState resp None
                                                 return F(s_loop ss,outMsgs2)
             | x                          -> return ignoreMsg (s_loop ss) x "s_loop"
-        }            
+        }
 
         and s_reason ss (vs,cuaResp) corrId msg  = async {
             Log.info $"in s_reason"
-            match msg with 
+            match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
-                                        return !!(s_summarizing ss corrId) 
+                                        return !!(s_summarizing ss corrId)
             | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let! ss = Rsnr.callFunctions ss resp
                                         let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value //continue after func. calls
                                         return !!(s_reason ss (vs,cuaResp) corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let resp = RUtils.parseContent<Rsnr.CuaInstructionsResponse> resp //get structured output
-                                        match resp with 
+                                        match resp with
                                         | None -> return failwith $"reasoner model did not send appropriate resp. for cua guidance"
                                         | Some (Choice2Of2 e) -> return failwith $"reaonser model refused to provide structured output '{e}'"
                                         | Some (Choice1Of2 cuaInstr) ->
-                                            if cuaInstr.cua_achieved_task then 
+                                            if cuaInstr.cua_achieved_task then
                                                 return F(s_terminate ss None, [TFo_Done ss.task])
                                             else
                                                 Cua.postCuaNext ss vs cuaResp (Some cuaInstr.cua_guidance)
@@ -382,12 +391,12 @@ module PlanFlow =
             | x                      -> return ignoreMsg (s_reason ss (vs,cuaResp) corrId) x "s_reason"
         }
 
-        and s_pause ss corrId msg = async {   
+        and s_pause ss corrId msg = async {
             Log.info $"in s_pause"
-            match msg with 
+            match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
-                                        return !!(s_summarizing ss corrId) 
+                                        return !!(s_summarizing ss corrId)
             | W_App (TFi_Resume tx)  -> let ss = ss.prependCuaMessage (User tx)
                                         let! (sn,_,_,_,_) as snapshot = FlUtils.snapshot(ss.driver)
                                         let ss = ss.prependSnapshot sn
@@ -395,7 +404,7 @@ module PlanFlow =
                                         return !!(s_loop ss)
             | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let! ss = Rsnr.callFunctions ss resp
-                                        let corrId = Rsnr.getGuidanceAfterCuaPause ss 
+                                        let corrId = Rsnr.getGuidanceAfterCuaPause ss
                                         return !!(s_pause ss corrId)
             | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
                                         let text = RUtils.outputText resp
@@ -406,14 +415,14 @@ module PlanFlow =
 
         and s_summarizing ss corrId msg = async {
             Log.info $"in s_summarizing"
-            match msg with 
+            match msg with
             | W_Err e                 -> return !!(s_terminate ss (Some e))
             | FuncCall corrId (resp)  -> let ss = ss.prependReasonerState resp.output
                                          let! ss = Rsnr.callFunctions ss resp
                                          let corrId = Rsnr.stopAndSummarize ss
                                          return !!(s_summarizing ss corrId)
-            | Reasoner corrId (resp)  -> let ss = FlResps.extractText resp  
-                                                  |> Option.map (fun txt -> ss.prependCuaMessage (Assistant {id=resp.id; content=txt})) 
+            | Reasoner corrId (resp)  -> let ss = FlResps.extractText resp
+                                                  |> Option.map (fun txt -> ss.prependCuaMessage (Assistant {id=resp.id; content=txt}))
                                                   |> Option.defaultValue ss
                                          return F(s_terminate ss None, [TFo_Done ss.task])
             | x                       -> return ignoreMsg (s_summarizing ss corrId) x "s_summarizing"
@@ -421,8 +430,8 @@ module PlanFlow =
 
         and s_terminate ss (e:WErrorType option) msg = async {
             Log.info $"in s_terminate"
-            e 
-            |> Option.iter (fun e -> 
+            e
+            |> Option.iter (fun e ->
                 ss.bus.postOutput (TFo_Error e)
                 Log.error (string e)
                 ss.cts.CancelAfter(1000))
@@ -440,7 +449,7 @@ module PlanFlow =
             task = task
             bus=bus
             driver=driver
-            actions = []        
+            actions = []
         }
 
         //initial state
@@ -452,7 +461,7 @@ module PlanFlow =
         //return handler to talk to flow
         {new IFlow<PlanFLowMsgIn> with
 
-            member _.Terminate () =                 
+            member _.Terminate () =
                 async {
                     Log.info "terminating flow ..."
                     do! Async.Sleep(1000)
@@ -460,7 +469,7 @@ module PlanFlow =
                     ss0.bus.Close()
                 }
                 |> Async.Start
- 
+
             member _.Post msg = bus.PostInput (W_App msg)
         }
 
