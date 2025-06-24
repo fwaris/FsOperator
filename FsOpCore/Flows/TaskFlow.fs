@@ -36,7 +36,7 @@ module TaskFlow =
             member this.appendAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
             member this.setPrompt b = {this with chat = Chat.setPrompt b this.chat}
 
-    ///handle Cua respones to potentially perform a computer call
+    ///handle Cua responses to potentially perform a computer call
     let performCall (ss:SubState) resp = async {
         //process computer call
         let! (ss,outMsgs,visualState) =

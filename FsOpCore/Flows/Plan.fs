@@ -2,40 +2,8 @@
 open Microsoft.SemanticKernel
 open System.ComponentModel
 open System.Threading
-
-///semantic kernel 'plugin' class that implements memory functions
-type OPlanMemory() =
-    let mutable map = Map.empty
-
-    [<KernelFunction("save_memory")>]
-    [<Description("Save a key-value pair for later retrieval")>]
-    member this.save_memory(key:string, value:string) =
-        Log.info $"save_memory:{key} = {value}"
-        map <- map |> Map.add key value
-
-    [<KernelFunction("dump_memory")>]
-    [<Description("Retrieve all key value pairs saved in memory")>]
-    member this.dump_memory() =
-        Log.info $"dump_memory()"
-        let memory =
-            map |> Map.toSeq |> Seq.map (fun (k,v) -> $"[{k}]=```{v}```")
-            |> String.concat "\r\n"
-        Log.info $"dump_memory()"
-        memory
-
-    [<KernelFunction("get_all_keys")>]
-    [<Description("retrieve all keys in the memory store ")>]
-    member this.get_all_keys() =
-        let ks = map.Keys |> Seq.toList
-        Log.info $"get_all_keys: {ks}"
-        ks
-
-    [<KernelFunction("get_memory")>]
-    [<Description("retrieve a value for the given key")>]
-    member this.get_memory(key:string) =
-        let v = map |> Map.tryFind key
-        Log.info $"get_memory {key} = {v}"
-        v
+open System.Text.Json
+open System.Text.Json.Serialization
 
 ///represents the target computer environment (browser url or windows exe) for a task
 type OTaskTarget = OProcess of string*string option | OLink of string
@@ -147,6 +115,86 @@ with
                         currentTask = None
                     }
 
+///plugin that provides a navigation function
+type Navigator(plan:Ref<OPlanRun> ) =
+    [<KernelFunction("home")>]
+    [<Description("Load initial task page")>]
+    member this.home() =
+        let comp = async {
+            Log.info $"home()"
+            match plan.Value.currentTask with
+            | Some t ->
+                match t.task.target with
+                | OLink url -> do! t.driver.start url
+                | _         -> ()
+            | None -> ()
+            return "home page loaded"
+        }
+        Async.StartAsTask comp
+
+///semantic kernel 'plugin' class that implements memory functions
+type OPlanMemory() =
+    let mutable map = Map.empty
+    static member statefile = lazy(homePath.Value @@ "memory.json")
+
+    static member serOpts = lazy(
+        let opts =JsonSerializerOptions()
+        opts.WriteIndented <- true
+        opts)
+
+    member this.SetMemory(m) = map <- m
+
+    static member LoadState() =
+        try
+            if System.IO.File.Exists(OPlanMemory.statefile.Value) then
+                use str = System.IO.File.OpenRead(OPlanMemory.statefile.Value)
+                let map = System.Text.Json.JsonSerializer.Deserialize<Map<string,string>>(str)
+                let mem = new OPlanMemory()
+                mem.SetMemory(map)
+                mem
+            else
+                new OPlanMemory()
+        with ex ->
+            Log.exn(ex, nameof OPlanMemory.LoadState)
+            new OPlanMemory()
+
+    member this.Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=OPlanMemory.serOpts.Value)
+
+    member this.SaveState() =
+        try
+            use str = System.IO.File.Create OPlanMemory.statefile.Value
+            JsonSerializer.Serialize(str,map, options=OPlanMemory.serOpts.Value)
+        with ex ->
+            Log.exn(ex,nameof this.SaveState)
+
+    [<KernelFunction("save_memory")>]
+    [<Description("Save a key-value pair for later retrieval")>]
+    member this.save_memory(key:string, value:string) =
+        Log.info $"save_memory:{key} = {value}"
+        map <- map |> Map.add key value
+        this.SaveState()
+        "saved"
+
+    [<KernelFunction("dump_memory")>]
+    [<Description("Retrieve all key value pairs saved in memory")>]
+    member this.dump_memory() =
+        Log.info $"dump_memory()"
+        this.Serialize(map)
+
+    [<KernelFunction("get_all_keys")>]
+    [<Description("retrieve all keys in the memory store ")>]
+    member this.get_all_keys() =
+        let ks = Map.keys map
+        Log.info $"get_all_keys: {ks}"
+        this.Serialize(ks)
+
+    [<KernelFunction("get_memory")>]
+    [<Description("retrieve a value for the given key")>]
+    member this.get_memory(key:string) =
+        let v = map |> Map.tryFind key
+        Log.info $"get_memory {key} = {v}"
+        this.Serialize(v)
+
 module OPlan =
     ///minimal 2-task sample plan
     let sample() =
@@ -231,7 +279,7 @@ Use save_memory function to save each person's linked-in and twitter data
         }
         |> Async.Start
 
-
+    ///actual implementation of 'home' function in the kernel
     let runCurrentTask (planRun:OPlanRun) = async{
         match planRun.currentTask with
         | None -> return failwith $"no task to run"
@@ -274,6 +322,7 @@ Use save_memory function to save each person's linked-in and twitter data
                     completedTasks = appendTask planRun.currentTask planRun.completedTasks}
         | Some t ->
                 let tr = {task = t; driver = PlaywrightDriver.create().driver; messages=[]}
+
                 let planRun =
                         {planRun with
                             currentTask = Some tr
@@ -283,10 +332,11 @@ Use save_memory function to save each person's linked-in and twitter data
                 return {planRun with currentTask = Some tr'}
     }
 
-    let rec run planRun = async {
+    let rec run (planRef:Ref<OPlanRun>) planRun = async {
+        planRef.Value <- planRun
         let! planRun = step planRun
         if planRun.currentTask.IsSome then
-            return! run planRun
+            return! run planRef planRun
         else
             return planRun
     }

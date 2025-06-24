@@ -7,6 +7,7 @@ module Samples =
     let sample() =
         let tHours =
             { OTask.Create() with
+                id = "load_hours"
                 description = "save task and daily hours from jira"
                 target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
@@ -20,8 +21,8 @@ Note down the task id, date and hours and save them to memory.
 
 Extract the information from the screenshots provided and invoke the save_memory function to save the data into memory.
 
-*** ALL information you need should all be available on a SINGLE PAGE.
-If a horizontal or vertical scroll bar is visible for the Timesheet view, scroll appropriately to see all data.
+**ALL information you need should all be available on a SINGLE PAGE. Don't click links to go to other pages.**
+*If a horizontal or vertical scroll bar is visible for the Timesheet view*, scroll appropriately to see all data.
 
 Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 
@@ -31,12 +32,13 @@ End the task when the relevant data has been saved.
 
         let tCapability =
             { OTask.Create() with
+                id = "get_capability_ids"
                 description = "get capability ids for each task in jira"
                 target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 cua = Some """Retrieve the task ids and hours from memory that were saved by a previous task.
-Your goal is to record the Capability ID: (Starts with ‘CAP’) for each task
+Your goal is to record the Capability ID: (Starts with ‘CAP’) for each task id
 
 How to Find the Capability ID:
 Open Task Details:
@@ -55,18 +57,16 @@ On the story page, click on the Feature Link.
 Get Capability ID:
 On the feature page, locate the Capability ID (it starts with “CAP”).
 
-Store all collected data in memory for each task in Tempo. This information will be used for a later, downstream task.
+Collect and save Capability ID
 
-Note you can use the 'back' button to go back, if lost.
+End task when all Capability IDs have been saved
 
-Only gather the data needed. Make no other changes.
-
-End task when all task-hours for the week have been saved.
-
+Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 """
                 }
         let t_tTime =
             { OTask.Create() with
+                id = "enter_hours_into_t-time"
                 target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 description = "Enter capability hours into T-Time"
@@ -82,26 +82,36 @@ End task when all task-hours for the week have been saved.
         let plan =
             { OPlan.Default with
                 description = "Take hours from jira and enter them into t-time"
-                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
+//                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
+                root = ONode.All {nodes= [ONode.One tCapability; ONode.One t_tTime]; description=None}
             }
         plan
 
 let s1 = Samples.sample()
 
 //FsResponses.Log.debug_logging <- true
-let kernel =
+let kernel planRef =
     let b = Kernel.CreateBuilder()
-    b.Plugins.AddFromType<OPlanMemory>() |>  ignore
+    let mem = OPlanMemory()
+    mem.save_memory("AGAP-8515", "22/Jun/25: 0; 23/Jun/25: 8; 24/Jun/25: 8; 25/Jun/25: 0; 26/Jun/25: 0; 27/Jun/25: 0; 28/Jun/25: 0") |> ignore
+//    b.Plugins.AddFromObject(OPlanMemory.LoadState()) |> ignore
+    b.Plugins.AddFromObject(mem) |> ignore
+    b.Plugins.AddFromObject(Navigator(planRef)) |> ignore
     b.Build()
+
+//holder for runtime plan (provides context for some function calls)
+let planRef = ref Unchecked.defaultof<_>
 
 //kernel.Plugins.GetFunctionsMetadata() |> Seq.iter (fun x-> printfn "%s.%s" x.PluginName x.Name)
 //kernel.Plugins.GetFunction("OPlanMemory", "save_memory")
-let s1r = OPlanRun.Create s1 kernel
+let s1r = OPlanRun.Create s1 (kernel planRef)
 
-let t1 = OPlan.run s1r |> Async.RunSynchronously
+//let t1 = OPlan.run s1r |> Async.RunSynchronously
+let s2r = OPlan.run planRef s1r |> Async.RunSynchronously
 
-for t in t1.completedTasks do
+for t in s1r.completedTasks do
     for m in t.messages do
         printfn "%A" m
 
 let i = 1
+

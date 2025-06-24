@@ -4,8 +4,6 @@ open System.Threading
 open Microsoft.SemanticKernel
 open FsResponses
 open FlUtils
-open System.Text.Json
-open System.Text.Json.Schema
 
 module PlanFlow =
     let MAX_SNAPSHOTS = 3
