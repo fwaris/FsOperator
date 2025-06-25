@@ -37,29 +37,20 @@ End the task when the relevant data has been saved.
                 target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
-                cua = Some """Retrieve the task ids and hours from memory that were saved by a previous task.
-Your goal is to record the Capability ID: (Starts with ‘CAP’) for each task id
+                cua = Some """Your goal is to save the Capability ID for each jira task
 
-How to Find the Capability ID:
-Open Task Details:
-Click on the task key to view task details.
+First, retrieve jira task ids from memory.
 
-Locate Parent Story:
-At the top navigation links, find the sequence:
-[Team Link] / [Story Link] / [Task Link]
+For each jira task id (that has hours) do the following:
+1. Task Details: Use search box to locate the task details page
+2. Parent Story: Breadcrumbs at top: [...] / [Story Link] / [Task Link]; use Story Link
+3. Parent Feature: Breadcrumbs at top: [...] / [Feature Link] / [Story Link]; use Feature Link
+4. Capability Id : On Feature Page Look for the Capability Id (starts with 'CAP')
+5. Save capability id for each jira task id into memory
+6. Use 'home' function to get back to the home page
+7. Repeat 1. to 6. for the next jira task with hours, if any
 
-Go to Story Page:
-Click the Story Link to open the story.
-
-Find Feature Link:
-On the story page, click on the Feature Link.
-
-Get Capability ID:
-On the feature page, locate the Capability ID (it starts with “CAP”).
-
-Collect and save Capability ID
-
-End task when all Capability IDs have been saved
+**End the CUA task when the Capability IDs for all tasks have been saved.**
 
 Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 """
@@ -70,12 +61,27 @@ Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
                 target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 description = "Enter capability hours into T-Time"
-                cua = Some """Retrieve the Capability Ids and hours from memory.
-    Calculate the total hours for each Capability for each day.
-    Enter the search for the capability in "Capability" search box.
-    If the capability exist the enter the hours for each day for that capability.
-    Save the T-Time hours.
-    Do not "Submit", just "Save".
+                cua = Some """Your goal is to add rows for each Capability ID, found in memory, for the selected week. The row contains hours
+for each weekday for jira tasks related to the capability.
+
+Retrieve Capability and jira task data from memory.
+
+**Select the date range on the page that matches the date range of jira tasks found in memory.**
+
+For each Capability ID in memory do:
+1. Select the Capability by entering the Capability ID in the 'Capability' box 
+1.1 Then select the Capability name that shows in the filtered list
+2. Select "NEW Functionality: Application Coding" for 'Activity Id'
+3. Add row
+4. Enter hours for each day
+5. Repeate 1. to 5. for the next capability, if any
+
+Note: to enter hours click in the hours field; type CTRL-A to select the existing value and
+then enter the new value so the old value is completely replaced.
+
+Do not "Submit", just "Save" 
+
+The task ends when call Capabilities have been entered.
     """
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
             }
@@ -83,7 +89,8 @@ Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
             { OPlan.Default with
                 description = "Take hours from jira and enter them into t-time"
 //                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
-                root = ONode.All {nodes= [ONode.One tCapability; ONode.One t_tTime]; description=None}
+                //root = ONode.All {nodes= [ONode.One tCapability; ONode.One t_tTime]; description=None}
+                root = ONode.All {nodes= [ONode.One t_tTime]; description=None}
             }
         plan
 
@@ -94,6 +101,7 @@ let kernel planRef =
     let b = Kernel.CreateBuilder()
     let mem = OPlanMemory()
     mem.save_memory("AGAP-8515", "22/Jun/25: 0; 23/Jun/25: 8; 24/Jun/25: 8; 25/Jun/25: 0; 26/Jun/25: 0; 27/Jun/25: 0; 28/Jun/25: 0") |> ignore
+    mem.save_memory("AGAP-8515", "CAP-12033") |> ignore
 //    b.Plugins.AddFromObject(OPlanMemory.LoadState()) |> ignore
     b.Plugins.AddFromObject(mem) |> ignore
     b.Plugins.AddFromObject(Navigator(planRef)) |> ignore

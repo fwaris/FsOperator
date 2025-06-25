@@ -4,6 +4,7 @@ open System.ComponentModel
 open System.Threading
 open System.Text.Json
 open System.Text.Json.Serialization
+open System.Collections.Concurrent
 
 ///represents the target computer environment (browser url or windows exe) for a task
 type OTaskTarget = OProcess of string*string option | OLink of string
@@ -134,7 +135,7 @@ type Navigator(plan:Ref<OPlanRun> ) =
 
 ///semantic kernel 'plugin' class that implements memory functions
 type OPlanMemory() =
-    let mutable map = Map.empty
+    let mutable bag = Map.empty
     static member statefile = lazy(homePath.Value @@ "memory.json")
 
     static member serOpts = lazy(
@@ -142,14 +143,15 @@ type OPlanMemory() =
         opts.WriteIndented <- true
         opts)
 
-    member this.SetMemory(m) = map <- m
+    member this.SetMemory(m) = bag <- m
 
     static member LoadState() =
         try
             if System.IO.File.Exists(OPlanMemory.statefile.Value) then
                 use str = System.IO.File.OpenRead(OPlanMemory.statefile.Value)
-                let map = System.Text.Json.JsonSerializer.Deserialize<Map<string,string>>(str)
+                let map = System.Text.Json.JsonSerializer.Deserialize<Map<string,string list>>(str)
                 let mem = new OPlanMemory()
+                let bag = ConcurrentBag<string>()
                 mem.SetMemory(map)
                 mem
             else
@@ -160,38 +162,44 @@ type OPlanMemory() =
 
     member this.Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=OPlanMemory.serOpts.Value)
 
-    member this.SaveState() =
+    static member private _SaveState(map:Map<string,string list>) =
         try
             use str = System.IO.File.Create OPlanMemory.statefile.Value
             JsonSerializer.Serialize(str,map, options=OPlanMemory.serOpts.Value)
         with ex ->
-            Log.exn(ex,nameof this.SaveState)
+            Log.exn(ex,nameof OPlanMemory._SaveState)
 
     [<KernelFunction("save_memory")>]
     [<Description("Save a key-value pair for later retrieval")>]
     member this.save_memory(key:string, value:string) =
         Log.info $"save_memory:{key} = {value}"
-        map <- map |> Map.add key value
-        this.SaveState()
+        lock bag (fun _ -> 
+            bag <-
+                bag 
+                |> Map.tryFind key 
+                |> Option.map (fun vs -> bag |> Map.add key (value::vs))
+                |> Option.defaultWith (fun _ -> bag |> Map.add key [value])
+            OPlanMemory._SaveState(bag)
+        )
         "saved"
 
     [<KernelFunction("dump_memory")>]
     [<Description("Retrieve all key value pairs saved in memory")>]
     member this.dump_memory() =
         Log.info $"dump_memory()"
-        this.Serialize(map)
+        this.Serialize(bag)
 
     [<KernelFunction("get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
     member this.get_all_keys() =
-        let ks = Map.keys map
+        let ks = Map.keys bag |> Seq.toList
         Log.info $"get_all_keys: {ks}"
         this.Serialize(ks)
 
     [<KernelFunction("get_memory")>]
     [<Description("retrieve a value for the given key")>]
     member this.get_memory(key:string) =
-        let v = map |> Map.tryFind key
+        let v = bag |> Map.tryFind key
         Log.info $"get_memory {key} = {v}"
         this.Serialize(v)
 
