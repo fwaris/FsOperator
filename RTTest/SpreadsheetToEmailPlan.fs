@@ -54,8 +54,8 @@ let create() =
         let plan =
             { OPlan.Default with
                 description = "Take contacts from Excel and send email"
-                //root = ONode.All {nodes= [ONode.One tGetEmails; ONode.One tSendEmails]; description=None}
-                root = ONode.All {nodes= [ONode.One tSendEmails]; description=None}
+                root = ONode.All {nodes= [ONode.One tGetEmails; ONode.One tSendEmails]; description=None}
+                //root = ONode.All {nodes= [ONode.One tSendEmails]; description=None}
             }
         plan
 
