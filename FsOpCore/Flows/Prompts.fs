@@ -61,7 +61,9 @@ Avoid multi-step instructions.
 
 Be concise.
 
-Only provide the immediate next step to help the CUA continue.
+**Only provide the immediate next step to help the CUA continue.** Do not issue multi-step instrucitons. For example, to enter text into a field, ask CUA first to click in or focus the field. Wait to make sure the cursor is blinking in that field. Then issue the *type* <text> instructions. In the next snapshot ensure the text was  actually entered.
+Review the latest snapshot image after CUA action and issue the next instruction accordinly. *Don't assume that CUA has actually followed through*. CUA may delay following instructions so they may have to be repeated. 
+
 
 To save and retrieve memory directly use the functions provided.
 Extract relevant textual information from the screenshots images provided.
@@ -80,6 +82,8 @@ If the is complete, respond accordingly.
 {{{{${Vars.actionHistory}}}}}
 
 Today is {{time.today}}
+
+Note: Cua does not have the ability to call functions. You have to invoke functions.
 """
 
     let ``resume cua after pause`` = $"""

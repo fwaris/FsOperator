@@ -16,7 +16,7 @@ let defaultKernel nav =
 //holder for runtime plan (provides context for some function calls)
 let nav = Navigator()
 
-let s1r = OPlanRun.Create runPlan (defaultKernel nav)
+let s1r = OPlanRun.Create runPlan (SpreadsheetToEmailPlan.testKernel nav)
 
 let s2r = OPlan.run nav.PlanRef s1r |> Async.RunSynchronously
 
