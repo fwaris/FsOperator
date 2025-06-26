@@ -29,7 +29,8 @@ module PlanFlow =
         id              : string
         cuaMessages     : ChatMsg list
         cuaPrompt       : string
-        reasonerState   : IOitem list
+        reasonerItems   : IOitem list
+        reasonerPrevId  : string option
         reasonerPrompt  : string option
         tools           : Tool list
         kernel          : Kernel
@@ -43,31 +44,13 @@ module PlanFlow =
                                reasonerPrompt = reasonerPrompt
                                tools = tools
                                kernel = kernel
-                               reasonerState = []
+                               reasonerItems = []
+                               reasonerPrevId = None
                             }
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
-        member this.prependReasonerState items =
-            let items = items @ this.reasonerState
-            let items = items |> List.filter (function IOitem.Reasoning _ -> false | _ -> true) //presence of Reasoning items causes issues
-            let keep,drop =
-                if List.length items <= MAX_REASONER_STATE then
-                    items,[]
-                else
-                    List.take MAX_REASONER_STATE items, List.skip MAX_REASONER_STATE items
-            let funcCallIds = //any function calls in drop?
-                drop
-                |> List.choose (function
-                    | IOitem.Function_call f -> Some f.call_id
-                    | IOitem.Function_call_output f -> Some f.call_id
-                    | _ -> None)
-            let unpairedFuncs = funcCallIds |> List.countBy id |> List.filter (fun (i,c) -> c <> 2) |> List.map fst |> set
-            let items =
-                keep //remove function call items that are related to dropped items
-                |> List.filter(function
-                    | IOitem.Function_call f -> unpairedFuncs.Contains f.call_id |> not
-                    | IOitem.Function_call_output f -> unpairedFuncs.Contains f.call_id |> not
-                    | _ -> true)
-            {this with reasonerState = items}
+        member this.prependReasonerItems items = {this with reasonerItems = items}
+        member this.setPrevId id = {this with reasonerPrevId = Some id}
+        member this.clearState() = {this with reasonerItems = []}
 
     type SubState = {
         cts          : CancellationTokenSource
@@ -79,10 +62,11 @@ module PlanFlow =
         with
             member this.prependCuaMessage msg = {this with task = this.task.prependCuaMessage msg}
             member this.prependAction a = {this with actions = a::this.actions |> List.truncate MAX_SNAPSHOTS }
-            member this.prependReasonerState items = {this with task = this.task.prependReasonerState items}
+            member this.prependReasonerItems items = {this with task = this.task.prependReasonerItems items}
+            member this.restRsnrState id = {this with task = (this.task.setPrevId id).clearState() }
             member this.prependSnapshot snapshot =
                 let imageCntnt = Content.Input_image {|image_url = snapshot|}
-                [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerState
+                [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerItems
             member this.actionsString() =
                 this.actions
                 |> List.rev
@@ -111,7 +95,7 @@ module PlanFlow =
                 let! rslt = FlUtils.invokeFunction ss.task.kernel f.name f.arguments
                 let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
                 fouts <- fout::fouts
-            let ss = ss.prependReasonerState fouts
+            let ss = ss.prependReasonerItems fouts
             return ss
         }
 
@@ -122,10 +106,11 @@ module PlanFlow =
         let postToReasoner correlationId (ss:SubState) (responseFormat : Type option) reasonerInstructions  =
             async {
                 let req = {Request.Default with
-                                    input = List.rev ss.task.reasonerState
+                                    input = List.rev ss.task.reasonerItems
                                     instructions = reasonerInstructions
                                     tools = ss.task.tools
-                                    store = false
+                                    previous_response_id = ss.task.reasonerPrevId
+                                    store = true
                                     model=Models.o4_mini
                                     text = responseFormat |> Option.map RUtils.structuredFormat
                                     truncation = Some Truncation.auto
@@ -308,7 +293,6 @@ module PlanFlow =
             }
             |> FlResps.catch ss.bus.PostInput
 
-
     //state machine
     module States =
         ///returns true if no compter call present
@@ -389,11 +373,11 @@ module PlanFlow =
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Rsnr.stopAndSummarize ss
                                         return !!(s_summarizing ss corrId)
-            | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
+            | FuncCall corrId (resp) -> let ss = ss.restRsnrState resp.id
                                         let! ss = Rsnr.callFunctions ss resp
                                         let corrId = Rsnr.getGuidanceForCuaNextAction ss ss.task.reasonerPrompt.Value //continue after func. calls
                                         return !!(s_reason ss (vs,cuaResp) corrId)
-            | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
+            | Reasoner corrId (resp) -> let ss = ss.restRsnrState resp.id
                                         match Rsnr.reasonerGuidance resp with
                                         | None ->
                                                 Log.info $"task {ss.task.id} completed"
@@ -415,11 +399,11 @@ module PlanFlow =
                                         let ss = ss.prependSnapshot sn
                                         Cua.postResumeCua ss snapshot //resume chat with (note no previous history save on server)
                                         return !!(s_cua ss 1)
-            | FuncCall corrId (resp) -> let ss = ss.prependReasonerState resp.output
+            | FuncCall corrId (resp) -> let ss = ss.restRsnrState resp.id
                                         let! ss = Rsnr.callFunctions ss resp
                                         let corrId = Rsnr.getGuidanceAfterCuaPause ss
                                         return !!(s_pause ss corrId)
-            | Reasoner corrId (resp) -> let ss = ss.prependReasonerState resp.output
+            | Reasoner corrId (resp) -> let ss = ss.restRsnrState resp.id
                                         match Rsnr.reasonerGuidance resp with
                                         | None ->
                                                 Log.info $"task {ss.task.id} completed"
@@ -435,7 +419,7 @@ module PlanFlow =
             Log.info $"in s_summarizing {ss.task.id}"
             match msg with
             | W_Err e                 -> return !!(s_terminate ss (Some e))
-            | FuncCall corrId (resp)  -> let ss = ss.prependReasonerState resp.output
+            | FuncCall corrId (resp)  -> let ss = ss.restRsnrState resp.id
                                          let! ss = Rsnr.callFunctions ss resp
                                          let corrId = Rsnr.stopAndSummarize ss
                                          return !!(s_summarizing ss corrId)

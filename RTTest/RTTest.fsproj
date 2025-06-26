@@ -12,6 +12,8 @@
 
   <ItemGroup>
     <Compile Include="SimpleCrypt.fs" />
+    <Compile Include="TimesheetPlan.fs" />
+    <Compile Include="SpreadsheetToEmailPlan.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
