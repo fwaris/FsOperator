@@ -64,27 +64,33 @@ Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
                 target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>() @ FlUtils.makeFunctionTools<Navigator>()
                 description = "Enter capability hours into T-Time"
-                cua = Some """Your goal is to add rows for each Capability ID, found in memory, for the selected week. The row contains hours
-for each weekday for jira tasks related to the capability.
+                cua = Some """Goal: Add a row for each Capability ID (from memory) for the selected week, entering weekday hours for related Jira tasks.
 
-Retrieve Capability and jira task data from memory.
+Instructions:
 
-**Select the date range on the page that matches the date range of jira tasks found in memory.**
+**Retrieve Capability and Jira task data from memory.**
 
-For each Capability ID in memory do:
-1. Select the Capability by entering the Capability ID (starts with 'CAP') in the 'Capability' box 
-1.1 Then select the Capability name that shows in the filtered list
-2. Select "NEW Functionality: Application Coding" for 'Activity Id'
-3. Add a row using the 'Add' button
-4. Enter hours for each day. **Ensure to overwrite any existing data in the cell**
-5. Repeat 1. to 5. for the next capability, if any
+On the page, select the date range matching the Jira tasks’ date range from memory.
+Note: select any day of the week to see the whole week.
 
-Note: to enter hours click in the hours field; type CTRL-A to select the existing value and
-then enter the new value so the old value is completely replaced.
+For each Capability ID (starts with "CAP"):
 
-Do not "Submit", just "Save" 
+1. Enter the ID in the Capability field and click on the matching name from the filtered list to select the capability. Note, once selected, only the name shows; the capability id does not show.
 
-The task ends when call Capabilities have been entered.
+2. Choose "NEW Functionality: Application Coding" for Activity Id.
+
+3. Click Add to insert a new row.
+
+4. Enter weekday hours. Select existing cell content (CTRL+A) and overwrite it. Note that its tricky to enter hours - just clicking in the box and entering say '8' hours will make it '80' hours as the existing '0' is not deleted.
+
+Repeat Steps 1 - 4 for all Capability IDs.
+
+Important:
+Only enter data for Capability IDs found in memory.
+
+Click Save, not Submit.
+
+Finish once all Capability rows are entered.
     """
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
             }
