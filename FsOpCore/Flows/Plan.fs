@@ -117,7 +117,11 @@ with
                     }
 
 ///plugin that provides a navigation function
-type Navigator(plan:Ref<OPlanRun> ) =
+type Navigator() =
+    let plan:Ref<OPlanRun> = ref Unchecked.defaultof<_>
+
+    member this.PlanRef = plan
+
     [<KernelFunction("home")>]
     [<Description("Load initial task page")>]
     member this.home() =
@@ -177,7 +181,7 @@ type OPlanMemory() =
             bag <-
                 bag 
                 |> Map.tryFind key 
-                |> Option.map (fun vs -> bag |> Map.add key (value::vs))
+                |> Option.map (fun vs -> bag |> Map.add key (List.distinct (value::vs)))
                 |> Option.defaultWith (fun _ -> bag |> Map.add key [value])
             OPlanMemory._SaveState(bag)
         )
