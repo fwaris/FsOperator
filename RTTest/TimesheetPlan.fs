@@ -11,11 +11,15 @@ let tHours =
         tools = FlUtils.makeFunctionTools<OPlanMemory>() @ FlUtils.makeFunctionTools<Navigator>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """Your goal is to record Jira task ids and associated daily hours
-from Jira’s Timesheet view for the *current week*
+from Jira’s Timesheet view for the given week.
 
-Select the current week from the time selector.
+Important:
+-- **Get the "Timesheet Week" key value from memory.** If no key is found, use the current week based on today's date.
+-- * Repeat the Timesheet Week dates to yourself as an additional assertion*
 
-Note down the Jira task id, date and hours and save them to memory. 
+For chosen week, select the 'Days' view that in the Timesheet view so the daily hours are visible for the whole week.
+
+Note down the Jira task id, date and hours and save them to memory.
 Example memory "JIRA_TASK-AGAP_XXX" => "22Jun:8,23Jun:0,24Jun:0,25Jun:8,26Jun:0,27Jun:0,28Jun:0"
 
 Extract the information from the screenshots provided and invoke the save_memory function to save the data into memory.
@@ -26,7 +30,7 @@ Extract the information from the screenshots provided and invoke the save_memory
 Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 To reset you may use the 'home' function to get back to the main page
 
-Your task ends when all Jira task ids and their asscociated hours by day have been saved to memory
+Your task ends when all Jira task ids and their associated hours by day have been saved to memory
 """}
 
 let tCapability =
@@ -67,6 +71,8 @@ Instructions:
 
 # First, use dump_memory to Retrieve Capability and Jira task data from memory
 
+Also note the 'Timesheet Week' retrieved from memory.
+
 On the page, select the date range matching the Jira tasks’ date range from memory.
 Note: select any day of the week to see the whole week.
 
@@ -102,6 +108,41 @@ let create() =
                 root = ONode.All {nodes= [ONode.One t_tTime]; description=None}
             }
         plan
+
+let startMemory =
+  [
+    "Timesheet Week", ["6/2/2025 to 6/8/2025"]
+  ]
+  |> Map.ofList
+
+let startCapMemory = 
+    let m = """
+{
+  "JIRA_TASK-AGAP_7856": [
+    "CAP-12033"
+  ],
+  "JIRA_TASK-AGAP_8082": [
+    "CAP-12033",
+    "02Jun:0,03Jun:0,04Jun:0,05Jun:0,06Jun:0,07Jun:0,08Jun:8"
+  ],
+  "JIRA_TASK-AGAP_8090": [
+    "02Jun:8,03Jun:8,04Jun:8,05Jun:0,06Jun:0,07Jun:0,08Jun:0"
+  ],
+  "Timesheet Week": [
+    "6/2/2025 to 6/8/2025"
+  ]
+}
+"""
+    JsonSerializer.Deserialize<Map<string,string list>>(m)
+
+let startKernel nav =
+    let b = Kernel.CreateBuilder()
+    let mem = OPlanMemory()
+    //mem.SetMemory(startMemory)
+    mem.SetMemory(startCapMemory)
+    b.Plugins.AddFromObject(mem) |> ignore
+    b.Plugins.AddFromObject(nav) |> ignore
+    b.Build()
 
 ///memory to test only the last task
 let memSnapshoot_t_tTime = """

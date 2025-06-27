@@ -3,7 +3,8 @@ open Microsoft.SemanticKernel
 open System.Text.Json
 open FsOpCore
 
-let runPlan = SpreadsheetToEmailPlan.create()
+//let runPlan = SpreadsheetToEmailPlan.create()
+let runPlan = TimesheetPlan.create()
 
 //FsResponses.Log.debug_logging <- true
 let defaultKernel nav =
@@ -17,7 +18,8 @@ let defaultKernel nav =
 let nav = Navigator()
 
 //let s1r = OPlanRun.Create runPlan (SpreadsheetToEmailPlan.testKernel nav)
-let s1r = OPlanRun.Create runPlan (defaultKernel nav)
+//let s1r = OPlanRun.Create runPlan (defaultKernel nav)
+let s1r = OPlanRun.Create runPlan (TimesheetPlan.startKernel nav)
 
 let s2r = OPlan.run nav.PlanRef s1r |> Async.RunSynchronously
 

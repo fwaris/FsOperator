@@ -57,22 +57,29 @@ module PlaywrightDriver =
             return page
         }
 
-    let getPage (browser:IBrowser) = 
+    let rec getPage count (browser:IBrowser) = 
         async{
-            let ctx = browser.Contexts |> Seq.tryFind (fun c -> c.Pages.Count > 0)
-            match ctx with 
-            | Some ctx -> 
-                let sortedPages =
-                    ctx.Pages
-                    |> Seq.toList
-                    |> List.rev
-                    |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
-                sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
-                let page = sortedPages.Head
-                if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
-                    do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
-                return page
-            | None -> return! initContext browser
+            try
+                let ctx = browser.Contexts |> Seq.tryFind (fun c -> c.Pages.Count > 0)
+                match ctx with 
+                | Some ctx -> 
+                    let sortedPages =
+                        ctx.Pages
+                        |> Seq.toList
+                        |> List.rev
+                        |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
+                    sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
+                    let page = sortedPages.Head
+                    if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
+                        do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
+                    return page
+                | None -> return! initContext browser
+            with ex -> 
+                Log.exn(ex,nameof getPage)
+                if count < 2 then 
+                    return! getPage (count+1) browser
+                else
+                    return raise ex
         }
         
     let launch (handle:WaitHandle) (launchHandle:ManualResetEvent) =
@@ -144,7 +151,7 @@ module PlaywrightDriver =
     let page () =
         async {
             let! browser = connection()
-            let! page = getPage browser
+            let! page = getPage 0 browser
             Log.info "got page; waiting for network idle ..."
             let! c = Async.StartChild(waitForIdle page, 1500)
             try do! c with ex -> Log.info $"waitForIdle failed"
@@ -249,19 +256,28 @@ module PlaywrightDriver =
         }
 
     let snapshot() =
-        async {
-            let! page = page()
-            Log.info $"taking snapshot of {page.Url}"
-            let opts = PageScreenshotOptions()
-            opts.Animations <- ScreenshotAnimations.Disabled
-            opts.FullPage <- true
-            let! image = page.ScreenshotAsync() |> Async.AwaitTask
-            Log.info $"done snapshot"
-            let bmp = SKBitmap.Decode(image)
-            let imgUrl = FsResponses.RUtils.toImageUri image
-            System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), image)
-            return imgUrl,(bmp.Width, bmp.Height)
-        }
+        let rec loop count = 
+            async {
+                try
+                    let! page = page()
+                    Log.info $"taking snapshot of {page.Url}"
+                    let opts = PageScreenshotOptions()
+                    opts.Animations <- ScreenshotAnimations.Disabled
+                    opts.FullPage <- true
+                    let! image = page.ScreenshotAsync() |> Async.AwaitTask
+                    Log.info $"done snapshot"
+                    let bmp = SKBitmap.Decode(image)
+                    let imgUrl = FsResponses.RUtils.toImageUri image
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), image)
+                    return imgUrl,(bmp.Width, bmp.Height)
+                with ex ->
+                    Log.exn(ex, "snapshot")
+                    if count < 2 then 
+                        return! loop (count + 1)
+                    else
+                        return raise ex
+            }
+        loop 0
 
 
     let launchExternal() =

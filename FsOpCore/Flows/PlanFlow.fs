@@ -178,7 +178,7 @@ module PlanFlow =
         let reasonerGuidance resp =
             let resp = RUtils.parseContent<CuaInstructionsResponse> resp //get structured output
             match resp with
-            | None -> failwith $"reasoner model did not send appropriate resp. for cua guidance"
+            | None -> Some $"reasoner model did not send appropriate resp. for cua guidance"
             | Some (Choice2Of2 e) -> failwith $"reasoner model refused to provide structured output '{e}'"
             | Some (Choice1Of2 cuaInstr) ->
                 if cuaInstr.task_complete then
