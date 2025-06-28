@@ -23,7 +23,7 @@ let tSendEmails =
         tools = FlUtils.makeFunctionTools<OPlanMemory>() @ FlUtils.makeFunctionTools<Navigator>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """
-Obtain the names and email address of all contacts from memory (use dump_memory).
+Obtain the names and email address of all contacts from memory (use get_memory).
 
 For each contact:
 1. Compose a new email by using the 'New mail' button

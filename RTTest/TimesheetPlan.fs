@@ -11,16 +11,18 @@ let tHours =
         tools = FlUtils.makeFunctionTools<OPlanMemory>() @ FlUtils.makeFunctionTools<Navigator>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """Your goal is to record Jira task ids and associated daily hours
-from Jira’s Timesheet view for the given week.
+from Jira’s Timesheet view for the "Timesheet Week".
 
-Important:
--- **Get the "Timesheet Week" key value from memory.** If no key is found, use the current week based on today's date.
--- * Repeat the Timesheet Week dates to yourself as an additional assertion*
+# How to get the "Timesheet Week"
+-- *USE get_memory function to get the "Timesheet Week" from memory data*
+-- If not found, use the week in which today's date falls
 
 For chosen week, select the 'Days' view that in the Timesheet view so the daily hours are visible for the whole week.
 
 Note down the Jira task id, date and hours and save them to memory.
 Example memory "JIRA_TASK-AGAP_XXX" => "22Jun:8,23Jun:0,24Jun:0,25Jun:8,26Jun:0,27Jun:0,28Jun:0"
+
+*Ensure that for each day, no more that 8 hours are recorded across all tasks.* Ignore any aggregagted hours. Pay attention to DAY values only
 
 Extract the information from the screenshots provided and invoke the save_memory function to save the data into memory.
 
@@ -31,6 +33,8 @@ Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 To reset you may use the 'home' function to get back to the main page
 
 Your task ends when all Jira task ids and their associated hours by day have been saved to memory
+
+Important: Make sure the hours captured are for the "Timesheet Week".
 """}
 
 let tCapability =
@@ -46,8 +50,8 @@ First, retrieve jira task ids from memory.
 
 For each jira task id (that has hours) do the following:
 1. Task Details: Use search box to locate the task details page
-2. Parent Story: Breadcrumbs at top: [...] / [Story Link] / [Task Link]; use Story Link
-3. Parent Feature: Breadcrumbs at top: [...] / [Feature Link] / [Story Link]; use Feature Link
+2. Parent Story: Breadcrumbs at top: Project / [...] / [Story Link] / [Task Link]; use Story Link
+3. Parent Feature: Breadcrumbs at top: Project / [...] / [Feature Link] / [Story Link]; use Feature Link
 4. Capability Id : On Feature Page Look for the Capability Id (starts with 'CAP')
 5. Save capability id for each jira task id into memory, for example: "JIRA_TASK-AGAP-xxx"=>"CAP-xxxx". Ensure jira task id is associated with the Capability id
 6. Use 'home' function to get back to the home page
@@ -69,7 +73,7 @@ let t_tTime =
             cua = Some """Goal: Add a row for each Capability ID (from memory) for the selected week, entering weekday hours for related Jira tasks.
 Instructions:
 
-# First, use dump_memory to Retrieve Capability and Jira task data from memory
+# First, use get_memory function to Retrieve Capability and Jira task data from memory
 
 Also note the 'Timesheet Week' retrieved from memory.
 
@@ -103,33 +107,35 @@ let create() =
         let plan =
             { OPlan.Default with
                 description = "Take hours from jira and enter them into t-time"
-                //root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
+                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
                 //root = ONode.All {nodes= [ONode.One tCapability; ONode.One t_tTime]; description=None}
-                root = ONode.All {nodes= [ONode.One t_tTime]; description=None}
+                //root = ONode.All {nodes= [ONode.One t_tTime]; description=None}
             }
         plan
 
 let startMemory =
   [
-    "Timesheet Week", ["6/2/2025 to 6/8/2025"]
+    "Timesheet Week", ["6/2/2025"]
   ]
   |> Map.ofList
 
 let startCapMemory = 
     let m = """
 {
-  "JIRA_TASK-AGAP_7856": [
-    "CAP-12033"
-  ],
-  "JIRA_TASK-AGAP_8082": [
+  "JIRA_TASK-AGAP-8515": [
     "CAP-12033",
-    "02Jun:0,03Jun:0,04Jun:0,05Jun:0,06Jun:0,07Jun:0,08Jun:8"
+    "22Jun:0,23Jun:8,24Jun:8,25Jun:0,26Jun:0,27Jun:0,28Jun:0"
   ],
-  "JIRA_TASK-AGAP_8090": [
-    "02Jun:8,03Jun:8,04Jun:8,05Jun:0,06Jun:0,07Jun:0,08Jun:0"
+  "JIRA_TASK-AGAP-8586": [
+    "CAP-12033",
+    "22Jun:0,23Jun:0,24Jun:0,25Jun:8,26Jun:8,27Jun:0,28Jun:0"
+  ],
+  "JIRA_TASK-AGAP-8692": [
+    "CAP-12033",
+    "22Jun:0,23Jun:0,24Jun:0,25Jun:0,26Jun:0,27Jun:8,28Jun:0"
   ],
   "Timesheet Week": [
-    "6/2/2025 to 6/8/2025"
+    "6/9/2025"
   ]
 }
 """
@@ -138,8 +144,8 @@ let startCapMemory =
 let startKernel nav =
     let b = Kernel.CreateBuilder()
     let mem = OPlanMemory()
-    //mem.SetMemory(startMemory)
-    mem.SetMemory(startCapMemory)
+    mem.SetMemory(startMemory)
+    //mem.SetMemory(startCapMemory)
     b.Plugins.AddFromObject(mem) |> ignore
     b.Plugins.AddFromObject(nav) |> ignore
     b.Build()

@@ -157,7 +157,7 @@ module FlResps =
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
                 replyChannel (msgWrap response)
             with ex ->
-                if count < 2 then
+                if count < 5 then
                     logApiException ex
                     do! Async.Sleep 2000
                     return! sendWithRetry (count + 1) msgWrap replyChannel req

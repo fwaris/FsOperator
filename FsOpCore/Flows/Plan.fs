@@ -187,10 +187,10 @@ type OPlanMemory() =
         )
         "saved"
 
-    [<KernelFunction("dump_memory")>]
+    [<KernelFunction("get_memory")>]
     [<Description("Retrieve all key value pairs saved in memory")>]
-    member this.dump_memory() =
-        Log.info $"dump_memory()"
+    member this.get_memory() =
+        Log.info (nameof this.get_memory)
         this.Serialize(bag)
 
     [<KernelFunction("get_all_keys")>]
