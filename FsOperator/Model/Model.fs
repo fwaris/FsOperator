@@ -42,8 +42,8 @@ with static member Create mailbox =
 
 type FlowState = 
     | FL_Init 
-    | FL_Flow of {| flow : IFlow<TaskFlow.TaskFLowMsgIn>; |}
-    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlow.TaskFLowMsgIn> |}
+    | FL_Flow of {| flow : IFlow<PlanFlowInteractive.PlanFLowMsgIn>; |}
+    | FL_Flow_Summarizing of {| flow : IFlow<PlanFlowInteractive.PlanFLowMsgIn> |}
 
 type Flow =
     {
@@ -56,9 +56,10 @@ type Flow =
         member this.Post msg = match this.state with FL_Flow f | FL_Flow_Summarizing f -> f.flow.Post msg | _ -> ()
         member this.isRunning = match this.state with FL_Init -> false | _ -> true
         member this.setChat ch = {this with chat = ch}        
+        member this.setChatMsgs msgs = {this with chat.messages = msgs}
         member this.stopAndSummarize() = 
             match this.state with 
-            | FL_Flow f -> this.Post TaskFlow.TFi_EndAndReport; {this with state = FL_Flow_Summarizing f}
+            | FL_Flow f -> this.Post PlanFlowInteractive.TFi_EndAndReport; {this with state = FL_Flow_Summarizing f}
             | x         -> this
         member this.Terminate () = 
             match this.state with 
@@ -318,7 +319,7 @@ type ClientMsg =
     | Flow_Terminate
     | Flow_StopAndSummarize
     | Flow_Resume of string
-    | Flow_Msg of TaskFlow.TaskFLowMsgOut
+    | Flow_Msg of PlanFlowInteractive.PlanFLowMsgOut
 
     | Action_Set of string
     | Action_Flash of bool

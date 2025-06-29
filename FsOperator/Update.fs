@@ -6,6 +6,7 @@ open FSharp.Control
 open Avalonia.FuncUI.Hosts
 open FsOpCore
 open Avalonia.Threading
+open Microsoft.SemanticKernel
 
 module Update =
     let mailbox = Channel.CreateBounded<ClientMsg>(10)
@@ -394,13 +395,21 @@ module Update =
     let startFlow model =
         match checkEmpty model.opTask.textModeInstructions, OpTask.isEmptyTarget model.opTask.target with 
         | Some instr, false -> 
-            let chat = {Chat.Default with systemMessage = Some instr}
             let ui = PlaywrightDriver.create()
-            let flow = TaskFlow.create (Flow_Msg>>model.post) ui.driver chat       
+            let kernel = OPlan.defaultKernel Map.empty None
+            let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
+            let t0 = FsOpCore.TaskState.Create<_,_>  //initial task state
+                        model.opTask.id
+                        bus
+                        ui.driver
+                        model.opTask.textModeInstructions
+                        (checkEmpty model.opTask.reasonerInstructions)
+                        kernel
+            let flow = PlanFlowInteractive.create t0
             let model = {model with flow = {model.flow with state=FL_Flow {|flow=flow|}}}        
             async {
                 do! Async.Sleep 100
-                flow.Post TaskFlow.TFi_Start
+                flow.Post PlanFlowInteractive.TFi_Start
             } 
             |> Async.Start
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
@@ -456,15 +465,15 @@ module Update =
             | Flow_StartStop when model.flow.isRunning -> terminateFlow model
             | Flow_StartStop                           -> startFlow model
             | Flow_StopAndSummarize -> {model with flow = model.flow.stopAndSummarize()},Cmd.none
-            | Flow_Resume txt -> model.flow.Post (TaskFlow.TFi_Resume txt); model,Cmd.none
+            | Flow_Resume txt -> model.flow.Post (PlanFlowInteractive.TFi_Resume txt); model,Cmd.none
             | Flow_Terminate -> terminateFlow model
 
             ///handle messages emitted by a running flow
-            | Flow_Msg (TaskFlow.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (TaskFlow.TFo_Paused)   -> model, Cmd.none
-            | Flow_Msg (TaskFlow.TFo_ChatUpdated chat) -> {model with flow = model.flow.setChat chat}, Cmd.none
-            | Flow_Msg (TaskFlow.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
-            | Flow_Msg (TaskFlow.TFo_Summary ch) -> {model with flow = model.flow.setChat ch}, Cmd.ofMsg Flow_Terminate
+            | Flow_Msg (PlanFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
+            | Flow_Msg (PlanFlowInteractive.TFo_Paused chat)   -> model, Cmd.none
+            | Flow_Msg (PlanFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
+            | Flow_Msg (PlanFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
+            | Flow_Msg (PlanFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate
 
             | TextChat_StartStopTask -> startStopTextChat model
             | VoiceChat_StartStop -> startStopVoiceChat model

@@ -21,9 +21,13 @@
 		<Compile Include="Flows\Prompts.fs" />
 		<Compile Include="Flows\Actions.fs" />
 		<Compile Include="Flows\Workflow.fs" />
-		<Compile Include="Flows\Chat.fs" />
+		<Compile Include="Flows\ChatMsg.fs" />
 		<Compile Include="Flows\FlowsCommon.fs" />
 		<Compile Include="Flows\TaskFlow.fs" />
+		<Compile Include="Flows\TaskState.fs" />
+		<Compile Include="Flows\Reasoner.fs" />
+		<Compile Include="Flows\Cua.fs" />
+		<Compile Include="Flows\PlanFlowInteractive.fs" />
 		<Compile Include="Flows\PlanFlow.fs" />
 		<Compile Include="Flows\Plan.fs" />
 	</ItemGroup>

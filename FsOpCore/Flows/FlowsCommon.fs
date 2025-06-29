@@ -35,7 +35,7 @@ module FlUtils =
     /// Convert metadata to 'function' tool for use with <see cref="FsResponses.Request" />.
     /// Also see <see cref="FlUtils.functionMetadata" />.
     /// </summary>
-    let toFunction (metadata:KernelFunctionMetadata) =
+    let toFunctionTool (metadata:KernelFunctionMetadata) =
         {Function.Default with
             name = metadata.Name
             description = metadata.Description
@@ -76,7 +76,7 @@ module FlUtils =
     ///The functions are extracted from a properly annotated type.<br />
     ///See <see cref="FlUtils.functionMetadata"/>.
     ///</summary>
-    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunction |> Seq.toList
+    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunctionTool |> Seq.toList
 
     ///call an indivudal function
     let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
@@ -87,6 +87,47 @@ module FlUtils =
         let rsltStr = JsonSerializer.Serialize(str)
         return rsltStr
     }
+
+    ///extracts 'computer call' from response
+    let computerCall (response:FsResponses.Response) =
+        response.output
+        |> List.choose (function
+            | IOitem.Computer_call cb -> Some cb
+            | _                -> None)
+        |> List.tryHead
+
+    ///returns true if no compter call present
+    let noCC resp = (computerCall resp).IsNone
+
+    ///log that a message was ignored in some state
+    let ignoreMsg s msg name =
+        Log.warn $"{name}: ignored message {msg}"
+        F(s,[])
+
+    ///convenience 'active pattern' to match a W_Reasoner msg
+    ///with the given correlation id
+    let (|Reasoner|_|) corrId msg =
+        match msg with
+        | W_Reasoner (id,resp) when id = corrId -> Some resp
+        | _                                     -> None
+
+    let hasFunction (resp:Response) =
+        resp.output
+        |> List.exists (fun x -> x.IsFunction_call)
+
+    ///convenience 'active pattern' to match a W_Reasoner msg
+    ///with the given correlation id and with at least one function call
+    let (|FuncCall|_|) corrId msg =
+        match msg with
+        | Reasoner corrId (resp) when hasFunction resp -> Some resp
+        | _                                            -> None
+
+    ///convenience 'active pattern' to match a W_Reasoner msg
+    ///with the given correlation id and with at least one function call
+    let (|Cua_FuncCall|_|) = function
+        | W_Cua (resp) when hasFunction resp -> Some resp
+        | _                                  -> None
+
 
 //utility functions for working Responses API messsages
 module FlResps =
@@ -122,12 +163,6 @@ module FlResps =
         RUtils.outputText response
         |> checkEmpty
 
-    let computerCall (response:FsResponses.Response) =
-        response.output
-        |> List.choose (function
-            | IOitem.Computer_call cb -> Some cb
-            | _                -> None)
-        |> List.tryHead
 
     ///attempt to extract the 'computer call id' from a response
     let lastCallId (resp:FsResponses.Response) =
@@ -169,10 +204,6 @@ module FlResps =
     ///post request to respones api
     let sendRequest msgWrap replyChannel msg =
         sendWithRetry 0 msgWrap replyChannel msg
-
-    let hasFunction (resp:Response) =
-        resp.output
-        |> List.exists (fun x -> x.IsFunction_call)
 
 
     ///send an initial 'computer tool call' request

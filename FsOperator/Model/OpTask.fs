@@ -17,9 +17,8 @@ type OpTask = {
 
     //instructions to be used in text mode 
     textModeInstructions : string 
+    reasonerInstructions : string
     voiceAsstInstructions : string 
-
-    //guardrails : string option //to be added later
 }
 
 module OpTask =
@@ -79,17 +78,17 @@ Always confirm with the user first before sending the instructions to the assist
             target = TLink ""
             voiceAsstInstructions=""
             textModeInstructions=""
+            reasonerInstructions = ""
         }
 
     module Samples = 
 
         let sampleAmazon  = 
-            {
+            {empty with
                 id="amazon"
                 description="look for a cell phone case"
                 target= TLink "https://www.amazon.com" 
-                voiceAsstInstructions= ""
-                textModeInstructions = """On Amazon, find me an iphone 16 pro max case that has 
+                textModeInstructions = """On Amazon, find me an iphone 16 pro max case that has                
     **built in screen protector**. 
     Find me the top rated case regardless of price.
     **Ignore any sign-in pages and continue without signing in**
@@ -98,31 +97,28 @@ Always confirm with the user first before sending the instructions to the assist
 
 
         let sampleNetflix  = 
-            {
+            {empty with
                 id="netflix"
                 description="Godzilla and Kong movies"
                 target = TLink "https://www.netflix.com" 
-                voiceAsstInstructions=""
                 textModeInstructions = """What movies are available on Netflix featuring both Godzilla and King Kong"""
             }
 
         let sampleTwitter  = 
-            {
+            {empty with
                 id="twitter"
                 description="summarize recent gen ai posts"
                 target = TLink "https://twitter.com" 
-                voiceAsstInstructions=""
                 textModeInstructions = """Scroll through my Twitter feed and summarize the latest posts
 about "Generative AI".
                 """
             }
 
         let sampleLinked  = 
-            {
+            {empty with
                 id="linkedin"
                 description="summarize latest posts"
                 target = TLink "https://linkedin.com" 
-                voiceAsstInstructions=""
                 textModeInstructions = """Scroll through my LinkedIn feed and summarize the latest posts
 about "Generative AI" 
 """

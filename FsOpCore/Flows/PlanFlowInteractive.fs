@@ -5,7 +5,7 @@ open Microsoft.SemanticKernel
 open FsResponses
 open FlUtils
 
-module PlanFlow =    
+module PlanFlowInteractive =    
     ///controls how many CUA turns to do before getting reasoner guidance
     let MAXC = 1 
 
@@ -17,10 +17,11 @@ module PlanFlow =
 
     ///flow output messages
     type PlanFLowMsgOut =
-        | TFo_Paused of ChatMsg list
         | TFo_Error of WErrorType
         | TFo_Action of string
-        | TFo_Done of TaskState<PlanFLowMsgIn,PlanFLowMsgOut>
+        | TFo_Paused of ChatMsg list
+        | TFo_ChatUpdated of ChatMsg list
+        | TFo_Done of ChatMsg list
 
     type SubState = {
         cts          : CancellationTokenSource
@@ -102,7 +103,7 @@ module PlanFlow =
                                         match Reasoner.reasonerGuidance resp with
                                         | None ->
                                                 Log.info $"task {ss.task.id} completed"
-                                                return F(s_terminate ss None, [TFo_Done ss.task])
+                                                return F(s_terminate ss None, [TFo_Done ss.task.cuaMessages])
                                         | Some guidance ->
                                                 Cua.postCuaNext ss.task vs cuaResp (Some guidance)
                                                 return !!(s_cua ss 1)
@@ -128,7 +129,7 @@ module PlanFlow =
                                         match Reasoner.reasonerGuidance resp with
                                         | None ->
                                                 Log.info $"task {ss.task.id} completed"
-                                                return F(s_terminate ss None, [TFo_Done ss.task])
+                                                return F(s_terminate ss None, [TFo_Done ss.task.cuaMessages])
                                         | Some guidance ->
                                                 ss.task.bus.PostInput (W_App (TFi_Resume guidance))
                                                 return !!(s_pause ss "")
@@ -146,7 +147,7 @@ module PlanFlow =
                                          let corrId = Reasoner.stopAndSummarize ss.task
                                          return !!(s_summarizing ss corrId)
             | Reasoner corrId (resp)  -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp)
-                                         return F(s_terminate ss None, [TFo_Done ss.task])
+                                         return F(s_terminate ss None, [TFo_Done ss.task.cuaMessages])
             | x                       -> return ignoreMsg (s_summarizing ss corrId) x (nameof s_summarizing)
         }
 
@@ -169,7 +170,7 @@ module PlanFlow =
             task = task
         }
 
-        //initial state
+        //starting state node
         let s0 = States.s_start ss0
 
         //start flow

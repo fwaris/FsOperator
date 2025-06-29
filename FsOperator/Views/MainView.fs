@@ -185,6 +185,7 @@ type MainView =
                         {   id = ""
                             description = description
                             target = pTarget
+                            reasonerInstructions=""
                             textModeInstructions = textPrompt
                             voiceAsstInstructions = voicePrompt 
                         }

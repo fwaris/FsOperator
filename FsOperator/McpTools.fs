@@ -46,6 +46,7 @@ type JiraTools() =
                     description="Add task to jira"
                     target = TLink $"https://jirasw.t-mobile.com/browse/{parentTaskId.Trim()}" 
                     voiceAsstInstructions= ""
+                    reasonerInstructions=""
                     textModeInstructions = $"""Goal: Create a sub-task under the story {parentTaskId}.
 
 **JUST CREATE SUB-TASK**

@@ -4,23 +4,25 @@ open System.Threading.Channels
 open FsResponses
 open FlUtils
 
-module TaskFlow =
+module TaskFlow2 =
+ ()
+(*
     let MAX_SNAPSHOTS = 3
 
     ///flow input messages
     type TaskFLowMsgIn =
         | TFi_Start
         | TFi_Resume of string
-        | TFi_ChatUpdated of Chat
+        | TFi_ChatUpdated of ChatMsg list
         | TFi_EndAndReport
 
     ///messages output by flow
     type TaskFLowMsgOut =
         | TFo_Paused
-        | TFo_ChatUpdated of Chat
+        | TFo_ChatUpdated of ChatMsg list
         | TFo_Error of WErrorType
         | TFo_Action of string
-        | TFo_Summary of Chat
+        | TFo_Summary of ChatMsg list
 
     type SubState = {
         cts         : CancellationTokenSource
@@ -306,3 +308,4 @@ When asking CUA to enter text, suggest type <text> in the <field name>
             member _.Post msg = bus.PostInput (W_App msg)
         }
 
+*)

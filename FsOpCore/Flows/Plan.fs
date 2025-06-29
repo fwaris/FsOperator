@@ -3,6 +3,7 @@ open Microsoft.SemanticKernel
 open System.ComponentModel
 open System.Threading
 open System.Text.Json
+open Microsoft.Extensions.DependencyInjection
 open System.Text.Json.Serialization
 open System.Collections.Concurrent
 
@@ -126,14 +127,35 @@ type Navigator() =
     [<Description("Load initial task page")>]
     member this.home() =
         let comp = async {
-            Log.info $"home()"
-            match plan.Value.currentTask with
-            | Some t ->
-                match t.task.target with
-                | OLink url -> do! t.driver.start url
-                | _         -> ()
-            | None -> ()
-            return "home page loaded"
+            Log.info $"{nameof this.home}"
+            if plan.Value <> Unchecked.defaultof<_> then 
+                match plan.Value.currentTask with
+                | Some t ->
+                    match t.task.target with
+                    | OLink url -> do! t.driver.start url
+                    | _         -> ()
+                | None -> ()
+                return "home page loaded"
+            else
+                return "a home page url not found"
+        }
+        Async.StartAsTask comp
+
+    [<KernelFunction("get_current_url")>]
+    [<Description("Get the current URL of the browser")>]
+    member this.get_current_url() =
+        let comp = async {
+            Log.info $"{nameof this.get_current_url}"
+            let noUrl = "unable to get url"
+            if plan.Value <> Unchecked.defaultof<_> then 
+                match plan.Value.currentTask with
+                | Some t ->
+                    match! t.driver.url() with 
+                    | Some url -> return url
+                    | None     -> return noUrl
+                | None -> return noUrl
+            else
+                return noUrl
         }
         Async.StartAsTask comp
 
@@ -173,7 +195,7 @@ type OPlanMemory() =
         with ex ->
             Log.exn(ex,nameof OPlanMemory._SaveState)
 
-    [<KernelFunction("save_memory")>]
+    [<KernelFunction("memory_save")>]
     [<Description("Save a key-value pair for later retrieval")>]
     member this.save_memory(key:string, value:string) =
         Log.info $"save_memory:{key} = {value}"
@@ -187,24 +209,24 @@ type OPlanMemory() =
         )
         "saved"
 
-    [<KernelFunction("get_memory")>]
+    [<KernelFunction("memory_get_all_pairs")>]
     [<Description("Retrieve all key value pairs saved in memory")>]
-    member this.get_memory() =
-        Log.info (nameof this.get_memory)
+    member this.get_all_memory() =
+        Log.info (nameof this.get_all_memory)
         this.Serialize(bag)
 
-    [<KernelFunction("get_all_keys")>]
+    [<KernelFunction("memory_get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
     member this.get_all_keys() =
         let ks = Map.keys bag |> Seq.toList
-        Log.info $"get_all_keys: {ks}"
+        Log.info $"{nameof this.get_all_keys}: {ks}"
         this.Serialize(ks)
 
-    [<KernelFunction("get_memory")>]
+    [<KernelFunction("memory_get_value")>]
     [<Description("retrieve a value for the given key")>]
-    member this.get_memory(key:string) =
+    member this.get_value(key:string) =
         let v = bag |> Map.tryFind key
-        Log.info $"get_memory {key} = {v}"
+        Log.info $"{nameof this.get_value} {key} = {v}"
         this.Serialize(v)
 
 module OPlan =
@@ -215,24 +237,22 @@ module OPlan =
                 target = OLink "https://www.linkedin.com"
                 description = "find people who post about generative ai"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
-                cua = Some """find individuals who have original posts
-related to generative AI and record there linkedin names and profile links.
-Use the save_memory function to record each name as you find it.
-Make sure to collect at least 5 names.
-"""
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """find individuals who have original posts
+related to generative AI and record their linkedin names and profile links.
+Use the memory_save function to record this data as you find it.
+Make sure to collect at least 5 names."""
                 }
         let tw =
             { OTask.Create() with
                 target = OLink "https://www.twitter.com"
                 tools = FlUtils.makeFunctionTools<OPlanMemory>()
                 description = "retrieve linkedIn people info from memory and get twitter handles"
-                cua = Some """
-list of names and linked in profile links. Search each name on twitter and obtain their
-twitter handle.
-Use save_memory function to save each person's linked-in and twitter data
-    """
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """Get the list of names and linked-in profile links from memory.
+Search each name on twitter and obtain their twitter handle.
+Use memory_save function to save each person's linked-in and twitter data into memory.
+"""
             }
         let plan =
             { OPlan.Default with
@@ -291,20 +311,14 @@ Use save_memory function to save each person's linked-in and twitter data
         }
         |> Async.Start
 
-    ///actual implementation of 'home' function in the kernel
+    ///Runs the current task set in planRun
     let runCurrentTask (planRun:OPlanRun) = async{
         match planRun.currentTask with
         | None -> return failwith $"no task to run"
         | Some ot ->
-            let rt = PlanFlow.TaskState.Create
-                                            ot.task.id
-                                            ot.task.cua.Value
-                                            ot.task.reasoner
-                                            ot.task.tools
-                                            planRun.kernel
-
-            let completedTask = ref None
             use h = new ManualResetEvent(false)
+            let completedTask = ref None
+            let driver = (PlaywrightDriver.create().driver)
             let post = fun p ->
                 printfn "%A" p
                 match p with
@@ -312,19 +326,27 @@ Use save_memory function to save each person's linked-in and twitter data
                 | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
                 | PlanFlow.TFo_Action a -> ()//printfn "%A" a
                 | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
-            let driver = (PlaywrightDriver.create().driver)
+            let bus = WBus.Create<_,_> post
+            let t0 = TaskState.Create<_,_>  //initial task state
+                        ot.task.id
+                        bus
+                        driver
+                        ot.task.cua.Value
+                        ot.task.reasoner
+                        planRun.kernel
             match ot.task.target with
             | OLink url -> do! driver.start url
             | OProcess (a,b) -> ()
-            let flow = PlanFlow.create post driver rt
+            let flow = PlanFlow.create t0
             flow.Post PlanFlow.TFi_Start
-            startTimer ot.task.allowedSec flow
-            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3)
+            startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
+            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with
             | Some t -> return {ot with messages = t.cuaMessages}
             | None   -> return failwith "no output from step"
     }
 
+    ///Single step the plan: Transition to next task and run it or end if no task.
     let step planRun = async {
         match! transitionToNext planRun with
         | None ->
@@ -344,11 +366,26 @@ Use save_memory function to save each person's linked-in and twitter data
                 return {planRun with currentTask = Some tr'}
     }
 
-    let rec run (planRef:Ref<OPlanRun>) planRun = async {
-        planRef.Value <- planRun
+    ///Create a kernel with the required plugins and services for running tasks.
+    ///Optionally supply a function to perform additional configuration.
+    ///The initialMemory will be added to the memory plugin
+    let defaultKernel (initialMemory:Map<string,string list>) (build:(IKernelBuilder->unit) option) =
+        let b = Kernel.CreateBuilder()
+        match build with Some build -> build b | _ -> ()
+        let nav = Navigator()
+        let mem = OPlanMemory()
+        mem.SetMemory initialMemory
+        b.Plugins.AddFromObject(mem) |> ignore
+        b.Plugins.AddFromObject(nav) |> ignore
+        b.Services.AddSingleton(nav) |> ignore
+        b.Build()
+
+    let rec run planRun = async {
+        let nav = planRun.kernel.Services.GetService<Navigator>()
+        nav.PlanRef.Value <- planRun
         let! planRun = step planRun
         if planRun.currentTask.IsSome then
-            return! run planRef planRun
+            return! run planRun
         else
             return planRun
     }

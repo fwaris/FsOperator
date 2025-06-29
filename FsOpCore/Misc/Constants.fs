@@ -19,3 +19,5 @@ module C =
     let CORR_ID = "correlationId"
 
     let PLAYWRIGHT_DEFAULT_TIMEOUT = 60000f
+
+    let MAX_SNAPSHOTS = 3
