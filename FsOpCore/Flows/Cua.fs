@@ -4,11 +4,11 @@ open FsResponses
 //functions for Cua model
 module Cua =
 
-    ///if there is text content in resp then add that to chat history as asst. msg
+    ///if there is text content in resp then add that to chat history as asst. msg, also return the text
     let prependAsstMsg (task:TaskState<_,_>) resp =
         FlResps.extractText resp
-        |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}))
-        |> Option.defaultValue task
+        |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}),Some text) 
+        |> Option.defaultValue (task,None)
 
     ///if there is text content in resp then add that to chat history as user msg
     let prependUserMsg (task:TaskState<_,_>) resp =

@@ -20,4 +20,4 @@ module C =
 
     let PLAYWRIGHT_DEFAULT_TIMEOUT = 60000f
 
-    let MAX_SNAPSHOTS = 3
+    let MAX_ACTIONS = 3

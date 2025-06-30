@@ -28,6 +28,8 @@ module PlanFlow =
     }
         with
             member this.setTask v : SubState = {this with task = v} // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this v
+            member this.setTask2 (v,x)  = {this with task = v},x // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this 
+            member this.lastActionM() = this.task.lastAction() |> List.map TFo_Action
 
             member this.performComputerCall resp = 
                 async{
@@ -40,7 +42,6 @@ module PlanFlow =
                     let! task = Reasoner.callFunctions this.task resp
                     return {this with task = task}
                 }
-
 
     //state machine
     module States =
@@ -68,22 +69,22 @@ module PlanFlow =
             | Cua_FuncCall (resp)            -> let! fouts = Cua.callFunctions ss.task resp
                                                 Cua.postCuaFuncResults ss.task resp fouts
                                                 return !!(s_cua ss count)
-            | W_Cua resp when noCC resp      -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //cua not asking for comptuer call
+            | W_Cua resp when noCC resp      -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //cua not asking for comptuer call
                                                 let corrId = Reasoner.getGuidanceAfterCuaPause ss.task //ask reasoner what to do next
                                                 return !!(s_pause ss corrId)
-            | W_Cua resp when count >= MAXC  -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //set reasoner guidance for cua
+            | W_Cua resp when count >= MAXC  -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //set reasoner guidance for cua
                                                 let! ss,visualState = ss.performComputerCall resp
-                                                let outMsgs = if visualState.IsSome then [TFo_Action (ss.task.actionsString())] else []
+                                                let outMsgs = if visualState.IsSome then ss.lastActionM() else []
                                                 if ss.task.reasonerPrompt.IsSome then  //get reasoner guidance if prompt set
                                                      let corrId = Reasoner.getGuidanceForCuaNextAction ss.task ss.task.reasonerPrompt.Value
                                                      return F(s_reason ss (visualState,resp) corrId,outMsgs)
                                                 else
                                                      Cua.postCuaNext ss.task visualState resp None
                                                      return F(s_cua ss count,outMsgs)
-            | W_Cua resp                     -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //cont. w/out rsnr guidance
+            | W_Cua resp                     -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //cont. w/out rsnr guidance
                                                 let! ss,visualState = ss.performComputerCall resp            
                                                 Cua.postCuaNext ss.task visualState resp None
-                                                let outMsgs = if visualState.IsSome then [TFo_Action (ss.task.actionsString())] else []
+                                                let outMsgs = if visualState.IsSome then ss.lastActionM() else []
                                                 return F(s_cua ss (count + 1),outMsgs) //increment count 
             | x                              -> return ignoreMsg (s_cua ss count) x (nameof s_cua)
         }
@@ -145,7 +146,7 @@ module PlanFlow =
                                          let ss = {ss with task = task}
                                          let corrId = Reasoner.stopAndSummarize ss.task
                                          return !!(s_summarizing ss corrId)
-            | Reasoner corrId (resp)  -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp)
+            | Reasoner corrId (resp)  -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
                                          return F(s_terminate ss None, [TFo_Done ss.task])
             | x                       -> return ignoreMsg (s_summarizing ss corrId) x (nameof s_summarizing)
         }

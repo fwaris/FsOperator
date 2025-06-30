@@ -28,7 +28,13 @@ module PlanFlowInteractive =
         task         : TaskState<PlanFLowMsgIn,PlanFLowMsgOut>
     }
         with
-            member this.setTask v : SubState = {this with task = v} // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this v
+            member this.setTask v : SubState = {this with task = v} 
+            member this.lastActionM() = this.task.lastAction() |> List.map TFo_Action
+
+            member this.setTaskM (v,x)  = 
+                {this with task = v},
+                x |> Option.map (fun _ -> [TFo_ChatUpdated v.cuaMessages]) |> Option.defaultValue []
+
 
             member this.performComputerCall resp = 
                 async{
@@ -41,6 +47,7 @@ module PlanFlowInteractive =
                     let! task = Reasoner.callFunctions this.task resp
                     return {this with task = task}
                 }
+
 
 
     //state machine
@@ -69,22 +76,24 @@ module PlanFlowInteractive =
             | Cua_FuncCall (resp)            -> let! fouts = Cua.callFunctions ss.task resp
                                                 Cua.postCuaFuncResults ss.task resp fouts
                                                 return !!(s_cua ss count)
-            | W_Cua resp when noCC resp      -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //cua not asking for comptuer call
+            | W_Cua resp when noCC resp      -> let ss,outMsgs = ss.setTaskM (Cua.prependAsstMsg ss.task resp) //cua not asking for comptuer call
                                                 let corrId = Reasoner.getGuidanceAfterCuaPause ss.task //ask reasoner what to do next
-                                                return !!(s_pause ss corrId)
-            | W_Cua resp when count >= MAXC  -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //set reasoner guidance for cua
+                                                return F(s_pause ss corrId,outMsgs)
+            | W_Cua resp when count >= MAXC  -> let ss,outMsgs1 = ss.setTaskM (Cua.prependAsstMsg ss.task resp) //set reasoner guidance for cua
                                                 let! ss,visualState = ss.performComputerCall resp
-                                                let outMsgs = if visualState.IsSome then [TFo_Action (ss.task.actionsString())] else []
+                                                let outMsgs2 = if visualState.IsSome then ss.lastActionM() else []
+                                                let outMsgs = outMsgs1 @ outMsgs2
                                                 if ss.task.reasonerPrompt.IsSome then  //get reasoner guidance if prompt set
                                                      let corrId = Reasoner.getGuidanceForCuaNextAction ss.task ss.task.reasonerPrompt.Value
                                                      return F(s_reason ss (visualState,resp) corrId,outMsgs)
                                                 else
                                                      Cua.postCuaNext ss.task visualState resp None
                                                      return F(s_cua ss count,outMsgs)
-            | W_Cua resp                     -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp) //cont. w/out rsnr guidance
+            | W_Cua resp                     -> let ss,outMsgs1 = ss.setTaskM (Cua.prependAsstMsg ss.task resp) //cont. w/out rsnr guidance
                                                 let! ss,visualState = ss.performComputerCall resp            
                                                 Cua.postCuaNext ss.task visualState resp None
-                                                let outMsgs = if visualState.IsSome then [TFo_Action (ss.task.actionsString())] else []
+                                                let outMsgs2 = if visualState.IsSome then ss.lastActionM()  else []
+                                                let outMsgs = outMsgs1 @ outMsgs2
                                                 return F(s_cua ss (count + 1),outMsgs) //increment count 
             | x                              -> return ignoreMsg (s_cua ss count) x (nameof s_cua)
         }
@@ -120,20 +129,11 @@ module PlanFlowInteractive =
                                         let! (sn,_,_,_,_) as snapshot = FlUtils.snapshot(ss.task.driver)
                                         let ss = {ss with task = ss.task.prependSnapshot sn}
                                         Cua.postResumeCua ss.task snapshot //resume chat (note server history is gone so use history)
-                                        return !!(s_cua ss 1)
+                                        return F(s_cua ss 1,[TFo_ChatUpdated ss.task.cuaMessages ])
             | FuncCall corrId (resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
                                         let! ss = ss.callFunctions resp
                                         let corrId = Reasoner.getGuidanceAfterCuaPause ss.task
                                         return !!(s_pause ss corrId)
-            | Reasoner corrId (resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
-                                        match Reasoner.reasonerGuidance resp with
-                                        | None ->
-                                                Log.info $"task {ss.task.id} completed"
-                                                return F(s_terminate ss None, [TFo_Done ss.task.cuaMessages])
-                                        | Some guidance ->
-                                                ss.task.bus.PostInput (W_App (TFi_Resume guidance))
-                                                return !!(s_pause ss "")
-
             | x                       -> return ignoreMsg (s_pause ss corrId) x (nameof s_pause)
         }
 
@@ -146,7 +146,7 @@ module PlanFlowInteractive =
                                          let ss = {ss with task = task}
                                          let corrId = Reasoner.stopAndSummarize ss.task
                                          return !!(s_summarizing ss corrId)
-            | Reasoner corrId (resp)  -> let ss = ss.setTask (Cua.prependAsstMsg ss.task resp)
+            | Reasoner corrId (resp)  -> let ss,_ = ss.setTaskM (Cua.prependAsstMsg ss.task resp)            //not sending rsnr guidnc to gui yet
                                          return F(s_terminate ss None, [TFo_Done ss.task.cuaMessages])
             | x                       -> return ignoreMsg (s_summarizing ss corrId) x (nameof s_summarizing)
         }

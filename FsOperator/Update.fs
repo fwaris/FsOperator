@@ -462,15 +462,15 @@ module Update =
             | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
             | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
-            | Flow_StartStop when model.flow.isRunning -> terminateFlow model
-            | Flow_StartStop                           -> startFlow model
+            | Flow_StartStop when model.flow.isRunning() -> terminateFlow model
+            | Flow_StartStop                             -> startFlow model
             | Flow_StopAndSummarize -> {model with flow = model.flow.stopAndSummarize()},Cmd.none
             | Flow_Resume txt -> model.flow.Post (PlanFlowInteractive.TFi_Resume txt); model,Cmd.none
             | Flow_Terminate -> terminateFlow model
 
             ///handle messages emitted by a running flow
             | Flow_Msg (PlanFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (PlanFlowInteractive.TFo_Paused chat)   -> model, Cmd.none
+            | Flow_Msg (PlanFlowInteractive.TFo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
             | Flow_Msg (PlanFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
             | Flow_Msg (PlanFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
             | Flow_Msg (PlanFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate

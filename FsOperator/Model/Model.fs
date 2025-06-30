@@ -43,6 +43,7 @@ with static member Create mailbox =
 type FlowState = 
     | FL_Init 
     | FL_Flow of {| flow : IFlow<PlanFlowInteractive.PlanFLowMsgIn>; |}
+    | FL_Paused of {| flow : IFlow<PlanFlowInteractive.PlanFLowMsgIn>; |}
     | FL_Flow_Summarizing of {| flow : IFlow<PlanFlowInteractive.PlanFLowMsgIn> |}
 
 type Flow =
@@ -54,12 +55,21 @@ type Flow =
         static member Default = {state = FL_Init; chat=Chat.Default}
         member this.messages() = this.chat.messages
         member this.Post msg = match this.state with FL_Flow f | FL_Flow_Summarizing f -> f.flow.Post msg | _ -> ()
-        member this.isRunning = match this.state with FL_Init -> false | _ -> true
+        member this.isRunning() = not this.state.IsFL_Init 
         member this.setChat ch = {this with chat = ch}        
         member this.setChatMsgs msgs = {this with chat.messages = msgs}
+        member this.pause() = match this.state with FL_Flow f -> {this with state = FL_Paused f} | _ -> this
+        member this.isPaused() = this.state.IsFL_Paused
+        member this.setQuestion q = {this with chat.question = Some q}
+        member this.resume() = 
+            match this.state with 
+            | FL_Paused f when this.chat.question.IsSome -> this.Post (PlanFlowInteractive.TFi_Resume this.chat.question.Value)
+                                                            {this with state = FL_Flow f}
+            | _                                          -> this
         member this.stopAndSummarize() = 
             match this.state with 
-            | FL_Flow f -> this.Post PlanFlowInteractive.TFi_EndAndReport; {this with state = FL_Flow_Summarizing f}
+            | FL_Flow f -> this.Post PlanFlowInteractive.TFi_EndAndReport
+                           {this with state = FL_Flow_Summarizing f}
             | x         -> this
         member this.Terminate () = 
             match this.state with 

@@ -82,7 +82,7 @@ type TextChatView =
                             TextBlock.margin (Thickness(leftMargin,10.,0.,0.))
                         ]
                         match model.flow.state with 
-                        | FL_Flow f when model.flow.chat.prompt ->
+                        | FL_Paused f  ->
                             Panel.create [
                                 DockPanel.dock Dock.Top
                                 Panel.margin 2

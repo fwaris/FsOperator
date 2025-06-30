@@ -1,8 +1,8 @@
 ﻿namespace FsOperator
 open FsOpCore
 
-type Chat = { systemMessage:string option; question:string option; messages:ChatMsg list ; prompt:bool}
-    with static member Default = { systemMessage = None; question = None; messages = [] ; prompt=false}
+type Chat = { systemMessage:string option; question:string option; messages:ChatMsg list}
+    with static member Default = { systemMessage = None; question = None; messages = []}
 
 module Chat = 
     let private updateWith f cs = cs |> List.map f
@@ -12,6 +12,5 @@ module Chat =
     let setQuestion question chat = {chat with question = Some question}
     let getSystemMessage chat = chat.systemMessage |> Option.defaultValue ""
     let getQuestion chat = chat.question |> Option.defaultValue ""
-    let setPrompt b chat = {chat with prompt = b}
-
+    
 
