@@ -14,8 +14,14 @@ let tHours =
 from Jira’s Timesheet view for the "Timesheet Week".
 
 # How to get the "Timesheet Week"
--- *USE get_memory function to get the "Timesheet Week" from memory data*
+-- *USE 'memory_get_all' function to find the value of "Timesheet Week" from memory data*
 -- If not found, use the week in which today's date falls
+
+To select the week on the page, click on 'Week' next to calendar and the click on any week day to select the entire week.
+Note that week is Sunday to Saturday for the purpose of this task.
+
+JUST CHANGE THE DATE - DON'T MAKE ANY OTHER CHANGES ON THE PAGE.
+All data you need should be available on the page after the date change.
 
 For chosen week, select the 'Days' view that in the Timesheet view so the daily hours are visible for the whole week.
 
@@ -24,7 +30,7 @@ Example memory "JIRA_TASK-AGAP_XXX" => "22Jun:8,23Jun:0,24Jun:0,25Jun:8,26Jun:0,
 
 *Ensure that for each day, no more that 8 hours are recorded across all tasks.* Ignore any aggregagted hours. Pay attention to DAY values only
 
-Extract the information from the screenshots provided and invoke the save_memory function to save the data into memory.
+Extract the information from the screenshots provided and invoke the memory save function to save the data into memory.
 
 **ALL information you need should all be available on a SINGLE PAGE. Don't click links to go to other pages.**
 *If a horizontal or vertical scroll bar is visible for the Timesheet view*, scroll appropriately to see all data.
@@ -71,21 +77,35 @@ let t_tTime =
             description = "Enter capability hours into T-Time"
             reasoner = Some Prompts.``reasoner prompt for cua guidance``
             cua = Some """Goal: Add a row for each Capability ID (from memory) for the selected week, entering weekday hours for related Jira tasks.
-Instructions:
+# Instructions
 
-# First, use get_memory function to Retrieve Capability and Jira task data from memory
+## Sign In: 
+- If a 'sign in' dialog box appears, click it to sign in. 
+- Ignore any progress bars on the first page.
+- DONT' KEEP TAKING SCREENSHOTS. Just click on sign in button.
 
-Also note the 'Timesheet Week' retrieved from memory.
+## Get data stored in memory:
+- Use memory functions to retrieve Capability and Jira task id and hours data from memory
+- Also note the 'Timesheet Week' retrieved from memory.
 
-On the page, select the date range matching the Jira tasks’ date range from memory.
-Note: select any day of the week to see the whole week.
+## Select Data Date:
+- Use calendar icon to select the 'Timesheet Week' retrieved from memory
+- Note: select the Wednesday of the week to select the whole week.
+- Alternate approach: Use '<' or '>' keys to change week to the desired week.
+- Ignore 'Current Week' as that does not apply to data entry
 
+## Enter hours by Capability:
 For each Capability ID (starts with "CAP"):
 
 1. Ensure row for Capability and Activity:
-Click 'Capability' dropdown and *type* the Capability ID in the search box. Then **click** on the name in the filtered list to select the capability. No need to scroll. **Note, once selected, only the name shows; the capability id does not show. Make sure the capability name is showing otherwise repeat this step**
+Click 'Capability' dropdown and *type* the Capability ID in the search box. 
+Then **click** on the Capability in the dropdown to select the capability. No need to scroll. 
+**Note, once selected, only the name of capability shows; the capability id does not show. 
+** Make sure the capability NAME is showing otherwise repeat this step**
+Save the Capability ID with is name to memory to assert this assocication.
 
 2. Choose "NEW Functionality: Application Coding" for Activity Id.
+Fields to ignore: 'Feature ID', 'Jira Project' and 'Release Version'.
 
 3. Click Add to insert a new row.
 

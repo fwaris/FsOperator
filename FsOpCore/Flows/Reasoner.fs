@@ -102,12 +102,14 @@ module Reasoner =
 
     ///returns None if reasoner says task is done otherwise Some 'new instructions'
     let reasonerGuidance resp =
-        let resp = RUtils.parseContent<CuaInstructionsResponse> resp //get structured output
-        match resp with
-        | None -> Some $"reasoner model did not send appropriate resp. for cua guidance"
-        | Some (Choice2Of2 e) -> failwith $"reasoner model refused to provide structured output '{e}'"
-        | Some (Choice1Of2 cuaInstr) ->
-            if cuaInstr.task_complete then
-                None
-            else
-                Some cuaInstr.cua_guidance
+        try
+            let resp = RUtils.parseContent<CuaInstructionsResponse> resp //get structured output
+            match resp with
+            | None -> Some $"reasoner model did not send appropriate resp. for cua guidance. Please retry"
+            | Some (Choice2Of2 e) -> Some $"reasoner model refused to provide structured output '{e}'. Please retry"
+            | Some (Choice1Of2 cuaInstr) ->
+                if cuaInstr.task_complete then
+                    None
+                else
+                    Some cuaInstr.cua_guidance
+        with ex -> Some "unable to parse model response. Please retry"

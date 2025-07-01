@@ -197,8 +197,8 @@ type OPlanMemory() =
 
     [<KernelFunction("memory_save")>]
     [<Description("Save a key-value pair for later retrieval")>]
-    member this.save_memory(key:string, value:string) =
-        Log.info $"save_memory:{key} = {value}"
+    member this.memory_save(key:string, value:string) =
+        Log.info $"{nameof this.memory_save}:{key} = {value}"
         lock bag (fun _ -> 
             bag <-
                 bag 
@@ -209,24 +209,24 @@ type OPlanMemory() =
         )
         "saved"
 
-    [<KernelFunction("memory_get_all_pairs")>]
+    [<KernelFunction("memory_get_all")>]
     [<Description("Retrieve all key value pairs saved in memory")>]
-    member this.get_all_memory() =
-        Log.info (nameof this.get_all_memory)
+    member this.memory_get_all() =
+        Log.info (nameof this.memory_get_all)
         this.Serialize(bag)
 
     [<KernelFunction("memory_get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
-    member this.get_all_keys() =
+    member this.memory_get_all_keys() =
         let ks = Map.keys bag |> Seq.toList
-        Log.info $"{nameof this.get_all_keys}: {ks}"
+        Log.info $"{nameof this.memory_get_all_keys}: {ks}"
         this.Serialize(ks)
 
     [<KernelFunction("memory_get_value")>]
     [<Description("retrieve a value for the given key")>]
-    member this.get_value(key:string) =
+    member this.memory_get_value(key:string) =
         let v = bag |> Map.tryFind key
-        Log.info $"{nameof this.get_value} {key} = {v}"
+        Log.info $"{nameof this.memory_get_value} {key} = {v}"
         this.Serialize(v)
 
 module OPlan =

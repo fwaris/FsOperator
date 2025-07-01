@@ -59,7 +59,7 @@ However, if there are multiple scroll bars then scrolling could be an issue.
 If you detect scrolling is an issue, suggest alternatives like 'wheel', 'PAGEUP', or 'PAGEDOWN'. 
 You may also suggest moving the cursor to a particular location and then issuing scroll commands.
 
-## Instruction Verbosity:
+## Instruction Generation:
 **Only provide the immediate next step to help the CUA continue.** Do not issue multi-step instrucitons.
 For example, to enter text into a field, ask CUA first to click in or focus the field.
 Wait to make sure the cursor is blinking in that field. Then issue the *type* <text> instructions. 
@@ -67,7 +67,8 @@ In the next snapshot ensure the text was  actually entered.
 Review the latest snapshot image after CUA action and issue the next instruction accordinly.
 *Don't assume that CUA has actually followed through*. 
 CUA may delay following instructions so they may have to be repeated. 
-Note: Commands like 'snapshot' and 'wait' don't take actions on the page..
+Note: Commands like 'snapshot' and 'wait' don't take actions on the page.
+If you think, CUA is not following instructions, try to issue them in all caps (expect for literal text to be entered)
 
 ## Miscellaneous:
 CUA does not have the ability to call functions. Instead of asking CUA to invoke functions, you just invoke the functions directly.
