@@ -56,7 +56,7 @@ module PlanFlowInteractive =
         (* --- states --- *)
 
         let rec s_start ss msg = async {
-            Log.info $"in {nameof s_start} {ss.task.id}"
+            Log.info $"in {nameof s_start} task '{ss.task.id}'"
             match msg with
             | W_Err e         -> return !!(s_terminate ss (Some e))
             | W_App TFi_Start -> let! (snapshot,w,h,url,env) as sn = snapshot ss.task.driver
@@ -68,7 +68,7 @@ module PlanFlowInteractive =
         }
 
         and s_cua ss count msg = async {
-            Log.info $"in {nameof s_cua} {count} {ss.task.id}"
+            Log.info $"in {nameof s_cua} {count} task '{ss.task.id}'"
             match msg with
             | W_Err e                        -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport         -> let corrId = Reasoner.stopAndSummarize ss.task
@@ -99,7 +99,7 @@ module PlanFlowInteractive =
         }
 
         and s_reason ss (vs,cuaResp) corrId msg  = async {
-            Log.info $"in {nameof s_reason} {ss.task.id}"
+            Log.info $"in {nameof s_reason} task '{ss.task.id}'"
             match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Reasoner.stopAndSummarize ss.task
@@ -120,7 +120,7 @@ module PlanFlowInteractive =
         }
 
         and s_pause ss corrId msg = async {
-            Log.info $"in {nameof s_pause} {ss.task.id}"
+            Log.info $"in {nameof s_pause} task '{ss.task.id}'"
             match msg with
             | W_Err e                -> return !!(s_terminate ss (Some e))
             | W_App TFi_EndAndReport -> let corrId = Reasoner.stopAndSummarize ss.task
@@ -138,7 +138,7 @@ module PlanFlowInteractive =
         }
 
         and s_summarizing ss corrId msg = async {
-            Log.info $"in {nameof s_summarizing} {ss.task.id}"
+            Log.info $"in {nameof s_summarizing} task '{ss.task.id}'"
             match msg with
             | W_Err e                 -> return !!(s_terminate ss (Some e))
             | FuncCall corrId (resp)  -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
@@ -152,7 +152,7 @@ module PlanFlowInteractive =
         }
 
         and s_terminate ss (e:WErrorType option) msg = async {
-            Log.info $"in s_terminate {ss.task.id}"
+            Log.info $"in s_terminate task '{ss.task.id}'"
             e
             |> Option.iter (fun e ->
                 ss.task.bus.postOutput (TFo_Error e)

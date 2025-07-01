@@ -14,31 +14,20 @@ let runPlan = TimesheetPlan.create()
 let initMem = 
     """
 {
-  "AGAP-7856": [
+  "AGAP-8692": [
     "CAP-12033",
-    "01Jun25:8,02Jun25:0,03Jun25:0,04Jun25:0,05Jun25:0,06Jun25:0,07Jun25:0"
-  ],
-  "AGAP-8082": [
-    "CAP-12033",
-    "01Jun25:0,02Jun25:8,03Jun25:0,04Jun25:0,05Jun25:0,06Jun25:0,07Jun25:0"
-  ],
-  "AGAP-8090": [
-    "CAP-12033",
-    "01Jun25:0,02Jun25:0,03Jun25:8,04Jun25:8,05Jun25:0,06Jun25:0,07Jun25:0"
-  ],
-  "Timeshee Week": [
-    "06-02-2025"
+    "29Jun:0,30Jun:8,01Jul:8,02Jul:0,03Jul:0,04Jul:0,05Jul:0"
   ],
   "Timesheet Week": [
-    "01/Jun/25 - 07/Jun/25"
+    "07-01-2025"
   ]
 }
-    """
+"""
     |> fun j -> JsonSerializer.Deserialize<Map<string,string list>>(j)
 
-let runPlan' = {runPlan with root = match runPlan.root with ONode.All all -> {all with nodes = all.nodes |> List.skip 2} |>  ONode.All | x -> x}
-let s1rMem = ["Timeshee Week",["06-02-2025"]] |> Map.ofList
-let s1r = OPlanRun.Create runPlan' (OPlan.defaultKernel initMem None)
+//let runPlan' = {runPlan with root = match runPlan.root with ONode.Seq all -> {all with nodes = all.nodes |> List.skip 2} |>  ONode.Seq | x -> x}
+let s1rMem = ["Timesheet Week",["07-01-2025"]] |> Map.ofList
+let s1r = OPlanRun.Create runPlan (OPlan.defaultKernel s1rMem  None)
 //let s1r = OPlanRun.Create runPlan (TimesheetPlan.startKernel())
 
 let s2r = OPlan.run s1r |> Async.RunSynchronously

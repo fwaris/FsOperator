@@ -61,7 +61,7 @@ and Choose = {
 }
 
 ///represents a sequence of task nodes that are to be completed in order
-and All = {
+and Seq = {
     nodes : ONode list
 
     ///if the All node is a child of a Choose node
@@ -71,15 +71,15 @@ and All = {
 
 ///task node tree structure
 and [<RequireQualifiedAccess>] ONode =
-    | One of OTask      //Leaf node containing the task
+    | Leaf of OTask      //Leaf node containing the task
     | Choose of Choose  //execute one of many sub nodes - based on LLM decision involving transition prompt
-    | All of All        //execute all sub nodes in sequence
+    | Seq of Seq        //execute all sub nodes in sequence
     with
         member this.allSubtasks() =
             let rec loop acc n =
                 match n with
-                | One t -> (t::acc)
-                | All all -> (acc,all.nodes) ||> List.fold loop
+                | Leaf t -> (t::acc)
+                | Seq all -> (acc,all.nodes) ||> List.fold loop
                 | Choose {transition={nodes=ns}} -> (acc,ns) ||> List.fold loop
             loop [] this
 
@@ -91,7 +91,7 @@ type OPlan = {
     with
         static member Default = {
                         description = ""
-                        root = ONode.All {nodes=[]; description=None}
+                        root = ONode.Seq {nodes=[]; description=None}
                     }
 
 ///run time state required to run a task
@@ -257,7 +257,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
         let plan =
             { OPlan.Default with
                 description = "take linkedin people and find their twitter handle"
-                root = ONode.All {nodes= [ONode.One ln; ONode.One tw]; description=None}
+                root = ONode.Seq {nodes= [ONode.Leaf ln; ONode.Leaf tw]; description=None}
             }
         plan
 
@@ -269,7 +269,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
     /// - 3of3 - transition to a Choose child
     /// </summary>
     let rec findNext (doneSet:Set<string>) = function
-        | ONode.One t -> if doneSet.Contains t.id then Choice1Of3 () else Choice2Of3 t
+        | ONode.Leaf t -> if doneSet.Contains t.id then Choice1Of3 () else Choice2Of3 t
         | ONode.Choose {transition={nodes=ts}} as cts ->
             let subIds = cts.allSubtasks() |> List.map _.id |> set
             let subsDone = Set.intersect doneSet subIds
@@ -280,7 +280,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
                 |> List.map (findNext doneSet)
                 |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
                 |> Option.defaultValue (Choice1Of3 ())
-        | ONode.All {nodes=ts} ->
+        | ONode.Seq {nodes=ts} ->
             ts
             |> List.map (findNext doneSet)
             |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)

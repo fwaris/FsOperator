@@ -92,6 +92,7 @@ let t_tTime =
 ## Select Data Date:
 - Use calendar icon to select the 'Timesheet Week' retrieved from memory
 - Note: select the Wednesday of the week to select the whole week.
+- Ensure the right month is selected in the calendar.
 - Alternate approach: Use '<' or '>' keys to change week to the desired week.
 - Ignore 'Current Week' as that does not apply to data entry
 
@@ -99,8 +100,8 @@ let t_tTime =
 For each Capability ID (starts with "CAP"):
 
 1. Ensure row for Capability and Activity:
-Click 'Capability' dropdown and *type* the Capability ID in the search box. 
-Then **click** on the Capability in the dropdown to select the capability. No need to scroll. Also ENTER does not work here.
+Click 'Capability' dropdown and *TYPE* the Capability ID in the search box. (DON'T SCROLL)
+Then **click** on the dropdown list ITEM (not the searchbox) to select the Capability. No need to scroll. Also ENTER does not work here.
 **Note, once selected, only the name of capability shows; the capability id does not show. 
 ** Make sure the capability NAME is showing otherwise repeat this step**
 Save the Capability ID with is name to memory to assert this assocication.
@@ -110,7 +111,7 @@ Fields to ignore: 'Feature ID', 'Jira Project' and 'Release Version'.
 
 3. Click Add to insert a new row.
 
-4. Enter weekday hours for each day. Sum all hours for each day for the tasks under the same Capability ID. **After clicking into the day cell, use CTRL-A to select exsting hours and then enter the new hours**. Make sure the hours are correct, e.g. '8' hours shoud not be '80' hours.
+4. Enter weekday hours for each day. Sum all hours for each day for the tasks under the same Capability ID. **After clicking into the day cell, use CTRL-A to select exsting hours and then enter the new hours**. Make sure the hours are correct, e.g. '8' hours shoud not be '80' hours. Note that data cannot be entered into cells that are greyed out or disabled. Don't try to enter data in such cells.
 
 Repeat Steps 1 - 4 for all Capability IDs.
 
@@ -128,77 +129,6 @@ let create() =
         let plan =
             { OPlan.Default with
                 description = "Take hours from jira and enter them into t-time"
-                root = ONode.All {nodes= [ONode.One tHours; ONode.One tCapability; ONode.One t_tTime]; description=None}
-                //root = ONode.All {nodes= [ONode.One tCapability; ONode.One t_tTime]; description=None}
-                //root = ONode.All {nodes= [ONode.One t_tTime]; description=None}
+                root = ONode.Seq {nodes= [ONode.Leaf tHours; ONode.Leaf tCapability; ONode.Leaf t_tTime]; description=None}
             }
         plan
-
-let startMemory =
-  [
-    "Timesheet Week", ["6/2/2025"]
-  ]
-  |> Map.ofList
-
-let startCapMemory = 
-    let m = """
-{
-  "JIRA_TASK-AGAP-8515": [
-    "CAP-12033",
-    "22Jun:0,23Jun:8,24Jun:8,25Jun:0,26Jun:0,27Jun:0,28Jun:0"
-  ],
-  "JIRA_TASK-AGAP-8586": [
-    "CAP-12033",
-    "22Jun:0,23Jun:0,24Jun:0,25Jun:8,26Jun:8,27Jun:0,28Jun:0"
-  ],
-  "JIRA_TASK-AGAP-8692": [
-    "CAP-12033",
-    "22Jun:0,23Jun:0,24Jun:0,25Jun:0,26Jun:0,27Jun:8,28Jun:0"
-  ],
-  "Timesheet Week": [
-    "6/9/2025"
-  ]
-}
-"""
-    JsonSerializer.Deserialize<Map<string,string list>>(m)
-
-let startKernel nav =
-    let b = Kernel.CreateBuilder()
-    let mem = OPlanMemory()
-    mem.SetMemory(startMemory)
-    //mem.SetMemory(startCapMemory)
-    b.Plugins.AddFromObject(mem) |> ignore
-    b.Plugins.AddFromObject(nav) |> ignore
-    b.Build()
-
-///memory to test only the last task
-let memSnapshoot_t_tTime = """
-{
-  "AGAP-7495": [
-    "CAP-12033"
-  ],
-  "AGAP-8279": [
-    "CAP-12033"
-  ],
-  "AGAP-8515": [
-    "CAP-12033"
-  ],
-  "JIRA_TASK-AGAP_8515": [
-    "22Jun:0,23Jun:0,24Jun:8,25Jun:8,26Jun:0,27Jun:0,28Jun:0"
-  ],
-  "JIRA_TASK-AGAP_8586": [
-    "22Jun:0,23Jun:8,24Jun:0,25Jun:0,26Jun:0,27Jun:0,28Jun:0"
-  ]
-}
-"""
-
-let testKernel nav =
-    let b = Kernel.CreateBuilder()
-    //b.Plugins.AddFromType<OPlanMemory>() |> ignore
-    let mem = OPlanMemory()
-    let memD = JsonSerializer.Deserialize<Map<string,string list>>(memSnapshoot_t_tTime)
-    mem.SetMemory(memD)
-    b.Plugins.AddFromObject(mem) |> ignore
-    //b.Plugins.AddFromObject(OPlanMemory.LoadState()) |> ignore
-    b.Plugins.AddFromObject(nav) |> ignore
-    b.Build()
