@@ -75,6 +75,7 @@ let t_tTime =
             target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
             tools = FlUtils.makeFunctionTools<OPlanMemory>() @ FlUtils.makeFunctionTools<Navigator>()
             description = "Enter capability hours into T-Time"
+            allowedSec = 60*20
             reasoner = Some Prompts.``reasoner prompt for cua guidance``
             cua = Some """Goal: Add a row for each Capability ID (from memory) for the selected week, entering weekday hours for related Jira tasks.
 # Instructions
@@ -99,7 +100,7 @@ For each Capability ID (starts with "CAP"):
 
 1. Ensure row for Capability and Activity:
 Click 'Capability' dropdown and *type* the Capability ID in the search box. 
-Then **click** on the Capability in the dropdown to select the capability. No need to scroll. 
+Then **click** on the Capability in the dropdown to select the capability. No need to scroll. Also ENTER does not work here.
 **Note, once selected, only the name of capability shows; the capability id does not show. 
 ** Make sure the capability NAME is showing otherwise repeat this step**
 Save the Capability ID with is name to memory to assert this assocication.
@@ -120,7 +121,7 @@ Only enter data for Capability IDs found in memory.
 
 Click Save, not Submit.
 
-*The task ends after the timesheet is Saved.*
+**The task only ends after hours for all Capabilities and all days have been entered and the timesheet has been saved**
     """}
 
 let create() =

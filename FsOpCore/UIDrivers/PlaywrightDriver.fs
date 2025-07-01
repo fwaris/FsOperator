@@ -68,7 +68,7 @@ module PlaywrightDriver =
                         |> Seq.toList
                         |> List.rev
                         |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
-                    sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
+                    //sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
                     let page = sortedPages.Head
                     if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
                         do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
@@ -152,7 +152,7 @@ module PlaywrightDriver =
         async {
             let! browser = connection()
             let! page = getPage 0 browser
-            Log.info "got page; waiting for network idle ..."
+            Log.trace "got page; waiting for network idle ..."
             let! c = Async.StartChild(waitForIdle page, 1500)
             try do! c with ex -> Log.info $"waitForIdle failed"
             if isProperUrl page.Url then
@@ -260,12 +260,12 @@ module PlaywrightDriver =
             async {
                 try
                     let! page = page()
-                    Log.info $"taking snapshot of {page.Url}"
+                    Log.trace $"taking snapshot of {page.Url}"
                     let opts = PageScreenshotOptions()
                     opts.Animations <- ScreenshotAnimations.Disabled
                     opts.FullPage <- true
                     let! image = page.ScreenshotAsync() |> Async.AwaitTask
-                    Log.info $"done snapshot"
+                    Log.trace $"done snapshot"
                     let bmp = SKBitmap.Decode(image)
                     let imgUrl = FsResponses.RUtils.toImageUri image
                     System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), image)

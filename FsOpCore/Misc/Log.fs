@@ -12,6 +12,7 @@ module Log =
     let warn (msg:string) = _log.LogWarning(msg)
     let error (msg:string) = _log.LogError(msg)
     let exn (exn:exn,msg) = _log.LogError(exn,msg)
+    let trace (msg:string) = _log.LogTrace(msg)
 
     let init (sp:IServiceProvider) =
         match sp.GetService(typeof<ILoggerFactory>) with 
