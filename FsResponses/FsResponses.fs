@@ -211,6 +211,13 @@ type IOitem =
   | [<JsonName "computer_call" >] Computer_call of ComputerCall
   | [<JsonName "computer_call_output">] Computer_call_output of ComputerCallOutput
 
+type Usage = 
+    {
+        input_tokens : int
+        output_tokens : int
+        total_tokens : int    
+    }
+
 type Request = {
     model : string
     input : IOitem list
@@ -274,7 +281,7 @@ type Response = {
     tools : Tool list
     top_p : float32
     truncation : string option //auto, disabled
-    usage : JsonElement option
+    usage : Usage
     user : string option
 }
 

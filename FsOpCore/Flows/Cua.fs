@@ -25,8 +25,7 @@ module Cua =
                 async {
                     do! Actions.doAction 2 task.driver cb.action
                     let! visualState = FlUtils.snapshot task.driver
-                    let (snapshot,w,h,url,env) = visualState
-                    let task = task.prependSnapshot snapshot //save screenshot for reasoner also
+                    let task = task.prependSnapshot visualState.snapshot //save screenshot for reasoner also
                     let actStr = Actions.actionToString cb.action
                     let task = task.prependAction actStr
                     return task,Some visualState
@@ -70,14 +69,14 @@ module Cua =
     let postCuaNext ss vs (cuaResp:Response) cuaInstr =
 
         match vs, FlUtils.computerCall cuaResp with
-        | Some (snapshot,w,h,url,env), Some cc ->
-            let cuaTool = Tool_Computer_use {|display_height = h; display_width = w; environment = env|}
+        | Some vs, Some cc ->
+            let cuaTool = Tool_Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
             let cc_out =
                 {
                     call_id = cc.call_id
                     acknowledged_safety_checks = FlResps.safetyChecks cuaResp
-                    output = Computer_screenshot {|image_url = snapshot |}
-                    current_url = url
+                    output = Computer_screenshot {|image_url = vs.snapshot |}
+                    current_url = vs.url
                 }
                 |> IOitem.Computer_call_output
             let input =
@@ -105,6 +104,6 @@ module Cua =
     let postResumeCua task snapshot =
         async {
             let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
-            FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); snapshot=snapshot; chatHistory=chatHistory}
+            FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput

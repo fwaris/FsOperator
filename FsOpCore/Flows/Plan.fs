@@ -99,7 +99,15 @@ type OTaskRun = {
     task     : OTask
     driver   : IUIDriver
     messages : ChatMsg list
+    usage    : Map<string,FsResponses.Usage>
 }
+with static member Default task driver = 
+                    {
+                        task = task
+                        driver = driver
+                        messages = []
+                        usage = Map.empty
+                    }
 
 ///runtime state required to run a plan
 type OPlanRun = {
@@ -311,6 +319,30 @@ Use memory_save function to save each person's linked-in and twitter data into m
         }
         |> Async.Start
 
+    let reduceUsage (a:FsResponses.Usage) (b:FsResponses.Usage) = 
+        {a with 
+            input_tokens = a.input_tokens + b.input_tokens 
+            output_tokens = a.output_tokens + b.output_tokens
+            total_tokens = a.total_tokens + b.total_tokens
+        }
+
+    let sumUsages (us:Map<string,FsResponses.Usage list>) = 
+        us
+        |> Map.map (fun k vs ->  
+            vs 
+            |> List.reduce reduceUsage)
+
+    let collectUsages (uss:Map<string,FsResponses.Usage> list) = 
+        uss
+        |> List.collect Map.toList
+        |> List.groupBy fst
+        |> List.map (fun (k,xs) -> k, List.map snd xs)
+        |> Map.ofList
+            
+    let printTaskUsage (us:Map<string,FsResponses.Usage list>) =
+        sumUsages us
+        |> Map.iter (fun m u -> printfn $"{m} inp:{u.input_tokens}, out:{u.output_tokens}, tot:{u.total_tokens}")        
+
     ///Runs the current task set in planRun
     let runCurrentTask (planRun:OPlanRun) = async{
         match planRun.currentTask with
@@ -320,12 +352,12 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let completedTask = ref None
             let driver = (PlaywrightDriver.create().driver)
             let post = fun p ->
-                printfn "%A" p
                 match p with
                 | PlanFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
                 | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | PlanFlow.TFo_Action a -> ()//printfn "%A" a
+                | PlanFlow.TFo_Action a -> printfn "%A" a
                 | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
+                | PlanFlow.TFo_Usage us -> printTaskUsage us
             let bus = WBus.Create<_,_> post
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
@@ -342,7 +374,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
             startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with
-            | Some t -> return {ot with messages = t.cuaMessages}
+            | Some t -> return {ot with messages = t.cuaMessages; usage = sumUsages t.usage}
             | None   -> return failwith "no output from step"
     }
 
@@ -355,7 +387,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
                     currentTask = None
                     completedTasks = appendTask planRun.currentTask planRun.completedTasks}
         | Some t ->
-                let tr = {task = t; driver = PlaywrightDriver.create().driver; messages=[]}
+                let tr = OTaskRun.Default t (PlaywrightDriver.create().driver)
 
                 let planRun =
                         {planRun with

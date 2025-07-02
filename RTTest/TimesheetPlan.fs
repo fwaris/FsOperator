@@ -68,7 +68,6 @@ For each jira task id (that has hours) do the following:
 Note: If needed, use Faisal.Waris1@t-mobile.com as login email id.
 """}
 
-
 let t_tTime =
         { OTask.Create() with
             id = "enter_hours_into_t-time"

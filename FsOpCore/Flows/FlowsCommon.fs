@@ -4,18 +4,35 @@ open Microsoft.SemanticKernel
 open FsResponses
 open System.Text.Json
 
+type VisualState = 
+    {
+        snapshot        : string
+        width           : int
+        height          : int 
+        url             : string option
+        environment     : string
+    }
+    with static member Default = 
+                            {
+                                snapshot    = ""
+                                width       = C.VIEWPORT_WIDTH
+                                height      = C.VIEWPORT_HEIGHT
+                                url         = None
+                                environment = ComputerEnvironment.browser
+                            }
+
 ///type to package cua request parameters
 type CuaReq = 
     {
         instructions : string option
-        snapshot : string*int*int*string option*string 
-        chatHistory : Message list
-        nonCuaTools : Tool list
+        visualState  : VisualState
+        chatHistory  : Message list
+        nonCuaTools  : Tool list
     }
     with static member Default = 
                         {
                             instructions = None
-                            snapshot = "",C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT,None,"browser"
+                            visualState = VisualState.Default
                             chatHistory = []
                             nonCuaTools = []
                         }
@@ -28,7 +45,7 @@ module FlUtils =
     let snapshot (driver:IUIDriver) = async {
         let! (snapshot,(w,h)) = driver.snapshot()
         let! url = driver.url()
-        return (snapshot,w,h,url,driver.environment)
+        return {snapshot=snapshot; width=w; height=h; url=url;environment=driver.environment}
     }
 
     /// <summary>
@@ -128,6 +145,13 @@ module FlUtils =
         | W_Cua (resp) when hasFunction resp -> Some resp
         | _                                  -> None
 
+    ///Cua message with no computer call requested
+    let (|NoComputerCall|_|) = function
+        | W_Cua (resp) when noCC resp -> Some resp
+        | _                            -> None
+
+
+    let getUsage (resp:Response) = resp.model,resp.usage
 
 //utility functions for working Responses API messsages
 module FlResps =
@@ -208,11 +232,12 @@ module FlResps =
 
     ///send an initial 'computer tool call' request
     let postStartCua replyChannel cuaReq =
-       let (sanpshot,width,height,url,environment) = cuaReq.snapshot
+       let vs = cuaReq.visualState
+       //let (sanpshot,width,height,url,environment) = cuaReq.visualState
        async {
-            let contImg = Input_image {|image_url = sanpshot|}
+            let contImg = Input_image {|image_url = vs.snapshot|}
             let input = { Message.Default with content=[contImg]}
-            let cuaTool = Tool_Computer_use {|display_height = height; display_width = width; environment = environment|}
+            let cuaTool = Tool_Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
             let req = {Request.Default with
                             input = [IOitem.Message input] @ (cuaReq.chatHistory |> List.map IOitem.Message)
                             tools= cuaTool :: cuaReq.nonCuaTools

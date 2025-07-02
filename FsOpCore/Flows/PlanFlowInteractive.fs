@@ -59,9 +59,9 @@ module PlanFlowInteractive =
             Log.info $"in {nameof s_start} task '{ss.task.id}'"
             match msg with
             | W_Err e         -> return !!(s_terminate ss (Some e))
-            | W_App TFi_Start -> let! (snapshot,w,h,url,env) as sn = snapshot ss.task.driver
-                                 let ss = ss.setTask (ss.task.prependSnapshot snapshot)
-                                 FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); snapshot=sn}
+            | W_App TFi_Start -> let! sn = snapshot ss.task.driver
+                                 let ss = ss.setTask (ss.task.prependSnapshot sn.snapshot)
+                                 FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=sn}
                                  return !!(s_cua ss 1)
             | x               -> Log.warn $"{nameof s_start}: expecting {TFi_Start} message to start flow but got {x}"
                                  return !!(s_start ss)
@@ -126,9 +126,9 @@ module PlanFlowInteractive =
             | W_App TFi_EndAndReport -> let corrId = Reasoner.stopAndSummarize ss.task
                                         return !!(s_summarizing ss corrId)
             | W_App (TFi_Resume tx)  -> let ss = ss.setTask (ss.task.prependCuaMessage (User tx))
-                                        let! (sn,_,_,_,_) as snapshot = FlUtils.snapshot(ss.task.driver)
-                                        let ss = {ss with task = ss.task.prependSnapshot sn}
-                                        Cua.postResumeCua ss.task snapshot //resume chat (note server history is gone so use history)
+                                        let! vs = FlUtils.snapshot(ss.task.driver)
+                                        let ss = {ss with task = ss.task.prependSnapshot vs.snapshot}
+                                        Cua.postResumeCua ss.task vs //resume chat (note server history is gone so use history)
                                         return F(s_cua ss 1,[TFo_ChatUpdated ss.task.cuaMessages ])
             | FuncCall corrId (resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
                                         let! ss = ss.callFunctions resp
