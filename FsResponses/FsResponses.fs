@@ -72,6 +72,8 @@ module Truncation =
 module Models =
     let gpt_41 = "gpt-4.1"
     let o4_mini = "o4-mini"
+    let gpt_41_nano = "gpt-4.1-nano"
+    let gpt_41_mini = "gpt-4.1-mini"
     let computer_use_preview = "computer-use-preview"
 
 module Buttons =
@@ -285,6 +287,42 @@ type Response = {
     user : string option
 }
 
+type List = {
+    ``object`` : string
+    data : IOitem list
+    first_id : string
+    last_id  : string
+    has_more : bool
+}
+
+//let testRespos = JsonSerializer.Deserialize<Response>(jsonObt, options=serOpts)
+type DeleteResponse = {
+    id : string
+    object : string
+    deleted : bool
+}
+    
+[<JsonFSharpConverter(UnionUnwrapFieldlessTags=true)>]
+type SortOrder = 
+    | [<JsonName "asc">] Asc 
+    | [<JsonName "dsc">] Dsc
+
+type ListRequest = {
+    id : string
+    before : string option
+    after : string option
+    limit : int option
+    order : SortOrder option
+}
+with static member Create id = 
+                    {
+                        id = id
+                        before = None
+                        after = None
+                        limit = None
+                        order = None
+                    }
+
 exception ApiError of ResponseErrorObj
 
 module RUtils =
@@ -371,8 +409,6 @@ module Api =
         opts.WriteIndented <- true
         opts
 
-    //let testRespos = JsonSerializer.Deserialize<Response>(jsonObt, options=serOpts)
-
     let newClient(key:string) =
         let client = new HttpClient()
         client.BaseAddress <- Uri "https://api.openai.com/v1"
@@ -407,6 +443,86 @@ module Api =
                 | Some e -> return raise e
                 | None  -> return failwith $"{str}"
         }
+
+    let delete (id:string) (client:#HttpClient) = 
+        task {
+            let builder = UriBuilder(client.BaseAddress)
+            builder.Path <- builder.Path + $"/responses/{id}"
+            let! resp = client.DeleteAsync(builder.Uri)
+            if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"Response Delete: {str} "
+                return JsonSerializer.Deserialize<DeleteResponse>(str,options=serOpts)
+            else
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"{str} "
+                let err =
+                    try
+                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
+                        Some (ApiError err)
+                    with ex ->
+                        None
+                match err with
+                | Some e -> return raise e
+                | None  -> return failwith $"{str}"
+    }
+
+    let get (id:string) (client:#HttpClient) = 
+        task {
+            let builder = UriBuilder(client.BaseAddress)
+            builder.Path <- builder.Path + $"/responses/{id}"
+            let! resp = client.GetAsync(builder.Uri)
+            if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"Response Get: {str} "
+                return JsonSerializer.Deserialize<Response>(str,options=serOpts)
+            else
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"{str} "
+                let err =
+                    try
+                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
+                        Some (ApiError err)
+                    with ex ->
+                        None
+                match err with
+                | Some e -> return raise e
+                | None  -> return failwith $"{str}"
+    }
+
+    let list (req:ListRequest) (client:#HttpClient) = 
+        task {
+            let builder = UriBuilder(client.BaseAddress)
+            builder.Path <- builder.Path + $"/responses/{req.id}/input_items"
+            let query =
+                [
+                    Option.map (fun r -> $"after={r}") req.after
+                    Option.map (fun r -> $"before={r}") req.before
+                    Option.map (fun r -> $"limit={r}") req.limit
+                    Option.map (fun r -> $"""order={match r with Asc -> "asc" | _ -> "dsc"}""") req.order
+
+                ]
+                |> List.choose id 
+                |> String.concat "&"
+            builder.Query <- if String.IsNullOrWhiteSpace query then "" else "?" + query
+            let! resp = client.GetAsync(builder.Uri)
+            if resp.StatusCode = Net.HttpStatusCode.OK || resp.StatusCode = Net.HttpStatusCode.Accepted then
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"Response List: {str} "
+                return JsonSerializer.Deserialize<List>(str,options=serOpts)
+            else
+                let! str = resp.Content.ReadAsStringAsync()
+                if Log.debug_logging then Log.info $"{str} "
+                let err =
+                    try
+                        let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
+                        Some (ApiError err)
+                    with ex ->
+                        None
+                match err with
+                | Some e -> return raise e
+                | None  -> return failwith $"{str}"
+    }        
 
     let createWithDefaults (input:string) =
         create

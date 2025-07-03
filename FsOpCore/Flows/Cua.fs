@@ -91,7 +91,7 @@ module Cua =
                             previous_response_id = Some cuaResp.id
                             store = true
                             model=Models.computer_use_preview
-                            truncation = Some Truncation.auto
+                            truncation = Some Truncation.auto                           
                         }
             FlResps.sendRequest W_Cua ss.bus.PostInput req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
