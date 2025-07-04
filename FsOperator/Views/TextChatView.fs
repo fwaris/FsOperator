@@ -89,7 +89,7 @@ type TextChatView =
                                 Panel.children [
                                     TextBox.create [
                                         TextBlock.init (fun t -> Cache.textQuestion.Value <- t)
-                                        //TextBox.text (Cache.textQuestion.Value.Text)
+                                        TextBox.text (model.flow.chat.question |> Option.defaultValue "")
                                         TextBox.textWrapping TextWrapping.Wrap
                                         TextBox.horizontalAlignment HorizontalAlignment.Stretch
                                         TextBox.verticalAlignment VerticalAlignment.Stretch
@@ -100,13 +100,13 @@ type TextChatView =
                                         TextBox.margin 1  
                                         TextBox.fontSize 14.
                                         TextBox.borderThickness 1.
-                                        //TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
+                                        TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
                                         TextBox.margin (Thickness(2.,2.,35.,2.))
                                     ]
                                     Button.create [
                                         Button.margin (Thickness(0.,0.,1.,2.))
                                         Button.content Icons.send
-                                        Button.onClick (fun _ -> dispatch (Flow_Resume Cache.textQuestion.Value.Text)) 
+                                        Button.onClick (fun _ -> dispatch Flow_Resume)
                                         Button.horizontalAlignment HorizontalAlignment.Right
                                         Button.verticalAlignment VerticalAlignment.Bottom
                                     ]

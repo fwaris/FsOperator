@@ -23,6 +23,7 @@ module PlanFlowInteractive =
         | TFo_Usage of Map<string,FsResponses.Usage list>
         | TFo_ChatUpdated of ChatMsg list
         | TFo_Done of ChatMsg list
+        | TFo_Log of string
 
     ///keeps needed local 'substate'
     type SubState = {
@@ -119,7 +120,8 @@ module PlanFlowInteractive =
             match ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
-            | Cont (ss,ms, W_App TFi_Start)  -> let! vs = snapshot ss.task.driver
+            | Cont (ss,ms, W_App TFi_Start)  -> do! ss.task.driver.start ss.task.target
+                                                let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)
                                                 let ss = ss.setTask (ss.task.prependSnapshot vs.snapshot)
                                                 FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}
@@ -136,9 +138,7 @@ module PlanFlowInteractive =
             | TxnAsync st                               -> return! st
 
             | Cont (ss,ms, NoComputerCall resp)         -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
-                                                           let corrId = Reasoner.getGuidanceAfterCuaPause ss.task //ask reasoner what to do next
-                                                           let ss = ss.setCorrId corrId
-                                                           return F(s_pause ss,ms)
+                                                           return F(s_pause ss,TFo_Paused ss.task.cuaMessages::ms)
             | Cont (ss,ms, GetReasonerGuidance ss resp) -> //should get guidance from reasoner before responding to CUA
                                                            let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) 
                                                            let! ss = ss.performComputerCall resp
@@ -165,11 +165,13 @@ module PlanFlowInteractive =
             | Cont (ss,ms,Reasoner ss.corrId resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
                                                       match Reasoner.reasonerGuidance resp with
                                                       | None ->
-                                                            Log.info $"task {ss.task.id} completed"
-                                                            return F(s_terminate ss, TFo_Done ss.task.cuaMessages::ms)
+                                                            Log.info $"task {ss.task.id} completed, summarizing"
+                                                            let corrId = Reasoner.stopAndSummarize ss.task
+                                                            let ss = ss.setCorrId corrId
+                                                            return F(s_summarizing ss, TFo_Log "Finalizing"::ms)
                                                       | Some guidance ->
                                                             Cua.postCuaNext ss.task ss.visualState ss.cuaResp.Value (Some guidance)
-                                                            return F(s_cua ss,ms)
+                                                            return F(s_cua ss,TFo_Log $"Reasonger guidance '{guidance}'"::ms)
             | Cont(ss,_,x)                         -> return ignoreMsg (s_reason ss) x (nameof s_reason)
         }
 
@@ -183,8 +185,8 @@ module PlanFlowInteractive =
                                                     let ss = {ss with task = ss.task.prependSnapshot vs.snapshot}
                                                     let ss = ss.setVisualState (Some vs)
                                                     Cua.postResumeCua ss.task vs //resume chat (note server history is gone so use local history)
-                                                    return F(s_cua ss,ms)
-            | Cont (ss,_,x)                         -> return ignoreMsg (s_pause ss) x (nameof s_pause)
+                                                    return F(s_cua ss,TFo_ChatUpdated ss.task.cuaMessages::ms)
+            | Cont (ss,_,x)                      -> return ignoreMsg (s_pause ss) x (nameof s_pause)
         }                                           
 
         and s_summarizing ss msg = async {

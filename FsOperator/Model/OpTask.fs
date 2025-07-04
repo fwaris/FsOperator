@@ -5,7 +5,13 @@ open System
 open System.Text.Json
 open System.Text.Json.Serialization
 
-type TaskTarget = TProcess of string*string option | TLink of string
+type TaskTarget =
+    | TProcess of string*string option 
+    | TLink of string
+    with member this.TargetString() = 
+            match this with 
+            | TProcess (a,b) -> $"{a} {b}"
+            | TLink s -> s
 
 type OpTask = {
     id : string
@@ -119,8 +125,11 @@ about "Generative AI".
                 id="linkedin"
                 description="summarize latest posts"
                 target = TLink "https://linkedin.com" 
-                textModeInstructions = """Scroll through my LinkedIn feed and summarize the latest posts
-about "Generative AI" 
+                textModeInstructions = """Search LinkedIn and summarize the latest posts about "Generative AI
+Find at least 5 posts. 
+No need to get into details of each post.
+Just scroll down by half-pages one-way to find the interesting and relevant posts. Don't scroll back up.
+You may use memory to save and retrieve relevant information.
 """
             }
 

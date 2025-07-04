@@ -209,9 +209,12 @@ module Update =
         | _ -> model, Cmd.none
 
     let browserPostUrl model =
+        (*
         match model.ui, model.opTask.target with
         | Pw u, TLink url -> u.postUrl url |> Async.Start //model.browserMode
         | _ -> ()
+        *)
+        ()
 
     let checkUrl (url:string) =
         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
@@ -400,13 +403,14 @@ module Update =
             let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
             let t0 = FsOpCore.TaskState.Create<_,_>  //initial task state
                         model.opTask.id
+                        (model.opTask.target.TargetString())
                         bus
                         ui.driver
                         model.opTask.textModeInstructions
-                        (checkEmpty model.opTask.reasonerInstructions)
+                        (checkEmpty model.opTask.reasonerInstructions |> Option.orElse (Some Prompts.``reasoner prompt for cua guidance``))
                         kernel
             let flow = PlanFlowInteractive.create t0
-            let model = {model with flow = {model.flow with state=FL_Flow {|flow=flow|}}}        
+            let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}        
             async {
                 do! Async.Sleep 100
                 flow.Post PlanFlowInteractive.TFi_Start
@@ -429,7 +433,7 @@ module Update =
             | OpTask_SetTarget txt -> setTarget model txt
             | OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
             | OpTask_Load -> model,Cmd.none
-            | OpTask_Loaded (Some instr) -> {model with opTask=instr}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg SyncUrlToBrowser]
+            | OpTask_Loaded (Some instr) -> {model with opTask=instr; flow=Flow.Default}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg SyncUrlToBrowser]
             | OpTask_Loaded None -> model, Cmd.none
             | OpTask_LoadSample sample -> model, Cmd.OfAsync.either checkLoadSample (win,model,sample) OpTask_Loaded Error
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
@@ -454,7 +458,7 @@ module Update =
             | Nop _ -> model, Cmd.none
 
             | Chat_CUATurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
-            | Chat_UpdateQuestion txt -> {model with taskState = TaskState.setQuestion txt model.taskState}, Cmd.none
+            | Chat_UpdateQuestion txt -> {model with flow = model.flow.setQuestion txt}, Cmd.none
             | Chat_Append msg -> {model with taskState = TaskState.appendChatMsg msg model.taskState}, Cmd.none
             | Chat_HandleTurnEnd -> handleTurnEnd model
             | Chat_Resume ->  resumeTextCuaLoop model
@@ -465,7 +469,7 @@ module Update =
             | Flow_StartStop when model.flow.isRunning() -> terminateFlow model
             | Flow_StartStop                             -> startFlow model
             | Flow_StopAndSummarize -> {model with flow = model.flow.stopAndSummarize()},Cmd.none
-            | Flow_Resume txt -> model.flow.Post (PlanFlowInteractive.TFi_Resume txt); model,Cmd.none
+            | Flow_Resume -> {model with flow = model.flow.resume()},Cmd.none
             | Flow_Terminate -> terminateFlow model
 
             ///handle messages emitted by a running flow
@@ -474,6 +478,8 @@ module Update =
             | Flow_Msg (PlanFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
             | Flow_Msg (PlanFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
             | Flow_Msg (PlanFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate
+            | Flow_Msg (PlanFlowInteractive.TFo_Log s) -> model, Cmd.ofMsg (Log_Append s)
+            | Flow_Msg (PlanFlowInteractive.TFo_Usage u) -> OPlan.printTaskUsage u; model,Cmd.none
 
             | TextChat_StartStopTask -> startStopTextChat model
             | VoiceChat_StartStop -> startStopVoiceChat model

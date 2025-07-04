@@ -328,7 +328,7 @@ type ClientMsg =
     | Flow_StartStop
     | Flow_Terminate
     | Flow_StopAndSummarize
-    | Flow_Resume of string
+    | Flow_Resume
     | Flow_Msg of PlanFlowInteractive.PlanFLowMsgOut
 
     | Action_Set of string

@@ -8,7 +8,13 @@ open System.Text.Json.Serialization
 open System.Collections.Concurrent
 
 ///represents the target computer environment (browser url or windows exe) for a task
-type OTaskTarget = OProcess of string*string option | OLink of string
+type OTaskTarget = 
+    | OProcess of string*string option 
+    | OLink of string
+    with member this.TargetString() = 
+            match this with 
+            | OProcess (a,b) -> $"{a} {b}"
+            | OLink s -> s    
 
 ///definition of a single unit of work in a plan
 type OTask = {
@@ -361,6 +367,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let bus = WBus.Create<_,_> post
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
+                        (ot.task.target.TargetString())
                         bus
                         driver
                         ot.task.cua.Value

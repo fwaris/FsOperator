@@ -5,6 +5,7 @@ open Microsoft.SemanticKernel
 ///reuseable state needed to keep track of a running task
 type TaskState<'inMsg,'outMsg> = {
         id              : string
+        target          : string
         cuaMessages     : ChatMsg list
         cuaPrompt       : string
         reasonerItems   : IOitem list
@@ -17,9 +18,10 @@ type TaskState<'inMsg,'outMsg> = {
         usage           : Map<string,FsResponses.Usage list>
     }
     with
-        static member Create id bus driver cuaPrompt reasonerPrompt kernel =
+        static member Create id target bus driver cuaPrompt reasonerPrompt kernel =
                             {
                                id = id
+                               target = target
                                driver = driver
                                cuaMessages = []
                                cuaPrompt = cuaPrompt

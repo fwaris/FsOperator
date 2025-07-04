@@ -24,22 +24,24 @@ module PlaywrightDriver =
     let browserStatePath = lazy(homePath.Value @@ "fsoperator.json")
     let getStorageStatePath = lazy(if File.Exists browserStatePath.Value then browserStatePath.Value else null)    
 
-    let disconnectHook (ctx:IBrowserContext) = 
-        async{
-            Log.info "Saving browser context state"
-            try
-                let opts = BrowserContextStorageStateOptions()
-                opts.Path <- browserStatePath.Value
-                do! ctx.StorageStateAsync(opts) |> Async.AwaitTask |> Async.Ignore
-            with ex ->
-                Log.warn $"Error encountered when saving browser context state ${ex.Message}"
-        }
-        |> Async.Start
+    let saveState (ctx:IBrowserContext) = async {
+        Log.info "Saving browser context state"
+        try
+            let opts = BrowserContextStorageStateOptions()            
+            opts.Path <- browserStatePath.Value
+            do! ctx.StorageStateAsync(opts) |> Async.AwaitTask |> Async.Ignore
+        with ex ->
+            Log.warn $"Error encountered when saving browser context state ${ex.Message}"
+    }
+
+    //let disconnectHook (ctx:IBrowserContext) = 
+    //    saveState ctx
+    //    |> Async.Start
 
     let newPageHandler (page:IPage) = 
         task {
             do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH, C.VIEWPORT_HEIGHT)
-            page.Close.Add(fun p -> disconnectHook p.Context)
+            //page.Close.Add(fun p -> disconnectHook p.Context)
         }
         |> ignore
 
@@ -47,7 +49,7 @@ module PlaywrightDriver =
         async {
             let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value )
             let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask            
-            ctx.Close.Add(disconnectHook)
+            //ctx.Close.Add(disconnectHook)
             ctx.Page.Add(newPageHandler)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
             match _prevUrl.Value with 
@@ -104,20 +106,10 @@ module PlaywrightDriver =
                 return raise ex
         }
 
-    let shutdown() =
-        async {
-            try
-                try
-                    match _connection.Value with Some conn -> conn.CloseAsync() |> ignore| None -> ()
-                    match _waitHandle.Value with  Some w -> w.Set() |> ignore | None -> ()
-                with ex ->
-                    Log.exn ( ex,"Error in shutdown")
-            finally
-                _waitHandle.Value <- None
-                _connection.Value <- None
-        }
+    let isProperUrl (url:string) =
+        url.Trim().StartsWith("http", System.StringComparison.InvariantCultureIgnoreCase)
 
-    let connection () =
+    let rec connection () =
         async {
             match _connection.Value with
             | Some conn when conn.IsConnected -> return conn
@@ -136,19 +128,7 @@ module PlaywrightDriver =
                     return failwith "browser launch failed"
         }
 
-    let waitForIdle (page:IPage) =
-        async {
-            //let loadState = LoadState.NetworkIdle
-            let loadState = LoadState.DOMContentLoaded
-            let opts = PageWaitForLoadStateOptions()
-            opts.Timeout <- 1000.f
-            do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask
-        }
-
-    let isProperUrl (url:string) =
-        url.Trim().StartsWith("http", System.StringComparison.InvariantCultureIgnoreCase)
-
-    let page () =
+    and page () =
         async {
             let! browser = connection()
             let! page = getPage 0 browser
@@ -158,6 +138,34 @@ module PlaywrightDriver =
             if isProperUrl page.Url then
                 _prevUrl.Value <- Some page.Url
             return page
+        }
+
+    and shutdown() =
+        async {
+            try
+                try
+                    match _connection.Value with 
+                    | Some conn -> 
+                        let! page = page()
+                        saveState page.Context |> Async.Start
+                        do! Async.Sleep 1000
+                        conn.CloseAsync() |> ignore
+                    | None -> ()
+                    match _waitHandle.Value with  Some w -> w.Set() |> ignore | None -> ()
+                with ex ->
+                    Log.exn ( ex,"Error in shutdown")
+            finally
+                _waitHandle.Value <- None
+                _connection.Value <- None
+        }
+
+    and waitForIdle (page:IPage) =
+        async {
+            //let loadState = LoadState.NetworkIdle
+            let loadState = LoadState.DOMContentLoaded
+            let opts = PageWaitForLoadStateOptions()
+            opts.Timeout <- 1000.f
+            do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask
         }
 
     let pageDown() = async {
