@@ -130,6 +130,7 @@ Find at least 5 posts.
 No need to get into details of each post.
 Just scroll down by half-pages one-way to find the interesting and relevant posts. Don't scroll back up.
 You may use memory to save and retrieve relevant information.
+If you are not sure, don't make a computer call, ask the user for clarification.
 """
             }
 

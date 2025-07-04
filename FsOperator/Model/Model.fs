@@ -54,7 +54,7 @@ type Flow =
     with 
         static member Default = {state = FL_Init; chat=Chat.Default}
         member this.messages() = this.chat.messages
-        member this.Post msg = match this.state with FL_Flow f | FL_Flow_Summarizing f -> f.flow.Post msg | _ -> ()
+        member this.Post msg = match this.state with FL_Flow f | FL_Flow_Summarizing f | FL_Paused f  -> f.flow.Post msg | _ -> ()
         member this.isRunning() = not this.state.IsFL_Init 
         member this.setChat ch = {this with chat = ch}        
         member this.setChatMsgs msgs = {this with chat.messages = msgs}
