@@ -327,6 +327,9 @@ exception ApiError of ResponseErrorObj
 
 module RUtils =
     open System.Text.Json.Schema
+
+    let API_KEY_ENV_VAR = "OPENAI_API_KEY"
+
     let private shortenN (s:string) n = if s.Length < n then s else s.Substring(0,n) + "\u2026"
     let private shorten (s:string) = shortenN s 100
 
@@ -396,6 +399,7 @@ module RUtils =
         $"data:image/png;base64,{imageBytes}"
 
 module Api =
+
     let serOpts =
         let opts =
             JsonFSharpOptions.Default()
@@ -415,7 +419,7 @@ module Api =
         client.DefaultRequestHeaders.Authorization <- new Headers.AuthenticationHeaderValue("Bearer",key)
         client
 
-    let defaultClient() = newClient(Environment.GetEnvironmentVariable("OPENAI_API_KEY"))
+    let defaultClient() = newClient(Environment.GetEnvironmentVariable(RUtils.API_KEY_ENV_VAR))
 
     let create (req:Request) (client:#HttpClient) =
         task {

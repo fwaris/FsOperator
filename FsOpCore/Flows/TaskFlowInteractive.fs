@@ -12,6 +12,7 @@ module TaskFlowInteractive =
 
     ///flow input messages
     type TaskFlowMsgIn =
+        | TFi_Prime
         | TFi_Start
         | TFi_Resume of string
         | TFi_EndAndReport        
@@ -102,9 +103,9 @@ module TaskFlowInteractive =
 
         ///<summary>
         /// Capture common message processing here.<br />
-        /// The following patterns with their accepted value are described<br />
+        /// The patterns with their accepted value are:<br />
         /// -Txn: transition to the returned state<br />
-        /// -TxnAync: - async transition to returned state<br />
+        /// -TxnAync: - async transition to the returned state<br />
         /// -Cont: - no pattern matched but substate may have been updated. Use the new substate and continue matching other patterns.<br />
         /// </summary>
         let rec (|Txn|TxnAsync|Cont|) (ss:SubState,msg) =
@@ -159,6 +160,13 @@ module TaskFlowInteractive =
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
             | Voice s_start (st)             -> return! st
+            | Cont (ss,ms, W_App TFi_Prime)  -> match ss.voiceAsst with 
+                                                | None -> 
+                                                    ss.task.bus.PostInput (W_App TFi_Start)
+                                                    return F(s_start ss,ms)
+                                                | Some cnn -> 
+                                                    do! Voice.startVoice cnn ss.task
+                                                    return F(s_start ss,ms)
             | Cont (ss,ms, W_App TFi_Start)  -> do! ss.task.driver.start ss.task.target
                                                 let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)

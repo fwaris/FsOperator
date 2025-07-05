@@ -94,7 +94,7 @@ module Exts =
         instructions : string
     }
     with static member Default = {
-            model = ""
+            model = "gpt-4o-realtime-preview"
             modalities = ["audio"; "text"]
             instructions = "You are a friendly assistant"
         }        

@@ -249,7 +249,7 @@ module Update =
             let kernel = OPlan.defaultKernel Map.empty None
             let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
             let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
-            let tools = if model.voiceAsst.IsSome then FlUtils.makeFunctionTools<Functions.VoiceAsstFuncs>() @ tools else tools
+            let tools = if model.voiceAsst.IsSome then FlUtils.makeFunctionTools<Functions.FsOpVoice>() @ tools else tools
             let t0 = FsOpCore.TaskState.Create<_,_>  //initial task state
                         model.opTask.id
                         (model.opTask.target.TargetString())
@@ -260,10 +260,10 @@ module Update =
                         kernel
                         tools
             let flow = TaskFlowInteractive.create t0 model.voiceAsst
-            let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}        
+            let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
             async {
                 do! Async.Sleep 100
-                flow.Post TaskFlowInteractive.TFi_Start
+                flow.Post TaskFlowInteractive.TFi_Prime
             } 
             |> Async.Start
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")

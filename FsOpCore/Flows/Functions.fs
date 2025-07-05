@@ -115,7 +115,7 @@ type FsOpMemory() =
         this.Serialize(v)
 
 
-type VoiceAsstFuncs = {
+type VoiceFuncImpl = {
     gotoUrl : string -> Async<unit>
     startTask : unit -> Async<unit>
     setInstructions : string -> Async<unit>
@@ -126,7 +126,7 @@ type VoiceAsstFuncs = {
 type FsOpVoice() =
     let voiceAsstFuncs = ref Unchecked.defaultof<_>
 
-    member this.SetFunctions(va:VoiceAsstFuncs) = voiceAsstFuncs.Value <- va
+    member this.SetFunctions(va:VoiceFuncImpl) = voiceAsstFuncs.Value <- va
 
     [<KernelFunction("gotoUrl")>]
     [<Description("Ask the agent to go to a specific URL")>]

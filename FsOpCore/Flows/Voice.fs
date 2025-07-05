@@ -1,8 +1,10 @@
 namespace FsOpCore
+open System
 open RTOpenAI.Api
 open RTOpenAI.Api.Events
 open System.Text.Json
 open Microsoft.SemanticKernel
+open FSharp.Control
 
 module Voice = 
     ///Matches function call request from Voice Assistant
@@ -42,3 +44,25 @@ module Voice =
             let! rslt = FlUtils.invokeFunction kernel name arguments
             sendFunctionResponse conn callId rslt
         }
+
+    let rec startMessagePump (conn:Connection) (task:TaskState<_,_>) = 
+        let comp = 
+            conn.WebRtcClient.OutputChannel.Reader.ReadAllAsync()
+            |> AsyncSeq.ofAsyncEnum
+            |> AsyncSeq.iter(fun m -> task.bus.PostInput(W_Voice (Exts.toEvent m)))
+        async{
+            match! Async.Catch comp with 
+            | Choice1Of2 _ -> Log.info "Voice connection endded"
+            | Choice2Of2 ex -> 
+                Log.exn(ex,nameof startMessagePump)
+                task.bus.PostInput (W_Err (WE_Exn ex))
+        }
+        |> Async.Start
+
+    let startVoice (conn:Connection) (task:TaskState<_,_>) = async {
+        startMessagePump conn task
+        let keyReq = Exts.KeyReq.Default
+        let key = Environment.GetEnvironmentVariable(FsResponses.RUtils.API_KEY_ENV_VAR)
+        let! ephemKey = RTOpenAI.Api.Exts.getOpenAIEphemKey key keyReq |> Async.AwaitTask
+        do! Connection.connect ephemKey conn |> Async.AwaitTask        
+    }
