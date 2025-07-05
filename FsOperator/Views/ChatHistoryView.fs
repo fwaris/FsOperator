@@ -46,7 +46,7 @@ type  ChatHistoryView =
     static member chatHistory leftMargin model messages dispatch = 
         ListBox.create [
             ListBox.margin (Thickness(leftMargin,2.,2.,5.))
-            ListBox.dataItems (List.rev messages)
+            ListBox.dataItems messages
             ListBox.styles [ FsStyles.initStyle() ]
             ListBox.itemTemplate (
                 DataTemplateView<ChatMsg>.create (fun (msg: ChatMsg) -> 

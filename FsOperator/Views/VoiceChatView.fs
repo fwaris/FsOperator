@@ -10,8 +10,8 @@ type VoiceChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let cuaMode = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let chatMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let cuaMode =  CUAState.CUA_Init
+        let chatMode =  ChatMode.CM_Init
        
         Grid.create [
             Grid.column 1
@@ -30,7 +30,7 @@ type VoiceChatView =
                             TextBlock.margin (Thickness(leftMargin,1.,0.,0.))
                         ]
                         SelectableTextBlock.create [
-                            TextBlock.text (TaskState.voiceSysMsg model.taskState)
+                            TextBlock.text ("TaskState.voiceSysMsg model.taskState")
                             TextBlock.textWrapping TextWrapping.Wrap
                             TextBlock.horizontalAlignment HorizontalAlignment.Stretch
                             TextBlock.verticalAlignment VerticalAlignment.Stretch
@@ -78,7 +78,7 @@ type VoiceChatView =
                         ChatHistoryView.chatHistory 
                             leftMargin 
                             model 
-                            (TaskState.voiceChatMessages model.taskState)
+                            (model.flow.messages())
                             dispatch)                            
                 ]
                 GridSplitter.create [

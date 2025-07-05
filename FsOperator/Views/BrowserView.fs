@@ -18,12 +18,10 @@ open Avalonia.Platform
 type BrowserView =
 
     static member navigationBar model dispatch = 
-        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
         let actionBg = 
             if model.isFlashing 
             then Brushes.DarkOrange 
-            elif (TaskState.cuaMode model.taskState).IsCUA_Pause 
-            then  Brushes.DarkRed
+            elif model.flow.state.IsFL_Paused then  Brushes.DarkRed
             else Brushes.DarkSlateBlue
         Border.create [
             Grid.row 0

@@ -107,13 +107,22 @@ type OTaskRun = {
     messages : ChatMsg list
     usage    : Map<string,FsResponses.Usage>
 }
-with static member Default task driver = 
+with 
+    static member Create task driver = 
                     {
                         task = task
                         driver = driver
                         messages = []
                         usage = Map.empty
                     }
+
+    ///Configure the kernel so the function run in the context of this task
+    member this.HookFunctions(kernel:Kernel) =
+        let nav = kernel.Services.GetService<Functions.FsOpNavigator>()
+        if nav = Unchecked.defaultof<_> then
+            failwith "FsOpNavigator service not found in kernel"
+        nav.SetDriver  this.driver
+        nav.SetStartUrl (this.task.target.TargetString())
 
 ///runtime state required to run a plan
 type OPlanRun = {
@@ -132,7 +141,7 @@ with
                     }
 
 ///plugin that provides a navigation function
-type Navigator() =
+type NavigatorX() =
     let plan:Ref<OPlanRun> = ref Unchecked.defaultof<_>
 
     member this.PlanRef = plan
@@ -173,6 +182,7 @@ type Navigator() =
         }
         Async.StartAsTask comp
 
+(*
 ///semantic kernel 'plugin' class that implements memory functions
 type OPlanMemory() =
     let mutable bag = Map.empty
@@ -243,6 +253,8 @@ type OPlanMemory() =
         Log.info $"{nameof this.memory_get_value} {key} = {v}"
         this.Serialize(v)
 
+*)
+
 module OPlan =
     ///minimal 2-task sample plan
     let sample() =
@@ -250,7 +262,7 @@ module OPlan =
             { OTask.Create() with
                 target = OLink "https://www.linkedin.com"
                 description = "find people who post about generative ai"
-                tools = FlUtils.makeFunctionTools<OPlanMemory>()
+                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 cua = Some """find individuals who have original posts
 related to generative AI and record their linkedin names and profile links.
@@ -260,7 +272,7 @@ Make sure to collect at least 5 names."""
         let tw =
             { OTask.Create() with
                 target = OLink "https://www.twitter.com"
-                tools = FlUtils.makeFunctionTools<OPlanMemory>()
+                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
                 description = "retrieve linkedIn people info from memory and get twitter handles"
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 cua = Some """Get the list of names and linked-in profile links from memory.
@@ -394,8 +406,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
                     currentTask = None
                     completedTasks = appendTask planRun.currentTask planRun.completedTasks}
         | Some t ->
-                let tr = OTaskRun.Default t (PlaywrightDriver.create().driver)
-
+                let tr = OTaskRun.Create t (PlaywrightDriver.create().driver)
                 let planRun =
                         {planRun with
                             currentTask = Some tr
@@ -411,8 +422,8 @@ Use memory_save function to save each person's linked-in and twitter data into m
     let defaultKernel (initialMemory:Map<string,string list>) (build:(IKernelBuilder->unit) option) =
         let b = Kernel.CreateBuilder()
         match build with Some build -> build b | _ -> ()
-        let nav = Navigator()
-        let mem = OPlanMemory()
+        let nav = Functions.FsOpNavigator()
+        let mem = Functions.FsOpMemory()
         mem.SetMemory initialMemory
         b.Plugins.AddFromObject(mem) |> ignore
         b.Plugins.AddFromObject(nav) |> ignore
@@ -420,8 +431,6 @@ Use memory_save function to save each person's linked-in and twitter data into m
         b.Build()
 
     let rec run planRun = async {
-        let nav = planRun.kernel.Services.GetService<Navigator>()
-        nav.PlanRef.Value <- planRun
         let! planRun = step planRun
         if planRun.currentTask.IsSome then
             return! run planRun

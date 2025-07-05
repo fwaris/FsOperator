@@ -8,7 +8,6 @@ type AsstMsg = {
 
 type ChatMsg = 
     | User of string 
-    | Reasoner of string
     | Assistant of AsstMsg 
 
 

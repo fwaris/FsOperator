@@ -51,7 +51,6 @@ module Update =
         let model = {
             opTask = OpTask.empty
             isDirty = false
-            taskState = None
             mailbox = mailbox
             log = []
             action = ""
@@ -83,132 +82,10 @@ module Update =
                 return isOn
             }
 
-    let startTextChat model =
-        if isEmpty model.opTask.textModeInstructions then failwith "No instructions provided for text mode task"
-        if OpTask.isEmptyTarget model.opTask.target then failwith "No target (url or process) provided for text mode task"
-        let runState = {TaskState.initForText model.mailbox model.opTask with cuaState = CUA_Loop}
-        ComputerUse.startApiMessaging (runState.tokenSource.Token,runState.bus)
-        ComputerUse.sendStartMessage model.driver runState.bus (model.opTask.textModeInstructions) |> Async.Start
-        ComputerUse.startCuaLoop model.driver runState
-        {model with taskState =  Some runState}, Cmd.none
 
-    let stopTextChat model =
-        {model with taskState = TaskState.stop model.taskState}, Cmd.none
 
-    ///start or stop text mode task
-    let startStopTextChat model =
-        let cuaMode = TaskState.cuaMode model.taskState
-        let cmMode = TaskState.chatMode model.taskState
-        match cuaMode, cmMode with
-        | CUA_Init,  _ -> startTextChat model
-        | _ , CM_Text _ -> stopTextChat model
-        | _,_ -> model, Cmd.none
 
-    let stopVoiceChat (model:Model) =
-        match TaskState.chatMode model.taskState with
-        | CM_Voice _ ->
-            TaskState.voiceConnection model.taskState |> VoiceMachine.stopVoiceMachine
-            {model with taskState = TaskState.stop model.taskState}, Cmd.none
-        | _ -> model, Cmd.none
-
-       ///start or stop voice mode task
-    let startVoiceChat (model:Model) =
-        let ts = {TaskState.initForVoice model.mailbox model.opTask with cuaState = CUA_Loop}
-        let model = {model with taskState = Some ts}
-        ComputerUse.startApiMessaging (ts.tokenSource.Token,ts.bus)
-        ComputerUse.startCuaLoop model.driver ts
-        model, Cmd.OfAsync.either VoiceMachine.startVoiceMachine ts Nop Error
-
-    let startStopVoiceChat (model:Model) =
-        let cuaMode = TaskState.cuaMode model.taskState
-        let cmMode = TaskState.chatMode model.taskState
-        match cuaMode, cmMode with
-        | CUA_Init, _ -> startVoiceChat model
-        | _, CM_Voice _ -> stopVoiceChat model
-        | _,_ -> model, Cmd.none
-
-    ///cua assistant loop has stopped and we need to respond to the assistant's last message (and chatHistory)
-    ///For voice mode we send the cua assistant's last message to the voice assistant
-    ///For text, no action required (for now until reasoning is enabled) the user can see the message and respond
-    let handleTurnEnd model =
-        match TaskState.cuaMode model.taskState with
-        | CUA_Loop  ->
-            let model = {model with taskState = TaskState.setCuaMode CUA_Pause model.taskState}
-            match model.taskState with
-            | Some r when r.chatMode.IsCM_Voice ->
-                let callId = TaskState.functionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
-                let lastAsstMsg = TaskState.lastAssistantMessage model.taskState
-                let instrForVoice =
-                    match lastAsstMsg with
-                    | Some m -> m.content
-                    | None -> "Assistant completed the task but did not generate a text response"
-                let conn = TaskState.voiceConnection model.taskState
-                match callId with
-                | Some callId ->
-                    let conn = match conn.Value with Some c when c.WebRtcClient.State.IsConnected -> c | _ -> failwith "no connection to send"
-                    TaskState.removeFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION r
-                    let image = TaskState.screenshots model.taskState |> List.tryHead
-                    VoiceAsst.sendFunctionResponseWithImage conn callId instrForVoice image |> Async.Start
-                | None -> failwith "no function call id found to respond to voice assistant"
-                model, Cmd.none
-            | _ -> model,Cmd.none
-        | _ -> model,Cmd.none
-
-    ///User submitted a prompt in response to CUA text response - resume CUA after this
-    let resumeTextCuaLoop (model:Model) =
-        let question = TaskState.question model.taskState
-        match TaskState.cuaMode model.taskState with
-        | CUA_Pause ->
-            let model =
-                match model.taskState with
-                | Some rs when rs.chatMode.IsCM_Text ->
-
-                    let model =
-                        {model with
-                            taskState =
-                                model.taskState
-                                |> TaskState.appendChatMsg (User question)
-                                |> TaskState.setQuestion ""
-                                |> TaskState.setCuaMode CUA_Loop}
-
-                    let chatMode = TaskState.chatMode model.taskState
-                    let instr,messages = ComputerUse.toChatHistory chatMode
-                    let messages = ComputerUse.truncateHistory messages
-                    ComputerUse.sendTextResponse model.driver rs.bus (instr,messages) |> Async.Start
-                    ComputerUse.startCuaLoop model.driver model.taskState.Value
-                    model
-                | _ -> model
-
-            model,Cmd.none
-        |_ -> model,Cmd.none
-
-    ///User submitted a prompt in response to CUA text response - resume CUA after this
-    let startOrResumeVoiceCuaLoop (model:Model) instrFromVoiceAsst funcCallId =
-        match model.taskState with
-        | Some rs when rs.chatMode.IsCM_Voice ->
-            TaskState.setFunctionId VoiceMachine.ASST_INSTRUCTIONS_FUNCTION funcCallId rs
-            let prevVoiceState = TaskState.chatMode model.taskState |> function | CM_Voice v -> v | _ -> failwith "resumeVoiceChat: not a voice chat mode"
-            let voiceState =
-                match prevVoiceState.chat.messages with
-                | [] -> {prevVoiceState with chat.systemMessage = Some instrFromVoiceAsst }
-                | msgs -> {prevVoiceState with chat.messages = msgs @ [User instrFromVoiceAsst]}
-            let model =
-                {model with
-                    taskState =
-                        model.taskState
-                        |> TaskState.setMode (CM_Voice voiceState)
-                        |> TaskState.setCuaMode CUA_Loop}
-            match prevVoiceState.chat.messages with
-            | [] -> ComputerUse.sendStartMessage model.driver rs.bus instrFromVoiceAsst |> Async.Start   // for first instruction from voice assistant treat as the instructions to start the CUA loop
-            | _  -> //otherwise resume the chat
-                let chatMode = TaskState.chatMode model.taskState
-                let history = ComputerUse.toChatHistory chatMode
-                ComputerUse.sendTextResponse model.driver rs.bus history |> Async.Start
-            ComputerUse.startCuaLoop model.driver model.taskState.Value
-            model,Cmd.none
-        | _ -> model, Cmd.none
-
-    let browserPostUrl model =
+    let browserPostUrl (model:Model) =
         (*
         match model.ui, model.opTask.target with
         | Pw u, TLink url -> u.postUrl url |> Async.Start //model.browserMode
@@ -236,11 +113,15 @@ module Update =
         model, Cmd.batch cmds
 
     let syncUrl model =
+        browserPostUrl model
+        model,  Cmd.ofMsg (StatusMsg_Set "Synced url to browser not implmented yet")
+        (*
         match TaskState.cuaMode model.taskState, TaskState.chatMode model.taskState with
         | CUA_Init, CM_Init -> browserPostUrl model; model, Cmd.none
         | _, CM_Voice _ -> browserPostUrl model; model, Cmd.none
         | CUA_Loop, CM_Text _ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot sync url to browser in current state")
         | _,_ -> model,Cmd.none
+        *)
 
     let setTitle (win:HostWindow) model =
         let dirty = if model.isDirty then "*" else ""
@@ -323,16 +204,6 @@ module Update =
                 return (Some sample)
         }
 
-    let abort (model:Model) (ex:exn option) msg =
-        match ex with Some ex -> Log.exn(ex,msg) | None -> Log.error msg
-        let model,stopCmd =
-            match TaskState.chatMode model.taskState with
-            | CM_Text _ -> stopTextChat model
-            | CM_Voice _ -> stopVoiceChat model
-            | _ -> model,Cmd.none
-        let statusCmd = Cmd.ofMsg (StatusMsg_Set (ex |> Option.map _.Message |> Option.defaultValue msg))
-        let msgs = Cmd.batch [stopCmd; statusCmd]
-        model,msgs
 
     let updateTask model (instr:OpTask) =
         let task =
@@ -360,9 +231,7 @@ module Update =
         {model with opTask=OpTask.setTextPrompt txt model.opTask}, if isDirty then  Cmd.ofMsg OpTask_MarkDirty else Cmd.none
 
     let clearAll model =
-         let m,_ = stopTextChat model
-         let m,_ = stopVoiceChat m
-         {m with opTask=OpTask.empty; taskState=None; action=""},
+         {model with flow = model.flow.Terminate(); opTask=OpTask.empty; action=""},
          Cmd.batch [
             Cmd.ofMsg (StatusMsg_Set "cleared")
             Cmd.ofMsg OpTask_ClearDirty
@@ -372,26 +241,6 @@ module Update =
         model, Cmd.batch [
             Cmd.ofMsg (StatusMsg_Set "Staring browser..." );
             Cmd.OfAsync.either PlaywrightDriver.launchExternal () Browser_Connected Error]
-
-    let stopAndSummarize model =
-        {model with taskState = TaskState.setCuaMode CUA_Loop_Closing model.taskState},
-        Cmd.OfAsync.either ComputerUse.summarizeProgressCua (model.driver,model.taskState.Value) Chat_GotSummary_Cua Error
-
-    let reportProgress model (id,cntnt,isCuaResp) =
-        if isCuaResp then //(isCuaResp && isEmpty cntnt then                          //cua model did not generate a summary response, try alt model
-            let chatMode = TaskState.chatMode model.taskState
-            let instr,messages = ComputerUse.toChatHistory chatMode
-            let messages = ComputerUse.truncateHistory messages
-            let screenshots = TaskState.screenshots model.taskState
-            let cmd1 = Cmd.ofMsg (StatusMsg_Set "Generating report using alt. model ...")
-            let cmd2 = Cmd.OfAsync.either ComputerUse.summarizeProgressReasoner (instr,messages,screenshots) Chat_GotSummary_Alt Error
-            model, Cmd.batch [cmd1; cmd2]
-        else
-            let m = {model with taskState = TaskState.appendChatMsg (Assistant {id=id; content=cntnt}) model.taskState}
-            match TaskState.chatMode m.taskState with
-            | CM_Text _ -> stopTextChat m
-            | CM_Voice _ -> stopVoiceChat m
-            | _          -> m,Cmd.none
 
     let terminateFlow model = {model with flow = model.flow.Terminate()},Cmd.none
 
@@ -409,11 +258,11 @@ module Update =
                         model.opTask.textModeInstructions
                         (checkEmpty model.opTask.reasonerInstructions |> Option.orElse (Some Prompts.``reasoner prompt for cua guidance``))
                         kernel
-            let flow = PlanFlowInteractive.create t0
+            let flow = TaskFlowInteractive.create t0
             let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}        
             async {
                 do! Async.Sleep 100
-                flow.Post PlanFlowInteractive.TFi_Start
+                flow.Post TaskFlowInteractive.TFi_Start
             } 
             |> Async.Start
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
@@ -431,7 +280,7 @@ module Update =
             | OpTask_MarkDirty -> let m = {model with isDirty = true} in setTitle win m; m, Cmd.none
             | OpTask_ClearDirty -> let m = {model with isDirty = false} in setTitle win m; m, Cmd.none
             | OpTask_SetTarget txt -> setTarget model txt
-            | OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
+            //| OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
             | OpTask_Load -> model,Cmd.none
             | OpTask_Loaded (Some instr) -> {model with opTask=instr; flow=Flow.Default}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg SyncUrlToBrowser]
             | OpTask_Loaded None -> model, Cmd.none
@@ -453,18 +302,17 @@ module Update =
             | StatusMsg_Clear dt -> (if shouldClearStatus dt (fst model.statusMsg) then  {model with statusMsg = None,""} else model), Cmd.none
             | StatusMsg_Set txt -> let t = DateTime.Now in {model with statusMsg = Some t,txt}, Cmd.OfAsync.perform  delayClearStatus t StatusMsg_Clear
             | Error exn -> Log.exn(exn,""); model, Cmd.ofMsg (Abort (Some exn,""))
-            | Abort (ex,msg) -> abort model ex msg
+            //| Abort (ex,msg) -> abort model ex msg
             | TestSomething -> testSomething model
             | Nop _ -> model, Cmd.none
 
             | Chat_CUATurnEnd -> model, Cmd.batch [Cmd.ofMsg (StatusMsg_Set "assistant done its turn"); Cmd.ofMsg Chat_HandleTurnEnd]
             | Chat_UpdateQuestion txt -> {model with flow = model.flow.setQuestion txt}, Cmd.none
-            | Chat_Append msg -> {model with taskState = TaskState.appendChatMsg msg model.taskState}, Cmd.none
-            | Chat_HandleTurnEnd -> handleTurnEnd model
-            | Chat_Resume ->  resumeTextCuaLoop model
-            | Chat_StopAndSummarize -> stopAndSummarize model
-            | Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
-            | Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
+            //| Chat_Append msg -> {model with taskState = TaskState.appendChatMsg msg model.taskState}, Cmd.none
+            //| Chat_HandleTurnEnd -> handleTurnEnd model
+            //| Chat_Resume ->  resumeTextCuaLoop model
+            //| Chat_GotSummary_Cua (id,cntnt) -> reportProgress model (id,cntnt,true)
+            //| Chat_GotSummary_Alt (id,cntnt) -> reportProgress model (id,cntnt,false)
 
             | Flow_StartStop when model.flow.isRunning() -> terminateFlow model
             | Flow_StartStop                             -> startFlow model
@@ -473,18 +321,20 @@ module Update =
             | Flow_Terminate -> terminateFlow model
 
             ///handle messages emitted by a running flow
-            | Flow_Msg (PlanFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (PlanFlowInteractive.TFo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
-            | Flow_Msg (PlanFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
-            | Flow_Msg (PlanFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
-            | Flow_Msg (PlanFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate
-            | Flow_Msg (PlanFlowInteractive.TFo_Log s) -> model, Cmd.ofMsg (Log_Append s)
-            | Flow_Msg (PlanFlowInteractive.TFo_Usage u) -> OPlan.printTaskUsage u; model,Cmd.none
+            | Flow_Msg (TaskFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
+            | Flow_Msg (TaskFlowInteractive.TFo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
+            | Flow_Msg (TaskFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
+            | Flow_Msg (TaskFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
+            | Flow_Msg (TaskFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate
+            | Flow_Msg (TaskFlowInteractive.TFo_Log s) -> model, Cmd.ofMsg (Log_Append s)
+            | Flow_Msg (TaskFlowInteractive.TFo_Usage u) -> OPlan.printTaskUsage u; model,Cmd.none
 
-            | TextChat_StartStopTask -> startStopTextChat model
-            | VoiceChat_StartStop -> startStopVoiceChat model
-            | VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
+            //| TextChat_StartStopTask -> startStopTextChat model
+            //| VoiceChat_StartStop -> startStopVoiceChat model
+            //| VoiceChat_RunInstructions (instructions,ev) -> startOrResumeVoiceCuaLoop model instructions ev
             //| _ -> model, Cmd.none
+
+            | x -> model, Cmd.ofMsg (StatusMsg_Set $"{x} not handled")
         with ex ->
             printfn "%A" ex
             model, Cmd.ofMsg (Abort (Some ex,"elmish loop"))

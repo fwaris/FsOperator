@@ -281,8 +281,8 @@ type MainView =
 
     static member contentWrapper model dispatch =
         let leftMargin = 10.
-        let csState = model.taskState |> Option.map (fun rs -> rs.cuaState) |> Option.defaultValue CUAState.CUA_Init
-        let csMode = model.taskState |> Option.map (fun rs -> rs.chatMode) |> Option.defaultValue ChatMode.CM_Init
+        let csState = CUAState.CUA_Init
+        let csMode =  ChatMode.CM_Init
        
         Panel.create [
             Grid.row 1

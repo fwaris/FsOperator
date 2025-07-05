@@ -1,0 +1,173 @@
+﻿namespace FsOpCore.Functions
+open FsOpCore
+open Microsoft.SemanticKernel
+open System.ComponentModel
+open System.Text.Json
+
+///plugin that provides navigation related functions
+type FsOpNavigator() =
+    let startUrl:Ref<string> = ref Unchecked.defaultof<_>
+    let driver:Ref<IUIDriver> = ref Unchecked.defaultof<_>
+
+    member this.SetStartUrl(url:string) = 
+        Log.info $"{nameof this.SetStartUrl} {url}"
+        startUrl.Value <- url
+
+    member this.SetDriver(drv:IUIDriver) =
+        Log.info $"{nameof this.SetDriver} {drv.GetType().Name}"
+        driver.Value <- drv
+
+    [<KernelFunction("home")>]
+    [<Description("Load initial task page")>]
+    member this.home() =
+        let comp = async {
+            Log.info $"{nameof this.home}"
+            if startUrl.Value <> Unchecked.defaultof<_> && driver.Value <> Unchecked.defaultof<_> then 
+                do! driver.Value.start startUrl.Value
+                return "home page loaded"
+            else
+                return "a home page url not found"
+        }
+        Async.StartAsTask comp
+
+    [<KernelFunction("get_current_url")>]
+    [<Description("Get the current URL of the browser")>]
+    member this.get_current_url() =
+        let comp = async {
+            Log.info $"{nameof this.get_current_url}"
+            let noUrl = "unable to get url"
+            if driver.Value <> Unchecked.defaultof<_> then 
+                match! driver.Value.url() with
+                | Some url -> return url
+                | None     -> return noUrl
+            else
+                return noUrl
+        }
+        Async.StartAsTask comp
+
+///semantic kernel 'plugin' class that implements memory functions
+type FsOpMemory() =
+    let mutable bag = Map.empty
+    static member statefile = lazy(homePath.Value @@ "memory.json")
+
+    static member serOpts = lazy(
+        let opts =JsonSerializerOptions()
+        opts.WriteIndented <- true
+        opts)
+
+    member this.SetMemory(m) = bag <- m
+
+    static member LoadState() =
+        try
+            if System.IO.File.Exists(FsOpMemory.statefile.Value) then
+                use str = System.IO.File.OpenRead(FsOpMemory.statefile.Value)
+                let map = System.Text.Json.JsonSerializer.Deserialize<Map<string,string list>>(str)
+                let mem = new FsOpMemory()
+                mem.SetMemory(map)
+                mem
+            else
+                new FsOpMemory()
+        with ex ->
+            Log.exn(ex, nameof FsOpMemory.LoadState)
+            new FsOpMemory()
+
+    member this.Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=FsOpMemory.serOpts.Value)
+
+    static member private _SaveState(map:Map<string,string list>) =
+        try
+            use str = System.IO.File.Create FsOpMemory.statefile.Value
+            JsonSerializer.Serialize(str,map, options=FsOpMemory.serOpts.Value)
+        with ex ->
+            Log.exn(ex,nameof FsOpMemory._SaveState)
+
+    [<KernelFunction("memory_save")>]
+    [<Description("Save a key-value pair for later retrieval")>]
+    member this.memory_save(key:string, value:string) =
+        Log.info $"{nameof this.memory_save}:{key} = {value}"
+        lock bag (fun _ -> 
+            bag <-
+                bag 
+                |> Map.tryFind key 
+                |> Option.map (fun vs -> bag |> Map.add key (List.distinct (value::vs)))
+                |> Option.defaultWith (fun _ -> bag |> Map.add key [value])
+            FsOpMemory._SaveState(bag)
+        )
+        "saved"
+
+    [<KernelFunction("memory_get_all")>]
+    [<Description("Retrieve all key value pairs saved in memory")>]
+    member this.memory_get_all() =
+        Log.info (nameof this.memory_get_all)
+        this.Serialize(bag)
+
+    [<KernelFunction("memory_get_all_keys")>]
+    [<Description("retrieve all keys in the memory store ")>]
+    member this.memory_get_all_keys() =
+        let ks = Map.keys bag |> Seq.toList
+        Log.info $"{nameof this.memory_get_all_keys}: {ks}"
+        this.Serialize(ks)
+
+    [<KernelFunction("memory_get_value")>]
+    [<Description("retrieve a value for the given key")>]
+    member this.memory_get_value(key:string) =
+        let v = bag |> Map.tryFind key
+        Log.info $"{nameof this.memory_get_value} {key} = {v}"
+        this.Serialize(v)
+
+
+type VoiceAsstFuncs = {
+    gotoUrl : string -> Async<unit>
+    startTask : unit -> Async<unit>
+    setInstructions : string -> Async<unit>
+    addGuidance : string -> Async<unit>
+}
+
+//semantic kernel 'plugin' class that implements functions required by voice assistant
+type FsOpVoice() =
+    let voiceAsstFuncs = ref Unchecked.defaultof<_>
+
+    member this.SetFunctions(va:VoiceAsstFuncs) = voiceAsstFuncs.Value <- va
+
+    [<KernelFunction("gotoUrl")>]
+    [<Description("Ask the agent to go to a specific URL")>]
+    member this.gotoUrl(url:string) = async {
+        try
+            do! voiceAsstFuncs.Value.gotoUrl(url)
+            return $"gotoUrl {url} invoked"                
+        with ex ->
+            Log.exn(ex, nameof this.gotoUrl)
+            return $"gotoUrl {url} failed: {ex.Message}"
+    }
+    
+    [<KernelFunction("startTask")>]
+    [<Description("Ask agent to start the task")>]
+    member this.startTask() = async {
+        try
+            do! voiceAsstFuncs.Value.startTask()
+            return "task started"
+        with ex ->
+            Log.exn(ex, nameof this.startTask)
+            return $"startTask failed: {ex.Message}"
+    }
+
+    [<KernelFunction("setInstructions")>]
+    [<Description("Update the agent's instructions")>]
+    member this.setInstructions(instructions:string) = async {
+        try
+            do! voiceAsstFuncs.Value.setInstructions(instructions)
+            return "instructions set"
+        with ex ->
+            Log.exn(ex, nameof this.setInstructions)
+            return $"setInstructions failed: {ex.Message}"
+    }
+
+    [<KernelFunction("addGuidance")>]
+    [<Description("Give agent additional guidance")>]
+    member this.addGuidance(guidance:string) = async {
+        try
+            do! voiceAsstFuncs.Value.addGuidance(guidance)
+            return "guidance added"
+        with ex ->
+            Log.exn(ex, nameof this.addGuidance)
+            return $"addGuidance failed: {ex.Message}"
+    }
