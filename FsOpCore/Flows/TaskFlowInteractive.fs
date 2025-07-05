@@ -3,6 +3,7 @@ open System
 open System.Threading
 open Microsoft.SemanticKernel
 open FsResponses
+open RTOpenAI.Api.Events
 open FlUtils
 
 module TaskFlowInteractive =    
@@ -13,7 +14,9 @@ module TaskFlowInteractive =
     type TaskFlowMsgIn =
         | TFi_Start
         | TFi_Resume of string
-        | TFi_EndAndReport
+        | TFi_EndAndReport        
+        | TFi_SetInstructions of string
+        | TFi_AddGuidance of string
 
     ///flow output messages
     type TaskFlowMsgOut =
@@ -24,6 +27,15 @@ module TaskFlowInteractive =
         | TFo_ChatUpdated of ChatMsg list
         | TFo_Done of ChatMsg list
         | TFo_Log of string
+        | TFo_InstructionsSet of string
+
+    let createVoiceFunctions (task:TaskState<TaskFlowMsgIn,TaskFlowMsgOut>) = 
+        {
+            Functions.setInstructions = fun t -> async{ task.bus.PostInput (W_App (TFi_SetInstructions t))}
+            Functions.gotoUrl = fun t -> task.driver.start t
+            Functions.addGuidance = fun t -> async{task.bus.PostInput(W_App (TFi_AddGuidance t))}            
+            Functions.startTask = fun () -> async{task.bus.PostInput(W_App TFi_Start)}
+        }        
 
     ///keeps needed local 'substate'
     type SubState = {
@@ -34,9 +46,10 @@ module TaskFlowInteractive =
         cuaLoopCount        : int
         error               : WErrorType option
         cuaResp             : FsResponses.Response option
+        voiceAsst           : RTOpenAI.Api.Connection option
     }
         with
-            static member Create task = 
+            static member Create task voiceAsst = 
                 {
                     task = task
                     cts = new CancellationTokenSource()
@@ -45,7 +58,7 @@ module TaskFlowInteractive =
                     visualState = None
                     error = None
                     cuaResp = None
-
+                    voiceAsst = voiceAsst
                 }
             member this.setTask v : SubState = {this with task = v} // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this v
             member this.setTask2 (v,x)  = {this with task = v},x // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this 
@@ -70,6 +83,8 @@ module TaskFlowInteractive =
                     return {this with task = task}
                 }
 
+
+            
     //state machine       
     module States =
 
@@ -85,8 +100,13 @@ module TaskFlowInteractive =
             | W_App (TFi_Resume tx) -> Some tx
             | _                     -> None
 
-
-        ///capture common state processing here
+        ///<summary>
+        /// Capture common message processing here.<br />
+        /// The following patterns with their accepted value are described<br />
+        /// -Txn: transition to the returned state<br />
+        /// -TxnAync: - async transition to returned state<br />
+        /// -Cont: - no pattern matched but substate may have been updated. Use the new substate and continue matching other patterns.<br />
+        /// </summary>
         let rec (|Txn|TxnAsync|Cont|) (ss:SubState,msg) =
             let ss = ss.appendUsage msg
             match msg with 
@@ -112,6 +132,24 @@ module TaskFlowInteractive =
                                                     })
             | _                              -> Cont (ss,[TFo_Usage ss.task.usage],msg)
 
+        ///<summary>
+        ///Capture common voice event processing here.<br />
+        ///Note: that voice has two concurrent channels audio and data.<br />
+        /// The audio conversation with the user happens concurrently<br />
+        /// with the data exchange.
+        /// </summary>
+        and (|Voice|_|) nextState (ss:SubState,msg) = 
+            match msg with 
+            | Voice.FuncCall f ->                 
+                match ss.voiceAsst with 
+                | Some conn ->
+                        async{
+                            do! Voice.callFunction conn ss.task.kernel f
+                            return F(nextState ss,[])
+                        }
+                        |> Some
+                | None -> None
+            | _ -> None
 
         (* --- states --- *)
 
@@ -120,6 +158,7 @@ module TaskFlowInteractive =
             match ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
+            | Voice s_start (st)             -> return! st
             | Cont (ss,ms, W_App TFi_Start)  -> do! ss.task.driver.start ss.task.target
                                                 let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)
@@ -136,6 +175,7 @@ module TaskFlowInteractive =
             match ss,msg with
             | Txn st                                    -> return st
             | TxnAsync st                               -> return! st
+            | Voice s_cua (st)                        -> return! st
 
             | Cont (ss,ms, NoComputerCall resp)         -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
                                                            return F(s_pause ss,TFo_Paused ss.task.cuaMessages::ms)
@@ -162,6 +202,8 @@ module TaskFlowInteractive =
             match ss,msg with 
             | Txn st                               -> return st
             | TxnAsync st                          -> return! st
+            | Voice s_reason (st)                   -> return! st
+
             | Cont (ss,ms,Reasoner ss.corrId resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
                                                       match Reasoner.reasonerGuidance resp with
                                                       | None ->
@@ -180,6 +222,8 @@ module TaskFlowInteractive =
             match ss,msg with 
             | Txn st                             -> return st
             | TxnAsync st                        -> return! st
+            | Voice s_pause (st)                 -> return! st
+
             | Cont (ss,ms, Resume tx)            -> let ss = ss.setTask (ss.task.prependCuaMessage (User tx))
                                                     let! vs = FlUtils.snapshot(ss.task.driver)
                                                     let ss = {ss with task = ss.task.prependSnapshot vs.snapshot}
@@ -194,6 +238,8 @@ module TaskFlowInteractive =
             match ss,msg with 
             | Txn st                                -> return st
             | TxnAsync st                           -> return! st
+            | Voice s_summarizing (st)              -> return! st
+
             | Cont (ss,ms, Reasoner ss.corrId resp) -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
                                                        return F(s_terminate ss, TFo_Done ss.task.cuaMessages::ms)
             | Cont (ss,_,x)                         -> return ignoreMsg (s_summarizing ss) x (nameof s_summarizing)
@@ -210,9 +256,9 @@ module TaskFlowInteractive =
             return !!(s_terminate ss)
         }
     ///construct flow and also start it
-    let create task : IFlow<TaskFlowMsgIn> =
+    let create task voiceAsst : IFlow<TaskFlowMsgIn> =        
         ///initial substate
-        let ss0 = SubState.Create task 
+        let ss0 = SubState.Create task voiceAsst
 
         //initial state
         let s0 = States.s_start ss0

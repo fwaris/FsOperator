@@ -116,7 +116,7 @@ with
                         usage = Map.empty
                     }
 
-    ///Configure the kernel so the function run in the context of this task
+    ///Configure the kernel so the functions run in the context of this task
     member this.HookFunctions(kernel:Kernel) =
         let nav = kernel.Services.GetService<Functions.FsOpNavigator>()
         if nav = Unchecked.defaultof<_> then
@@ -139,121 +139,6 @@ with
                         completedTasks = []
                         currentTask = None
                     }
-
-///plugin that provides a navigation function
-type NavigatorX() =
-    let plan:Ref<OPlanRun> = ref Unchecked.defaultof<_>
-
-    member this.PlanRef = plan
-
-    [<KernelFunction("home")>]
-    [<Description("Load initial task page")>]
-    member this.home() =
-        let comp = async {
-            Log.info $"{nameof this.home}"
-            if plan.Value <> Unchecked.defaultof<_> then 
-                match plan.Value.currentTask with
-                | Some t ->
-                    match t.task.target with
-                    | OLink url -> do! t.driver.start url
-                    | _         -> ()
-                | None -> ()
-                return "home page loaded"
-            else
-                return "a home page url not found"
-        }
-        Async.StartAsTask comp
-
-    [<KernelFunction("get_current_url")>]
-    [<Description("Get the current URL of the browser")>]
-    member this.get_current_url() =
-        let comp = async {
-            Log.info $"{nameof this.get_current_url}"
-            let noUrl = "unable to get url"
-            if plan.Value <> Unchecked.defaultof<_> then 
-                match plan.Value.currentTask with
-                | Some t ->
-                    match! t.driver.url() with 
-                    | Some url -> return url
-                    | None     -> return noUrl
-                | None -> return noUrl
-            else
-                return noUrl
-        }
-        Async.StartAsTask comp
-
-(*
-///semantic kernel 'plugin' class that implements memory functions
-type OPlanMemory() =
-    let mutable bag = Map.empty
-    static member statefile = lazy(homePath.Value @@ "memory.json")
-
-    static member serOpts = lazy(
-        let opts =JsonSerializerOptions()
-        opts.WriteIndented <- true
-        opts)
-
-    member this.SetMemory(m) = bag <- m
-
-    static member LoadState() =
-        try
-            if System.IO.File.Exists(OPlanMemory.statefile.Value) then
-                use str = System.IO.File.OpenRead(OPlanMemory.statefile.Value)
-                let map = System.Text.Json.JsonSerializer.Deserialize<Map<string,string list>>(str)
-                let mem = new OPlanMemory()
-                let bag = ConcurrentBag<string>()
-                mem.SetMemory(map)
-                mem
-            else
-                new OPlanMemory()
-        with ex ->
-            Log.exn(ex, nameof OPlanMemory.LoadState)
-            new OPlanMemory()
-
-    member this.Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=OPlanMemory.serOpts.Value)
-
-    static member private _SaveState(map:Map<string,string list>) =
-        try
-            use str = System.IO.File.Create OPlanMemory.statefile.Value
-            JsonSerializer.Serialize(str,map, options=OPlanMemory.serOpts.Value)
-        with ex ->
-            Log.exn(ex,nameof OPlanMemory._SaveState)
-
-    [<KernelFunction("memory_save")>]
-    [<Description("Save a key-value pair for later retrieval")>]
-    member this.memory_save(key:string, value:string) =
-        Log.info $"{nameof this.memory_save}:{key} = {value}"
-        lock bag (fun _ -> 
-            bag <-
-                bag 
-                |> Map.tryFind key 
-                |> Option.map (fun vs -> bag |> Map.add key (List.distinct (value::vs)))
-                |> Option.defaultWith (fun _ -> bag |> Map.add key [value])
-            OPlanMemory._SaveState(bag)
-        )
-        "saved"
-
-    [<KernelFunction("memory_get_all")>]
-    [<Description("Retrieve all key value pairs saved in memory")>]
-    member this.memory_get_all() =
-        Log.info (nameof this.memory_get_all)
-        this.Serialize(bag)
-
-    [<KernelFunction("memory_get_all_keys")>]
-    [<Description("retrieve all keys in the memory store ")>]
-    member this.memory_get_all_keys() =
-        let ks = Map.keys bag |> Seq.toList
-        Log.info $"{nameof this.memory_get_all_keys}: {ks}"
-        this.Serialize(ks)
-
-    [<KernelFunction("memory_get_value")>]
-    [<Description("retrieve a value for the given key")>]
-    member this.memory_get_value(key:string) =
-        let v = bag |> Map.tryFind key
-        Log.info $"{nameof this.memory_get_value} {key} = {v}"
-        this.Serialize(v)
-
-*)
 
 module OPlan =
     ///minimal 2-task sample plan
@@ -385,6 +270,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
                         ot.task.cua.Value
                         ot.task.reasoner
                         planRun.kernel
+                        ot.task.tools
             match ot.task.target with
             | OLink url -> do! driver.start url
             | OProcess (a,b) -> ()
@@ -430,6 +316,12 @@ Use memory_save function to save each person's linked-in and twitter data into m
         b.Services.AddSingleton(nav) |> ignore
         b.Build()
 
+    let kernelWithVoice voiceFuncs mem () = 
+        let addVoice (b:IKernelBuilder) = 
+            let vf = new Functions.FsOpVoice()
+            vf.SetFunctions(voiceFuncs)
+        defaultKernel mem (Some addVoice)
+        
     let rec run planRun = async {
         let! planRun = step planRun
         if planRun.currentTask.IsSome then

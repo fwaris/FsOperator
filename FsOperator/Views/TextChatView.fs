@@ -45,6 +45,17 @@ type TextChatView =
                         ]
                         Button.create [
                             //Button.isEnabled (model.flow.IsFL_Init)
+                            Button.margin (Thickness(0.,0.,25.,2.))
+                            Button.background Brushes.Transparent
+                            Button.fontSize 11.
+                            Button.content (if model.voiceAsst.IsSome then Icons.mic else Icons.mic2)
+                            Button.tip (if model.voiceAsst.IsSome then "Voice mode on" else "Voice mode off")                            
+                            Button.onClick (fun _ -> dispatch ToggleVoiceMode)
+                            Button.horizontalAlignment HorizontalAlignment.Right
+                            Button.verticalAlignment VerticalAlignment.Top
+                        ]
+                        Button.create [
+                            //Button.isEnabled (model.flow.IsFL_Init)
                             Button.margin (Thickness(0.,0.,1.,2.))
                             Button.background Brushes.Transparent
                             Button.fontSize 11.
@@ -53,11 +64,11 @@ type TextChatView =
                             Button.onClick (fun _ -> dispatch Flow_StartStop)
                             Button.horizontalAlignment HorizontalAlignment.Right
                             Button.verticalAlignment VerticalAlignment.Top
-                        ]
+                        ]                       
                         if model.flow.state.IsFL_Flow || model.flow.state.IsFL_Flow_Summarizing then 
                             Button.create [
                                 Button.background Brushes.Transparent
-                                Button.margin (Thickness(0.,2.,25.,2.))
+                                Button.margin (Thickness(0.,2.,50.,2.))
                                 Button.fontSize 14.
                                 Button.fontFamily Icons.iconFont
                                 Button.tip "Stop and report"

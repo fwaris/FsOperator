@@ -16,9 +16,10 @@ type TaskState<'inMsg,'outMsg> = {
         kernel          : Kernel
         bus             : WBus<'inMsg,'outMsg>
         usage           : Map<string,FsResponses.Usage list>
+        toolDefs        : Tool list
     }
     with
-        static member Create id target bus driver cuaPrompt reasonerPrompt kernel =
+        static member Create id target bus driver cuaPrompt reasonerPrompt kernel tools =
                             {
                                id = id
                                target = target
@@ -32,13 +33,14 @@ type TaskState<'inMsg,'outMsg> = {
                                actions = []
                                bus = bus
                                usage = Map.empty
+                               toolDefs = tools
                             }
+
 
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerItems items = {this with reasonerItems = items}
         member this.setPrevId id = {this with reasonerPrevId = Some id}        
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
-        member this.tools = lazy(this.kernel.Plugins.GetFunctionsMetadata() |> Seq.map FlUtils.toFunctionTool |> Seq.toList)
 
         member this.appendUsage (modelId,(usage:FsResponses.Usage)) =
             let us = this.usage |> Map.tryFind modelId |> Option.map(fun us -> usage::us) |> Option.defaultWith (fun _ -> [usage])

@@ -26,3 +26,8 @@ module Icons =
     let edit = "\u270E"
     let report = "\U0001F4CB"
     let send = "\u27a1"
+
+    let mic = "\U0001F399"
+    let mic2 = "\U0001F3A4"
+    
+

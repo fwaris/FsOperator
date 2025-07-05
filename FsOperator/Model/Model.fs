@@ -306,6 +306,7 @@ type Model = {
     browserMode : BrowserMode
     isFlashing  : bool
     flow        : Flow
+    voiceAsst   : RTOpenAI.Api.Connection option    
 }
     with member this.post msg = this.mailbox.Writer.TryWrite msg |> ignore
 
@@ -325,6 +326,8 @@ type ClientMsg =
     | OpTask_SaveAs
     | OpTask_Clear
     | OpTask_Saved of OpTask option
+    
+    | ToggleVoiceMode 
 
     | Flow_StartStop
     | Flow_Terminate

@@ -60,6 +60,7 @@ module Update =
             ui = ui
             driver = ui.driver
             flow = Flow.Default
+            voiceAsst = None
         }
         model,Cmd.none
 
@@ -81,9 +82,6 @@ module Update =
                 do! Async.Sleep 1000
                 return isOn
             }
-
-
-
 
     let browserPostUrl (model:Model) =
         (*
@@ -250,6 +248,8 @@ module Update =
             let ui = PlaywrightDriver.create()
             let kernel = OPlan.defaultKernel Map.empty None
             let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
+            let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
+            let tools = if model.voiceAsst.IsSome then FlUtils.makeFunctionTools<Functions.VoiceAsstFuncs>() @ tools else tools
             let t0 = FsOpCore.TaskState.Create<_,_>  //initial task state
                         model.opTask.id
                         (model.opTask.target.TargetString())
@@ -258,7 +258,8 @@ module Update =
                         model.opTask.textModeInstructions
                         (checkEmpty model.opTask.reasonerInstructions |> Option.orElse (Some Prompts.``reasoner prompt for cua guidance``))
                         kernel
-            let flow = TaskFlowInteractive.create t0
+                        tools
+            let flow = TaskFlowInteractive.create t0 model.voiceAsst
             let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}        
             async {
                 do! Async.Sleep 100
@@ -268,6 +269,13 @@ module Update =
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
         | None,_ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, no instructions given")
         | _,true -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, target is empty")
+
+    let voiceToggle model = 
+        let voiceAsst = 
+            match model.voiceAsst with 
+            | Some v -> RTOpenAI.Api.Connection.close v; None
+            | None   -> Some (RTOpenAI.Api.Connection.create())
+        {model with voiceAsst = voiceAsst}, Cmd.none
 
     let update (win:HostWindow) msg (model:Model) =
         try
@@ -290,6 +298,8 @@ module Update =
             | OpTask_Saved (Some t) -> {model with opTask=t},Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg (StatusMsg_Set $"saved {t.id}")]
             | OpTask_Saved None -> model, Cmd.none
             | OpTask_Clear -> clearAll model
+
+            | ToggleVoiceMode -> voiceToggle model
 
             | SyncUrlToBrowser -> syncUrl model
 
@@ -320,7 +330,7 @@ module Update =
             | Flow_Resume -> {model with flow = model.flow.resume()},Cmd.none
             | Flow_Terminate -> terminateFlow model
 
-            ///handle messages emitted by a running flow
+            //handle messages emitted by a running flow
             | Flow_Msg (TaskFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
             | Flow_Msg (TaskFlowInteractive.TFo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
             | Flow_Msg (TaskFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none

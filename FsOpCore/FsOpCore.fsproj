@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
 		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
@@ -27,6 +27,7 @@
 		<Compile Include="Flows\TaskState.fs" />
 		<Compile Include="Flows\Reasoner.fs" />
 		<Compile Include="Flows\Cua.fs" />
+		<Compile Include="Flows\Voice.fs" />
 		<Compile Include="Flows\TaskFlowInteractive.fs" />
 		<Compile Include="Flows\PlanFlowInteractive.fs" />
 		<Compile Include="Flows\PlanFlow.fs" />
