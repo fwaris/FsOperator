@@ -1,11 +1,7 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
-open System.ComponentModel
 open System.Threading
-open System.Text.Json
 open Microsoft.Extensions.DependencyInjection
-open System.Text.Json.Serialization
-open System.Collections.Concurrent
 
 ///represents the target computer environment (browser url or windows exe) for a task
 type OTaskTarget = 
@@ -218,7 +214,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
     let startTimer (n:int) (f:IFlow<_>) =
         async {
             do! Async.Sleep (n * 1000)
-            f.Post PlanFlow.TFi_EndAndReport
+            f.Post TaskFlow.TFi_EndAndReport
         }
         |> Async.Start
 
@@ -256,11 +252,11 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let driver = (PlaywrightDriver.create().driver)
             let post = fun p ->
                 match p with
-                | PlanFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
-                | PlanFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | PlanFlow.TFo_Action a -> printfn "%A" a
-                | PlanFlow.TFo_Paused msgs -> printfn "%A" msgs
-                | PlanFlow.TFo_Usage us -> printTaskUsage us
+                | TaskFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
+                | TaskFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | TaskFlow.TFo_Action a -> printfn "%A" a
+                | TaskFlow.TFo_Paused msgs -> printfn "%A" msgs
+                | TaskFlow.TFo_Usage us -> printTaskUsage us
             let bus = WBus.Create<_,_> post
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
@@ -274,8 +270,8 @@ Use memory_save function to save each person's linked-in and twitter data into m
             match ot.task.target with
             | OLink url -> do! driver.start url
             | OProcess (a,b) -> ()
-            let flow = PlanFlow.create t0
-            flow.Post PlanFlow.TFi_Start
+            let flow = TaskFlow.create t0
+            flow.Post TaskFlow.TFi_Start
             startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with
