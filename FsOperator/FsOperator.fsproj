@@ -26,10 +26,6 @@
 		<Compile Include="Model\OpTask.fs" />
 		<Compile Include="Model\Chat.fs" />
 		<Compile Include="Model\Model.fs" />
-		<Compile Include="CUA\Scripts.fs" />
-		<Compile Include="CUA\Preview.fs" />
-		<Compile Include="CUA\ComputerUse.fs" />
-		<Compile Include="CUA\VoiceAsst.fs" />
 		<Compile Include="Dialogs.fs" />
 		<Compile Include="Update.fs" />
 		<Compile Include="Views\Lottie.fs" />
