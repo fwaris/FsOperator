@@ -117,57 +117,37 @@ type FsOpMemory() =
 
 type VoiceFuncImpl = {
     gotoUrl : string -> Async<unit>
-    startTask : unit -> Async<unit>
-    setInstructions : string -> Async<unit>
     addGuidance : string -> Async<unit>
 }
 
-//semantic kernel 'plugin' class that implements functions required by voice assistant
-type FsOpVoice() =
+///Semantic kernel 'plugin' class that implements functions required by voice assistant
+type FsOpVoice() = //need parameterless constructor so SK can extract function tool defs
     let voiceAsstFuncs = ref Unchecked.defaultof<_>
 
     member this.SetFunctions(va:VoiceFuncImpl) = voiceAsstFuncs.Value <- va
 
-    [<KernelFunction("gotoUrl")>]
+    [<KernelFunction("voice_gotoUrl")>]
     [<Description("Ask the agent to go to a specific URL")>]
-    member this.gotoUrl(url:string) = async {
-        try
-            do! voiceAsstFuncs.Value.gotoUrl(url)
-            return $"gotoUrl {url} invoked"                
-        with ex ->
-            Log.exn(ex, nameof this.gotoUrl)
-            return $"gotoUrl {url} failed: {ex.Message}"
-    }
+    member this.gotoUrl(url:string) = 
+        let comp = async {
+            try
+                do! voiceAsstFuncs.Value.gotoUrl(url)
+                return $"gotoUrl {url} invoked"                
+            with ex ->
+                Log.exn(ex, nameof this.gotoUrl)
+                return $"gotoUrl {url} failed: {ex.Message}"
+        }
+        Async.StartAsTask comp
     
-    [<KernelFunction("startTask")>]
-    [<Description("Ask agent to start the task")>]
-    member this.startTask() = async {
-        try
-            do! voiceAsstFuncs.Value.startTask()
-            return "task started"
-        with ex ->
-            Log.exn(ex, nameof this.startTask)
-            return $"startTask failed: {ex.Message}"
-    }
-
-    [<KernelFunction("setInstructions")>]
-    [<Description("Update the agent's instructions")>]
-    member this.setInstructions(instructions:string) = async {
-        try
-            do! voiceAsstFuncs.Value.setInstructions(instructions)
-            return "instructions set"
-        with ex ->
-            Log.exn(ex, nameof this.setInstructions)
-            return $"setInstructions failed: {ex.Message}"
-    }
-
-    [<KernelFunction("addGuidance")>]
+    [<KernelFunction("voice_addGuidance")>]
     [<Description("Give agent additional guidance")>]
-    member this.addGuidance(guidance:string) = async {
-        try
-            do! voiceAsstFuncs.Value.addGuidance(guidance)
-            return "guidance added"
-        with ex ->
-            Log.exn(ex, nameof this.addGuidance)
-            return $"addGuidance failed: {ex.Message}"
-    }
+    member this.addGuidance(guidance:string) = 
+        let comp = async {
+            try
+                do! voiceAsstFuncs.Value.addGuidance(guidance)
+                return "guidance added"
+            with ex ->
+                Log.exn(ex, nameof this.addGuidance)
+                return $"addGuidance failed: {ex.Message}"
+        }
+        Async.StartAsTask comp

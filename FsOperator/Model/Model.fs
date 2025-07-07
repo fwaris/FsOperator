@@ -343,7 +343,7 @@ type ClientMsg =
 
     | StatusMsg_Set of string
     | StatusMsg_Clear of DateTime option
-    | SyncUrlToBrowser
+    | SyncUrlToBrowser of bool //start browser
     | Error of exn
     | Abort of (exn option*string)
     | Nop of unit

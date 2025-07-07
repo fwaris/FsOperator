@@ -49,7 +49,6 @@ module PlaywrightDriver =
         async {
             let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value )
             let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask            
-            //ctx.Close.Add(disconnectHook)
             ctx.Page.Add(newPageHandler)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
             match _prevUrl.Value with 
@@ -107,9 +106,9 @@ module PlaywrightDriver =
         }
 
     let isProperUrl (url:string) =
-        url.Trim().StartsWith("http", System.StringComparison.InvariantCultureIgnoreCase)
+        url.Trim().StartsWith("http", System.StringComparison.InvariantCultureIgnoreCase)    
 
-    let rec connection () =
+    let rec private _connect () =
         async {
             match _connection.Value with
             | Some conn when conn.IsConnected -> return conn
@@ -127,6 +126,19 @@ module PlaywrightDriver =
                     Log.info "browser launch failed"
                     return failwith "browser launch failed"
         }
+
+    ///serialize connection requests due possible race conditions
+    and _connectionAgent = MailboxProcessor.Start(fun inbox -> async {
+        while true do 
+            let! (rc:AsyncReplyChannel<IBrowser>) = inbox.Receive()
+            let! browser = _connect()
+            rc.Reply(browser)
+    })
+
+    and connection() = async {
+        let! browser = _connectionAgent.PostAndAsyncReply(fun rc -> rc)
+        return browser
+    }
 
     and page () =
         async {
@@ -167,6 +179,7 @@ module PlaywrightDriver =
             opts.Timeout <- 1000.f
             do! page.WaitForLoadStateAsync(loadState,options=opts) |> Async.AwaitTask
         }
+
 
     let pageDown() = async {
         let! page = page()

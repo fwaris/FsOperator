@@ -315,12 +315,6 @@ Use memory_save function to save each person's linked-in and twitter data into m
         b.Plugins.AddFromObject(nav) |> ignore
         b.Services.AddSingleton(nav) |> ignore
         b.Build()
-
-    let kernelWithVoice voiceFuncs mem () = 
-        let addVoice (b:IKernelBuilder) = 
-            let vf = new Functions.FsOpVoice()
-            vf.SetFunctions(voiceFuncs)
-        defaultKernel mem (Some addVoice)
         
     let rec run planRun = async {
         let! planRun = step planRun

@@ -7,6 +7,30 @@ open Microsoft.SemanticKernel
 open FSharp.Control
 
 module Voice = 
+
+    ///Convert voice usage type to FsResponses usage type
+    let toResponsesUsage (u:RTOpenAI.Api.Events.Usage) =
+        {
+            FsResponses.input_tokens = u.input_tokens
+            FsResponses.output_tokens = u.output_tokens
+            FsResponses.total_tokens = u.total_tokens
+        }
+
+    ///Convert FsRespones.Function to RTOpenAI.Api.Events.FunctionTool
+    let toVoiceTool (respTool:FsResponses.Function) : RTOpenAI.Api.Events.FunctionTool = 
+        {
+            ``type`` = "function"
+            name = respTool.name
+            description = respTool.description
+            parameters = 
+                {
+                    ``type`` = respTool.parameters.``type``
+                    properties = respTool.parameters.properties |> Map.map (fun k v -> {description = Some v.description; ``type``=v.``type``})
+                    required = respTool.parameters.required
+                }
+
+        }
+
     ///Matches function call request from Voice Assistant
     let (|FuncCall|_|) msg = 
         match msg with 
@@ -16,6 +40,31 @@ module Voice =
                                                         None
         | _                                    -> None
 
+    let reconfigure tools instructions (s:Session) =
+        { s with
+            id = None                               //*** set 'id' and 'object' to None when updating an existing session
+            object = None
+                                                    // set, unset, or override other fields as needed
+            instructions = instructions
+            tool_choice = Some "auto"
+            tools = tools
+        }
+
+    let toUpdateEvent (s:Session) =
+        { SessionUpdateEvent.Default with
+            event_id = Utils.newId()
+            session = s}
+        |> SessionUpdate
+
+    let voiceTools = lazy(
+        let tools = FlUtils.makeFunctionTools<Functions.FsOpVoice>() 
+        tools |> List.choose (function FsResponses.Tool_Function f -> toVoiceTool f |> Some | _ -> None))
+
+    let sendUpdateSession instructions conn session =
+        session
+        |> reconfigure voiceTools.Value instructions
+        |> toUpdateEvent
+        |> Connection.sendClientEvent conn
 
     let sendResponseCreate conn=
         (ClientEvent.ResponseCreate {ResponseCreateEvent.Default with
@@ -45,6 +94,8 @@ module Voice =
             sendFunctionResponse conn callId rslt
         }
 
+
+    ///Pump events from voice asst. into task bus
     let rec startMessagePump (conn:Connection) (task:TaskState<_,_>) = 
         let comp = 
             conn.WebRtcClient.OutputChannel.Reader.ReadAllAsync()

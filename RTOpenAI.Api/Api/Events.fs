@@ -49,7 +49,7 @@ type Parameters =
     }
     static member Default = { ``type`` = ""; properties = Map.empty; required = [] }
 
-type Tool =
+type FunctionTool =
     {
         ``type``: string
         name: string
@@ -78,7 +78,7 @@ type Session =
         output_audio_format: string option
         input_audio_transcription: InputAudioTranscription option
         turn_detection: TurnDetection option
-        tools: Tool list
+        tools: FunctionTool list
         tool_choice: string option
         temperature: float option
         max_output_tokens: int option
@@ -300,7 +300,7 @@ type Response =
         instructions: string option
         voice: string option
         output_audio_format: string option
-        tools: Tool list option
+        tools: FunctionTool list option
         tool_choice: string option
         temperature: float option
         max_output_tokens: int option

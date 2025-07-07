@@ -7,6 +7,7 @@ open Avalonia.FuncUI.Hosts
 open FsOpCore
 open Avalonia.Threading
 open Microsoft.SemanticKernel
+open Microsoft.Extensions.DependencyInjection
 
 module Update =
     let mailbox = Channel.CreateBounded<ClientMsg>(10)
@@ -83,14 +84,12 @@ module Update =
                 return isOn
             }
 
-    let browserPostUrl (model:Model) =
-        (*
-        match model.ui, model.opTask.target with
-        | Pw u, TLink url -> u.postUrl url |> Async.Start //model.browserMode
-        | _ -> ()
-        *)
-        ()
-
+    let browserPostUrl startBrowser (model:Model) =        
+        if startBrowser || FsOpCore.PlaywrightDriver._connection.Value.IsSome then        
+            match model.ui, model.opTask.target with
+            | Pw u, TLink url -> u.postUrl url |> Async.Start //model.browserMode
+            | _ -> ()
+       
     let checkUrl (url:string) =
         if Uri.IsWellFormedUriString(url, UriKind.Absolute) then
             Some url
@@ -106,13 +105,14 @@ module Update =
         let newTarget = OpTask.parseTarget tgt 
         let isDirty = prevTarget <> newTarget
         let model = {model with opTask = OpTask.setTarget newTarget model.opTask}
-        let cmds = match newTarget with TLink url -> [Cmd.ofMsg SyncUrlToBrowser] | _ -> []
+        let cmds = match newTarget with TLink url -> [Cmd.ofMsg (SyncUrlToBrowser true)] | _ -> []
         let cmds = if isDirty then (Cmd.ofMsg OpTask_MarkDirty::cmds) else cmds
         model, Cmd.batch cmds
 
-    let syncUrl model =
-        browserPostUrl model
-        model,  Cmd.ofMsg (StatusMsg_Set "Synced url to browser not implmented yet")
+    let syncUrl starBrowser model =
+        browserPostUrl starBrowser model
+        model,Cmd.none
+        //model,  Cmd.ofMsg (StatusMsg_Set "Synced url to browser not implmented yet")
         (*
         match TaskState.cuaMode model.taskState, TaskState.chatMode model.taskState with
         | CUA_Init, CM_Init -> browserPostUrl model; model, Cmd.none
@@ -217,7 +217,7 @@ module Update =
         if isDirty then
             let cmds = [
                 Cmd.ofMsg OpTask_MarkDirty
-                Cmd.ofMsg SyncUrlToBrowser
+                Cmd.ofMsg (SyncUrlToBrowser false)
                 updtdMsg
             ]
             model, Cmd.batch cmds
@@ -240,13 +240,77 @@ module Update =
             Cmd.ofMsg (StatusMsg_Set "Staring browser..." );
             Cmd.OfAsync.either PlaywrightDriver.launchExternal () Browser_Connected Error]
 
-    let terminateFlow model = {model with flow = model.flow.Terminate()},Cmd.none
+    let terminateFlow model = 
+        let voiceAsst = 
+            model.voiceAsst
+            |> Option.map RTOpenAI.Api.Connection.close
+            |> Option.map RTOpenAI.Api.Connection.create
+        {model with flow = model.flow.Terminate(); voiceAsst = voiceAsst},Cmd.none
 
-    let startFlow model =
+    let startVoiceFlow model conn taskState = 
+        let voicePrompt = 
+            checkEmpty model.opTask.voiceAsstInstructions
+            |> Option.orElse (Some Prompts.``starting voice prompt``)
+            |> Option.map (fun t -> 
+                t, Prompts.kernelArgs
+                    [
+                        Vars.taskInstructions, model.opTask.textModeInstructions
+                        Vars.startUrl, model.opTask.target.TargetString()
+                    ])
+            |> Option.map (fun (t,args) -> Prompts.renderPrompt t args)
+        let taskState = {taskState with toolDefs = taskState.toolDefs @ FlUtils.makeFunctionTools<Functions.FsOpVoice>()}
+        let flow = TaskFlowInteractive.create taskState (Some conn) voicePrompt
+        let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
+        async {
+            do! Async.Sleep 100
+            flow.Post TaskFlowInteractive.TFi_Prime
+        } 
+        |> Async.Start
+        model,Cmd.none
+
+    let configVoice driver bus  (b:IKernelBuilder) =
+        let funcs = TaskFlowInteractive.createVoiceFunctions driver bus
+        let voice = Functions.FsOpVoice()
+        voice.SetFunctions(funcs)
+        b.Plugins.AddFromObject(voice) |> ignore
+
+
+    let startTextFlow model taskState  =
+        let flow = TaskFlowInteractive.create taskState None None
+        let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
+        async {
+            do! Async.Sleep 100
+            flow.Post TaskFlowInteractive.TFi_Prime
+        } 
+        |> Async.Start
+        model,Cmd.none
+
+    let startFlow (model:Model) =
+        let taskState = lazy(
+            let driver = PlaywrightDriver.create()
+            let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
+            let kernel = OPlan.defaultKernel Map.empty (Some (configVoice driver.driver bus ))
+            let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
+            FsOpCore.TaskState.Create<_,_>  //initial task state
+                        model.opTask.id
+                        (model.opTask.target.TargetString())
+                        bus
+                        driver.driver
+                        model.opTask.textModeInstructions
+                        (checkEmpty model.opTask.reasonerInstructions |> Option.orElse (Some Prompts.``reasoner prompt for cua guidance``))
+                        kernel
+                        tools)
+        match model.voiceAsst, checkEmpty model.opTask.textModeInstructions, OpTask.isTargetNotEmpty model.opTask.target with
+        | Some conn, _, _ -> startVoiceFlow model conn taskState.Value
+        | None, Some instr, true -> startTextFlow model taskState.Value
+        | _, None, _ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start task, no text-mode instructions given")
+        | _,_,false    -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start task in text mode, no start URL provided")
+
+(*
         match checkEmpty model.opTask.textModeInstructions, OpTask.isEmptyTarget model.opTask.target with 
         | Some instr, false -> 
-            let ui = PlaywrightDriver.create()
-            let kernel = OPlan.defaultKernel Map.empty None
+            let driver = PlaywrightDriver.create()
+            let kernel = OPlan.defaultKernel Map.empty (Some configVoice)
             let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
             let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
             let tools = if model.voiceAsst.IsSome then FlUtils.makeFunctionTools<Functions.FsOpVoice>() @ tools else tools
@@ -254,12 +318,25 @@ module Update =
                         model.opTask.id
                         (model.opTask.target.TargetString())
                         bus
-                        ui.driver
+                        driver.driver
                         model.opTask.textModeInstructions
                         (checkEmpty model.opTask.reasonerInstructions |> Option.orElse (Some Prompts.``reasoner prompt for cua guidance``))
                         kernel
                         tools
-            let flow = TaskFlowInteractive.create t0 model.voiceAsst
+            let voicePrompt = 
+                match model.voiceAsst with 
+                | Some _ -> 
+                    checkEmpty model.opTask.voiceAsstInstructions
+                    |> Option.orElse (Some Prompts.``starting voice prompt``)
+                    |> Option.map (fun t -> 
+                        t, Prompts.kernelArgs
+                            [
+                                Vars.taskInstructions, model.opTask.textModeInstructions
+                                Vars.startUrl, model.opTask.target.TargetString()
+                            ])
+                    |> Option.map (fun (t,args) -> Prompts.renderPrompt t args)
+                | None -> None
+            let flow = TaskFlowInteractive.create t0 model.voiceAsst voicePrompt
             let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
             async {
                 do! Async.Sleep 100
@@ -269,6 +346,7 @@ module Update =
             model, Cmd.ofMsg (StatusMsg_Set "Started flow")
         | None,_ -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, no instructions given")
         | _,true -> model, Cmd.ofMsg (StatusMsg_Set "Cannot start flow, target is empty")
+*)
 
     let voiceToggle model = 
         let voiceAsst = 
@@ -280,9 +358,6 @@ module Update =
     let update (win:HostWindow) msg (model:Model) =
         try
             match msg with
-            | InitializeExternalBrowser -> startBrowser model
-            | Browser_Connected _  -> browserPostUrl model;  {model with browserMode = BM_Ready}, Cmd.none
-
             | OpTask_SetTextInstructions txt -> setInstructions model txt
             | OpTask_Update instr -> updateTask model instr
             | OpTask_MarkDirty -> let m = {model with isDirty = true} in setTitle win m; m, Cmd.none
@@ -290,7 +365,7 @@ module Update =
             | OpTask_SetTarget txt -> setTarget model txt
             //| OpTask_Load when (TaskState.cuaMode model.taskState).IsCUA_Init -> model, Cmd.OfAsync.either loadTask (win,model) OpTask_Loaded Error
             | OpTask_Load -> model,Cmd.none
-            | OpTask_Loaded (Some instr) -> {model with opTask=instr; flow=Flow.Default}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg SyncUrlToBrowser]
+            | OpTask_Loaded (Some instr) -> {model with opTask=instr; flow=Flow.Default}, Cmd.batch [Cmd.ofMsg OpTask_ClearDirty; Cmd.ofMsg (SyncUrlToBrowser false)]
             | OpTask_Loaded None -> model, Cmd.none
             | OpTask_LoadSample sample -> model, Cmd.OfAsync.either checkLoadSample (win,model,sample) OpTask_Loaded Error
             | OpTask_Save -> model, Cmd.OfAsync.either saveTask (win,model.opTask) OpTask_Saved Error
@@ -301,7 +376,7 @@ module Update =
 
             | ToggleVoiceMode -> voiceToggle model
 
-            | SyncUrlToBrowser -> syncUrl model
+            | SyncUrlToBrowser starBrowser -> syncUrl starBrowser model
 
             | Action_Set txt -> {model with action=txt}, Cmd.ofMsg (Action_Flash true)
             | Action_Flash isOn -> {model with isFlashing = isOn}, if isOn then Cmd.OfAsync.perform delayFlash (not isOn) Action_Flash else Cmd.none

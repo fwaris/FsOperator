@@ -35,7 +35,7 @@ module OpTask =
     let setTarget tgt  (opTask:OpTask) = {opTask with target = tgt}
     let setId id opTask = {opTask with OpTask.id = id}
     let targetToString = function TLink url -> url | TProcess (a,b) -> match b with Some b -> $"{a} {b}" | None -> a
-    let isEmptyTarget = function TLink url -> String.IsNullOrWhiteSpace url | _ -> false
+    let isTargetNotEmpty = function TLink url -> not(String.IsNullOrWhiteSpace url) | _ -> false
 
     let private _parseTarget (xs:string array) =
         let a = xs.[0]
