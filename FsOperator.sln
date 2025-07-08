@@ -27,6 +27,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponsesTest", "FsRespon
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpPlanEditor", "FsOpPlanEditor\FsOpPlanEditor.fsproj", "{07904A47-E4EF-4646-86DC-52BF9869B880}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PlanEditorTest", "PlanEditorTest\PlanEditorTest.fsproj", "{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -77,6 +79,10 @@ Global
 		{07904A47-E4EF-4646-86DC-52BF9869B880}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07904A47-E4EF-4646-86DC-52BF9869B880}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07904A47-E4EF-4646-86DC-52BF9869B880}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

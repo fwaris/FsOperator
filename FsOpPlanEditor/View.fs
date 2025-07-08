@@ -4,6 +4,7 @@ open FsOpCore
 open Elmish
 open Avalonia.FuncUI.Elmish
 open Avalonia.Controls
+open Avalonia.FuncUI.Types
 open Avalonia.FuncUI.DSL
 open Avalonia.Layout
 open Avalonia.FuncUI.Hosts
@@ -11,20 +12,33 @@ open System.Threading.Tasks
 
 [<AbstractClass; Sealed>]
 type MainView =    
+    static member tasks (model:Model) dispatch = 
+        let btns = model.tasks |> List.map (fun t -> Button.create [Button.content t.id; Button.onClick(fun _ -> dispatch (EditTask) )] :> IView) 
+        Panel.create [
+            Grid.row 1
+            Panel.children btns
+        ]
+
+    static member toolbar (model:Model) dispatch = 
+        DockPanel.create [
+            Grid.row 0
+            DockPanel.children [                
+                Button.create [Button.content "Add"; DockPanel.dock Dock.Left; Button.onClick (fun _ -> dispatch AddTask)]
+                Button.create [Button.content "Cancel"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Close)]
+                Button.create [Button.content "Save"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Save)]
+            ]
+        ]
+
     static member main (model:Model) dispatch =
         DockPanel.create [               
             DockPanel.children [
                 Grid.create [
-                    Grid.rowDefinitions "50,*"
+                    Grid.rowDefinitions "50,*"                   
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
-                        Button.create [
-                            Button.content "Close"
-                            Button.onClick (fun _ -> 
-                                
-                                dispatch Msg.Close)
-                        ]
+                        MainView.toolbar model dispatch  
+                        MainView.tasks model dispatch
                     ]
                 ]               
             ]
