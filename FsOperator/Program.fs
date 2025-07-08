@@ -23,7 +23,7 @@ type MainWindow() as this =
 
         Program.mkProgram Update.init (Update.update this) MainView.main
         |> Program.withHost this
-        |> Program.withSubscription Update.subscriptions        
+        |> Program.withSubscription Subscriptions.subscriptions        
         //|> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
 
@@ -46,7 +46,7 @@ type App() =
             //DevToolsExtensions.AttachDevTools(this)
             desktopLifetime.MainWindow <- win
             desktopLifetime.ShutdownRequested.Add (fun (s:ShutdownRequestedEventArgs) ->                 
-                Update.mailbox.Writer.TryComplete() |> ignore
+                Subscriptions.mailbox.Writer.TryComplete() |> ignore
                 Async.RunSynchronously(PlaywrightDriver.shutdown(),1000))
         | _ -> ()
 

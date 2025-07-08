@@ -281,8 +281,6 @@ type MainView =
 
     static member contentWrapper model dispatch =
         let leftMargin = 10.
-        let csState = CUAState.CUA_Init
-        let csMode =  ChatMode.CM_Init
        
         Panel.create [
             Grid.row 1

@@ -62,7 +62,7 @@ type JiraTools() =
 """
                 }
 
-            Update.mailbox.Writer.TryWrite (ClientMsg.Log_Append $"<-- MCP Jira task: {taskName} - {description}") |> ignore
-            Update.mailbox.Writer.TryWrite (ClientMsg.OpTask_Loaded (Some jiraTask))  |> ignore
+            Subscriptions.mailbox.Writer.TryWrite (ClientMsg.Log_Append $"<-- MCP Jira task: {taskName} - {description}") |> ignore
+            Subscriptions.mailbox.Writer.TryWrite (ClientMsg.OpTask_Loaded (Some jiraTask))  |> ignore
             return "Done"
         }

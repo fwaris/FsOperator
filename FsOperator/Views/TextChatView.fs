@@ -111,7 +111,7 @@ type TextChatView =
                                         TextBox.margin 1  
                                         TextBox.fontSize 14.
                                         TextBox.borderThickness 1.
-                                        TextBox.onTextChanged (fun t -> dispatch (Chat_UpdateQuestion t))
+                                        TextBox.onTextChanged (fun t -> dispatch (Flow_UpdateQuestion t))
                                         TextBox.margin (Thickness(2.,2.,35.,2.))
                                     ]
                                     Button.create [

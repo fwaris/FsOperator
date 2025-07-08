@@ -17,8 +17,6 @@ type ChatView =
 
     static member chat model dispatch =
         let leftMargin = 10.
-        let csState = CUAState.CUA_Init
-        let csMode = ChatMode.CM_Init
        
         TabControl.create [
             TabControl.horizontalAlignment HorizontalAlignment.Stretch
@@ -34,7 +32,7 @@ type ChatView =
                             Panel.children [
                                 TextBlock.create [
                                     TextBlock.verticalAlignment VerticalAlignment.Center
-                                    TextBlock.text "Text"
+                                    TextBlock.text "Chat"
                                     TextBlock.fontSize 14.
                                     TextBlock.fontWeight FontWeight.Bold
                                     TextBlock.margin (Thickness(leftMargin,1.,30.,0.))
@@ -64,12 +62,12 @@ type ChatView =
                             Panel.children [
                                 TextBlock.create [
                                     TextBlock.verticalAlignment VerticalAlignment.Center
-                                    TextBlock.text "Voice"
+                                    TextBlock.text "Plan"
                                     TextBlock.fontSize 14.
                                     TextBlock.fontWeight FontWeight.Bold
                                     TextBlock.margin (Thickness(leftMargin,1.,50.,0.))
                                 ]
-                                if ((csState.IsCUA_Pause || csState.IsCUA_Loop) && csMode.IsCM_Voice) then
+                                if (false) then
                                     Lottie.create [
                                         Grid.row 0
                                         Lottie.margin (Thickness(10.,0.,0.,0.))
@@ -81,7 +79,7 @@ type ChatView =
                             ]
                         ]
                     )
-                    TabItem.content(VoiceChatView.chat model dispatch)
+                    TabItem.content(Button.create [Button.content "Edit plan"; Button.onClick (fun _ -> dispatch Plan_Edit) ])
                 ]
             ]
         ]

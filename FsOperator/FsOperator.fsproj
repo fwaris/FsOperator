@@ -27,12 +27,15 @@
 		<Compile Include="Model\Chat.fs" />
 		<Compile Include="Model\Model.fs" />
 		<Compile Include="Dialogs.fs" />
-		<Compile Include="Update.fs" />
+		<Compile Include="Update\Subscriptions.fs" />
+		<Compile Include="Update\Tasks.fs" />
+		<Compile Include="Update\Flows.fs" />
+		<Compile Include="Update\Plans.fs" />
+		<Compile Include="Update\Update.fs" />
 		<Compile Include="Views\Lottie.fs" />
 		<Compile Include="Views\ViewCommon.fs" />
 		<Compile Include="Views\BrowserView.fs" />
 		<Compile Include="Views\ChatHistoryView.fs" />
-		<Compile Include="Views\VoiceChatView.fs" />
 		<Compile Include="Views\TextChatView.fs" />
 		<Compile Include="Views\ChatView.fs" />
 		<Compile Include="Views\MainView.fs" />
@@ -60,6 +63,7 @@
 		
 	<ItemGroup>
 	  <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+	  <ProjectReference Include="..\FsOpPlanEditor\FsOpPlanEditor.fsproj" />
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
 	</ItemGroup>
