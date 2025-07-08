@@ -1,49 +1,134 @@
 ﻿namespace FsOpPlanEditor
 open System
-open FsOpCore
 open Elmish
-open Avalonia.FuncUI.Elmish
-open Avalonia.Controls
-open Avalonia.FuncUI.Types
-open Avalonia.FuncUI.DSL
-open Avalonia.Layout
+open FsOpCore
 open Avalonia.FuncUI.Hosts
-open System.Threading.Tasks
+open Avalonia.Media
+open Avalonia.Controls
+open Avalonia.Input
+open Avalonia.FuncUI
+open Avalonia.FuncUI.DSL
+open Avalonia.FuncUI.Elmish
+open Avalonia.Layout
+open Avalonia.Threading
+open Avalonia.FuncUI.Types
 
 [<AbstractClass; Sealed>]
-type MainView =    
-    static member tasks (model:Model) dispatch = 
-        let btns = model.tasks |> List.map (fun t -> Button.create [Button.content t.id; Button.onClick(fun _ -> dispatch (EditTask) )] :> IView) 
-        Panel.create [
-            Grid.row 1
-            Panel.children btns
+type MainView =
+
+    static member task (t:OTask) dispatch =
+        Border.create [
+            Border.margin 3.0
+            Border.borderThickness 1.0
+            Border.borderBrush Brushes.AliceBlue
+            Border.cornerRadius 3.0
+            Border.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag e))
+            Border.padding 3.0
+            Border.child (
+                DockPanel.create [
+                    DockPanel.margin 3.0
+                    DockPanel.children [
+                        Button.create [
+                            Button.margin 2.0
+                            Button.content Icons.pen
+                            Button.tip "Edit task properties"
+                            Button.onClick (fun _ -> dispatch (EditTask t))
+                            DockPanel.dock Dock.Left
+                        ]
+                        Button.create [
+                            Button.margin 2.0
+                            Button.content Icons.minus
+                            Button.tip "Remove task"
+                            Button.onClick (fun _ -> dispatch (EditTask t))
+                            DockPanel.dock Dock.Right
+                        ]
+                        TextBlock.create [
+                            TextBlock.margin 2.
+                            TextBlock.verticalAlignment VerticalAlignment.Center
+                            TextBlock.width 50.
+                            TextBlock.text t.id
+                            TextBlock.tip $"Task id: {t.id}"
+                        ]
+                    ]
+                ]
+            )
         ]
 
-    static member toolbar (model:Model) dispatch = 
+    static member tasks (model:Model) dispatch =
+        let btns = model.tasks |> List.map (fun t -> MainView.task t dispatch :> IView)
+        Border.create [
+            Border.borderThickness 1.0
+            Border.borderBrush Brushes.LightGray
+            Grid.row 1
+            Border.child(
+                DockPanel.create [
+                    DockPanel.children [
+                        TextBlock.create [
+                            TextBlock.text "Tasks"
+                            TextBlock.horizontalAlignment HorizontalAlignment.Center
+                            TextBlock.dock Dock.Top
+                        ]
+                        WrapPanel.create [
+                            WrapPanel.children btns
+                        ]
+                    ]
+                ]
+            )
+        ]
+
+    static member toolbar (model:Model) dispatch =
         DockPanel.create [
             Grid.row 0
-            DockPanel.children [                
-                Button.create [Button.content "Add"; DockPanel.dock Dock.Left; Button.onClick (fun _ -> dispatch AddTask)]
+            DockPanel.children [
+                Button.create [Button.content Icons.plus; DockPanel.dock Dock.Left; Button.onClick (fun _ -> dispatch AddTask)]
                 Button.create [Button.content "Cancel"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Close)]
                 Button.create [Button.content "Save"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Save)]
             ]
         ]
 
+    static member planFlow (model:Model) dispatch =
+        let btns = model.nodes |> List.map (fun t -> MainView.task t dispatch :> IView)
+        Border.create [
+
+            Border.borderThickness 1.0
+            Border.borderBrush Brushes.LightGray
+            Grid.row 2
+            Border.child(
+                DockPanel.create [
+                    DockPanel.children [
+                        TextBlock.create [
+                            TextBlock.text "Nodes"
+                            TextBlock.horizontalAlignment HorizontalAlignment.Center
+                            TextBlock.dock Dock.Top
+                        ]
+                        WrapPanel.create [
+                            WrapPanel.background Brushes.DarkCyan
+                            WrapPanel.children btns
+                            Control.allowDrop true
+                            Control.onDrag(fun e -> ())
+
+                        ]
+                    ]
+                ]
+            )
+        ]
+
     static member main (model:Model) dispatch =
-        DockPanel.create [               
+        DockPanel.create [
             DockPanel.children [
                 Grid.create [
-                    Grid.rowDefinitions "50,*"                   
+                    Grid.rowDefinitions "50,*,*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
-                        MainView.toolbar model dispatch  
+                        MainView.toolbar model dispatch
                         MainView.tasks model dispatch
+                        MainView.planFlow model dispatch
                     ]
-                ]               
+                ]
             ]
         ]
-    
+
 type PlanEditor(plan:OPlan) as this =
     inherit HostWindow()
     let tcs = new TaskCompletionSource<OPlan option>()
@@ -55,7 +140,7 @@ type PlanEditor(plan:OPlan) as this =
 
         Program.mkProgram Update.init (Update.update this tcs) MainView.main
         |> Program.withHost this
-        //|> Program.withConsoleTrace        
+        //|> Program.withConsoleTrace
         |> Program.runWithAvaloniaSyncDispatch (plan)
 
 

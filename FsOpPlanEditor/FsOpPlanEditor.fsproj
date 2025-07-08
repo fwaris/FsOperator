@@ -13,6 +13,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Include="Icons.fs" />
 	  <Compile Include="Model.fs" />
 	  <Compile Include="Update.fs" />
 	  <Compile Include="View.fs" />
