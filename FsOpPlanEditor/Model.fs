@@ -14,7 +14,7 @@ type Msg =
     | EditTask of OTask
     | AddTask
     | Init of OPlan
-    | BeginDrag of PointerPressedEventArgs
+    | BeginDrag of PointerPressedEventArgs*OTask
     | Dragged of string
-    | Dropped of string
+    | Dropped of OTask
 

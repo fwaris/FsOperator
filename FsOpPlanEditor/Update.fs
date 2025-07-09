@@ -15,10 +15,10 @@ module Update =
         }
         model, Cmd.ofMsg (Init p)
 
-    let doDrag e = 
+    let doDrag (e,t) = 
         async {
             let dragData = DataObject()
-            dragData.Set(DataFormats.Text, "drag")
+            dragData.Set(DataFormats.Text,t)
 
             let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
                             (fun _ -> DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy)) |> Async.AwaitTask
@@ -38,9 +38,9 @@ module Update =
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
             match msg with
-            | BeginDrag e -> model, Cmd.OfAsync.perform doDrag e Dragged
+            | BeginDrag (e,t) -> model, Cmd.OfAsync.perform doDrag (e,t) Dragged
             | Dragged s -> model,Cmd.none
-            | Dropped s -> addNode model s, Cmd.none
+            | Dropped t -> {model with nodes = (t::model.nodes) |> List.distinct}, Cmd.none
             | Init p -> {model with plan = p},Cmd.none
             | Close -> tcs.SetResult(None); win.Close(); model,Cmd.none
             | Save  -> tcs.SetResult(Some model.plan); win.Close(); model,Cmd.none

@@ -12,6 +12,7 @@ open Avalonia.FuncUI.Elmish
 open Avalonia.Layout
 open Avalonia.Threading
 open Avalonia.FuncUI.Types
+open FsOpPlanEditor.DragDrop2
 
 [<AbstractClass; Sealed>]
 type MainView =
@@ -22,7 +23,7 @@ type MainView =
             Border.borderThickness 1.0
             Border.borderBrush Brushes.AliceBlue
             Border.cornerRadius 3.0
-            Border.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag e))
+            Border.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,t)))
             Border.padding 3.0
             Border.child (
                 DockPanel.create [
@@ -68,8 +69,9 @@ type MainView =
                             TextBlock.horizontalAlignment HorizontalAlignment.Center
                             TextBlock.dock Dock.Top
                         ]
-                        WrapPanel.create [
+                        WrapPanel.create [                         
                             WrapPanel.children btns
+                            
                         ]
                     ]
                 ]
@@ -101,13 +103,21 @@ type MainView =
                             TextBlock.horizontalAlignment HorizontalAlignment.Center
                             TextBlock.dock Dock.Top
                         ]
-                        WrapPanel.create [
-                            WrapPanel.background Brushes.DarkCyan
-                            WrapPanel.children btns
-                            Control.allowDrop true
-                            Control.onDrag(fun e -> ())
+                        View.createGeneric<AvaloniaGraphControl.GraphPanel> [] :> IView        // or IView<MyControl
+                        //NodeEditor.Controls.Editor
+                        //WrapPanel.create [
+                        //    Control.allowDrop true
+                        //    Control.onDragEnter(fun e -> e.DragEffects <- 
+                        //                                    match e.Data.Get(DataFormats.Text) with 
+                        //                                    | :? OTask as t -> DragDropEffects.Copy 
+                        //                                    | _ -> DragDropEffects.None)
+                        //    Control.onDrop(fun e -> match e.Data.Get(DataFormats.Text) with 
+                        //                            | :? OTask as t -> dispatch (Dropped t)
+                        //                            | _             -> ())
+                        //    WrapPanel.background Brushes.DarkCyan
+                        //    WrapPanel.children btns
 
-                        ]
+                        //]
                     ]
                 ]
             )
@@ -131,7 +141,7 @@ type MainView =
 
 type PlanEditor(plan:OPlan) as this =
     inherit HostWindow()
-    let tcs = new TaskCompletionSource<OPlan option>()
+    let tcs = new System.Threading.Tasks.TaskCompletionSource<OPlan option>()
 
     do
         base.Title <- "Plan Editor"
@@ -144,6 +154,6 @@ type PlanEditor(plan:OPlan) as this =
         |> Program.runWithAvaloniaSyncDispatch (plan)
 
 
-    member this.ShowDialogAsync(parent: Window) : Task<OPlan option> =
+    member this.ShowDialogAsync(parent: Window) =
         base.ShowDialog(parent) |> ignore
         tcs.Task

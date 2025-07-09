@@ -14,6 +14,7 @@
 
 	<ItemGroup>
 	  <Compile Include="Icons.fs" />
+	  <Compile Include="DragDrop.fs" />
 	  <Compile Include="Model.fs" />
 	  <Compile Include="Update.fs" />
 	  <Compile Include="View.fs" />
@@ -31,6 +32,7 @@
 		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
 		<PackageReference Include="System.Text.Json" Version="9.0.6" />
 		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
+		<PackageReference Include="AvaloniaGraphControl" Version="0.6.1" />
 	</ItemGroup>
 
 	<ItemGroup>
