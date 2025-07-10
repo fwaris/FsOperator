@@ -12,10 +12,12 @@ open Avalonia.FuncUI.Elmish
 open Avalonia.Layout
 open Avalonia.Threading
 open Avalonia.FuncUI.Types
+open AvaloniaGraphControl
+open Avalonia.Controls.Templates
 open FsOpPlanEditor.DragDrop2
 
 [<AbstractClass; Sealed>]
-type MainView =
+type Views =
 
     static member task (t:OTask) dispatch =
         Border.create [
@@ -55,27 +57,76 @@ type MainView =
             )
         ]
 
-    static member tasks (model:Model) dispatch =
-        let btns = model.tasks |> List.map (fun t -> MainView.task t dispatch :> IView)
+    static member iconButton (content:string) clickHandler (tip:string) =
+        Button.create [
+            Button.width 14.
+            Button.height 14.
+            Button.fontSize 10.0
+            Button.verticalAlignment VerticalAlignment.Center
+            Button.tip tip
+            Button.background Brushes.Transparent
+            Button.padding 0.0
+            Button.content content
+            Button.onClick clickHandler
+        ]
+
+    static member nodeMenu (n:ONode) dispatch =
         Border.create [
+            Border.borderBrush Brushes.DarkCyan
+            Border.background Brushes.DarkSlateBlue
             Border.borderThickness 1.0
-            Border.borderBrush Brushes.LightGray
-            Grid.row 1
-            Border.child(
-                DockPanel.create [
-                    DockPanel.children [
-                        TextBlock.create [
-                            TextBlock.text "Tasks"
-                            TextBlock.horizontalAlignment HorizontalAlignment.Center
-                            TextBlock.dock Dock.Top
-                        ]
-                        WrapPanel.create [                         
-                            WrapPanel.children btns
-                            
-                        ]
+            Border.cornerRadius 3.0
+            Border.padding 2.0
+            Border.child (
+                StackPanel.create [
+                    StackPanel.orientation Orientation.Horizontal
+                    StackPanel.children [
+                        if not n.IsSeq then
+                            Views.iconButton Icons.sequence.Value (fun _ -> dispatch (ConvertToSequence n)) "Convert to 'sequence' node"
+                        if not n.IsChoose then
+                            Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) "Convert to 'choose' node"
+                        Views.iconButton Icons.plus (fun _ -> dispatch AddTask n) "Add a 'task' node"
+                        Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
+                        Views.iconButton Icons.edit (fun _ -> dispatch (EditNode n))  "Edit node"
                     ]
                 ]
             )
+        ]
+
+    static member choose (c:Choose) dispatch =
+        Border.create [
+            Border.borderBrush Brushes.DarkCyan
+            Border.borderThickness 1.0
+            Border.cornerRadius 3.0
+            Border.padding 2.0
+            Border.child (
+                StackPanel.create [
+                    StackPanel.children [
+                        TextSticker.create [
+                            TextSticker.shape TextSticker.Shapes.Diamond
+                            TextSticker.dataContext (c.description |> Option.map (shorten 30) |> Option.defaultValue "")
+                        ]
+                        Views.nodeMenu (ONode.Choose c) dispatch
+                    ]
+                ])
+        ]
+
+    static member sequence (s:FsOpCore.Seq) dispatch =
+        Border.create [
+            Border.borderBrush Brushes.DarkCyan
+            Border.borderThickness 1.0
+            Border.cornerRadius 3.0
+            Border.padding 2.0
+            Border.child (
+                StackPanel.create [
+                    StackPanel.children [
+                        TextSticker.create [
+                            TextSticker.shape TextSticker.Shapes.Rectangle
+                            TextSticker.dataContext (s.description |> Option.map (shorten 30) |> Option.defaultValue "")
+                        ]
+                        Views.nodeMenu (ONode.Seq s) dispatch
+                    ]
+                ])
         ]
 
     static member toolbar (model:Model) dispatch =
@@ -83,15 +134,21 @@ type MainView =
             Grid.row 0
             DockPanel.children [
                 Button.create [Button.content Icons.plus; DockPanel.dock Dock.Left; Button.onClick (fun _ -> dispatch AddTask)]
-                Button.create [Button.content "Cancel"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Close)]
-                Button.create [Button.content "Save"; DockPanel.dock Dock.Right; Button.onClick (fun _ -> dispatch Save)]
+                StackPanel.create [
+                    DockPanel.dock Dock.Right;
+                    StackPanel.orientation Orientation.Horizontal
+                    StackPanel.children [
+                        Button.create [Button.content Icons.cancel; Button.onClick (fun _ -> dispatch Close)]
+                        Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
+                    ]
+                ]
+                TextBlock.create []
             ]
         ]
 
     static member planFlow (model:Model) dispatch =
-        let btns = model.nodes |> List.map (fun t -> MainView.task t dispatch :> IView)
+        let btns = model.nodes |> List.map (fun t -> Views.task t dispatch :> IView)
         Border.create [
-
             Border.borderThickness 1.0
             Border.borderBrush Brushes.LightGray
             Grid.row 2
@@ -103,21 +160,35 @@ type MainView =
                             TextBlock.horizontalAlignment HorizontalAlignment.Center
                             TextBlock.dock Dock.Top
                         ]
-                        View.createGeneric<AvaloniaGraphControl.GraphPanel> [] :> IView        // or IView<MyControl
-                        //NodeEditor.Controls.Editor
-                        //WrapPanel.create [
-                        //    Control.allowDrop true
-                        //    Control.onDragEnter(fun e -> e.DragEffects <- 
-                        //                                    match e.Data.Get(DataFormats.Text) with 
-                        //                                    | :? OTask as t -> DragDropEffects.Copy 
-                        //                                    | _ -> DragDropEffects.None)
-                        //    Control.onDrop(fun e -> match e.Data.Get(DataFormats.Text) with 
-                        //                            | :? OTask as t -> dispatch (Dropped t)
-                        //                            | _             -> ())
-                        //    WrapPanel.background Brushes.DarkCyan
-                        //    WrapPanel.children btns
+                        GraphPanel.create [
+                            GraphPanel.dataTemplates (
+                                let ds = DataTemplates()
+                                ds.AddRange(
+                                    [
+                                        DataTemplateView<ONode>.create (fun data ->
+                                            Border.create [
+                                                Control.allowDrop true
+                                                Control.onDragEnter(fun e -> e.DragEffects <-
+                                                                                match e.Data.Get(DataFormats.Text) with
+                                                                                | :? OTask as t -> DragDropEffects.Copy
+                                                                                | _ -> DragDropEffects.None)
+                                                Control.onDrop(fun e -> match e.Data.Get(DataFormats.Text) with
+                                                                        | :? OTask as t -> dispatch (Dropped t)
+                                                                        | _             -> ())
+                                                Border.child (
 
-                        //]
+                                                    match data with
+                                                    | ONode.Leaf t -> Views.task t dispatch :> IView
+                                                    | ONode.Choose c -> Views.choose c dispatch
+                                                    | ONode.Seq s -> Views.sequence s dispatch
+                                                )
+                                            ])
+                                    ])
+                                ds)
+                            GraphPanel.background Brushes.DarkTurquoise
+                            GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
+                            GraphPanel.graph (model.root |> Update.edges |> Update.graph)
+                        ]
                     ]
                 ]
             )
@@ -127,13 +198,12 @@ type MainView =
         DockPanel.create [
             DockPanel.children [
                 Grid.create [
-                    Grid.rowDefinitions "50,*,*"
+                    Grid.rowDefinitions "50,*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
-                        MainView.toolbar model dispatch
-                        MainView.tasks model dispatch
-                        MainView.planFlow model dispatch
+                        Views.toolbar model dispatch
+                        Views.planFlow model dispatch
                     ]
                 ]
             ]
@@ -148,7 +218,7 @@ type PlanEditor(plan:OPlan) as this =
         base.Width <- 400.0
         base.Height <- 600.0
 
-        Program.mkProgram Update.init (Update.update this tcs) MainView.main
+        Program.mkProgram Update.init (Update.update this tcs) Views.main
         |> Program.withHost this
         //|> Program.withConsoleTrace
         |> Program.runWithAvaloniaSyncDispatch (plan)

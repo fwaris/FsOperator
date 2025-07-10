@@ -4,15 +4,15 @@ open Microsoft.SemanticKernel
 open FsResponses
 open System.Text.Json
 
-type VisualState = 
+type VisualState =
     {
         snapshot        : string
         width           : int
-        height          : int 
+        height          : int
         url             : string option
         environment     : string
     }
-    with static member Default = 
+    with static member Default =
                             {
                                 snapshot    = ""
                                 width       = C.VIEWPORT_WIDTH
@@ -22,14 +22,14 @@ type VisualState =
                             }
 
 ///type to package cua request parameters
-type CuaReq = 
+type CuaReq =
     {
         instructions : string option
         visualState  : VisualState
         chatHistory  : Message list
         nonCuaTools  : Tool list
     }
-    with static member Default = 
+    with static member Default =
                         {
                             instructions = None
                             visualState = VisualState.Default
@@ -74,7 +74,7 @@ module FlUtils =
                         |> Seq.toList
                 }
         }
-        |> Tool_Function
+        //|> Tool_Function
 
     ///<summary>
     ///Extract function metadata from a properly annotated type.<br />

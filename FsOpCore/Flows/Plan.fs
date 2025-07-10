@@ -4,13 +4,13 @@ open System.Threading
 open Microsoft.Extensions.DependencyInjection
 
 ///represents the target computer environment (browser url or windows exe) for a task
-type OTaskTarget = 
-    | OProcess of string*string option 
+type OTaskTarget =
+    | OProcess of string*string option
     | OLink of string
-    with member this.TargetString() = 
-            match this with 
+    with member this.TargetString() =
+            match this with
             | OProcess (a,b) -> $"{a} {b}"
-            | OLink s -> s    
+            | OLink s -> s
 
 ///definition of a single unit of work in a plan
 type OTask = {
@@ -20,7 +20,7 @@ type OTask = {
     cua         : string option
     reasoner    : string option
     voice       : string option
-    tools       : FsResponses.Tool list
+    tools       : FsResponses.Function list
     allowedSec  : int
 }
     with
@@ -72,7 +72,7 @@ and Seq = {
 }
 
 ///task node tree structure
-and [<RequireQualifiedAccess>] ONode =
+and [<RequireQualifiedAccess; ReferenceEquality >] ONode =
     | Leaf of OTask      //Leaf node containing the task
     | Choose of Choose  //execute one of many sub nodes - based on LLM decision involving transition prompt
     | Seq of Seq        //execute all sub nodes in sequence
@@ -84,6 +84,13 @@ and [<RequireQualifiedAccess>] ONode =
                 | Seq all -> (acc,all.nodes) ||> List.fold loop
                 | Choose {transition={nodes=ns}} -> (acc,ns) ||> List.fold loop
             loop [] this
+
+module ONode =
+    let addNode (root:ONode) (p:ONode) (t:OTask) =
+        let rec loop (c:ONode) =
+            if p = c then
+                match p with
+                | ONode.Seq s -> s.nodes
 
 ///A collection of one or more tasks organized in a tree
 type OPlan = {
@@ -103,8 +110,8 @@ type OTaskRun = {
     messages : ChatMsg list
     usage    : Map<string,FsResponses.Usage>
 }
-with 
-    static member Create task driver = 
+with
+    static member Create task driver =
                     {
                         task = task
                         driver = driver
@@ -218,29 +225,29 @@ Use memory_save function to save each person's linked-in and twitter data into m
         }
         |> Async.Start
 
-    let reduceUsage (a:FsResponses.Usage) (b:FsResponses.Usage) = 
-        {a with 
-            input_tokens = a.input_tokens + b.input_tokens 
+    let reduceUsage (a:FsResponses.Usage) (b:FsResponses.Usage) =
+        {a with
+            input_tokens = a.input_tokens + b.input_tokens
             output_tokens = a.output_tokens + b.output_tokens
             total_tokens = a.total_tokens + b.total_tokens
         }
 
-    let sumUsages (us:Map<string,FsResponses.Usage list>) = 
+    let sumUsages (us:Map<string,FsResponses.Usage list>) =
         us
-        |> Map.map (fun k vs ->  
-            vs 
+        |> Map.map (fun k vs ->
+            vs
             |> List.reduce reduceUsage)
 
-    let collectUsages (uss:Map<string,FsResponses.Usage> list) = 
+    let collectUsages (uss:Map<string,FsResponses.Usage> list) =
         uss
         |> List.collect Map.toList
         |> List.groupBy fst
         |> List.map (fun (k,xs) -> k, List.map snd xs)
         |> Map.ofList
-            
+
     let printTaskUsage (us:Map<string,FsResponses.Usage list>) =
         sumUsages us
-        |> Map.iter (fun m u -> printfn $"{m} inp:{u.input_tokens}, out:{u.output_tokens}, tot:{u.total_tokens}")        
+        |> Map.iter (fun m u -> printfn $"{m} inp:{u.input_tokens}, out:{u.output_tokens}, tot:{u.total_tokens}")
 
     ///Runs the current task set in planRun
     let runCurrentTask (planRun:OPlanRun) = async{
@@ -311,7 +318,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
         b.Plugins.AddFromObject(nav) |> ignore
         b.Services.AddSingleton(nav) |> ignore
         b.Build()
-        
+
     let rec run planRun = async {
         let! planRun = step planRun
         if planRun.currentTask.IsSome then

@@ -18,13 +18,13 @@ type App() =
     override this.Initialize() =
         this.Styles.Add (FluentTheme())
         this.RequestedThemeVariant <- Styling.ThemeVariant.Dark
-        this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"    
+        this.Styles.Load "avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"
         this.AttachDevTools(Diagnostics.DevToolsOptions(Gesture=KeyGesture(Key.F12)))
 
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
         | :? IClassicDesktopStyleApplicationLifetime as desktopLifetime ->
-            let win = FsOpPlanEditor.PlanEditor(OPlan.Default)
+            let win = FsOpPlanEditor.PlanEditor(SpreadsheetToEmailPlan.create())
             //U.initNotfications(win)
             //win.Closing.Add(fun _ -> Connection.disconnect())
             //DevToolsExtensions.AttachDevTools(this)
@@ -33,13 +33,13 @@ type App() =
         | _ -> ()
 
 [<EntryPoint; STAThread>]
-let main(args: string[]) =      
+let main(args: string[]) =
         AppBuilder
             .Configure<App>()
             .UsePlatformDetect()
 #if DEBUG
-            //.LogToTrace(LogEventLevel.Debug)            
+            //.LogToTrace(LogEventLevel.Debug)
 #endif
             .StartWithClassicDesktopLifetime(args)
 
-    
+

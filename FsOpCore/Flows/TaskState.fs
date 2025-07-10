@@ -16,7 +16,7 @@ type TaskState<'inMsg,'outMsg> = {
         kernel          : Kernel
         bus             : WBus<'inMsg,'outMsg>
         usage           : Map<string,FsResponses.Usage list>
-        toolDefs        : Tool list
+        toolDefs        : Function list
     }
     with
         static member Create id target bus driver cuaPrompt reasonerPrompt kernel tools =
@@ -39,7 +39,7 @@ type TaskState<'inMsg,'outMsg> = {
 
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerItems items = {this with reasonerItems = items}
-        member this.setPrevId id = {this with reasonerPrevId = Some id}        
+        member this.setPrevId id = {this with reasonerPrevId = Some id}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
 
         member this.appendUsage (modelId,(usage:FsResponses.Usage)) =
@@ -62,4 +62,3 @@ type TaskState<'inMsg,'outMsg> = {
 
         ///Reset local reasoner state (full state is kept on server with.responses api 'save=true')
         member this.resetReasonerState id = {this with reasonerPrevId = Some id; reasonerItems = []}
-       
