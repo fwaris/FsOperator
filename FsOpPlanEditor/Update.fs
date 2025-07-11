@@ -29,9 +29,10 @@ module Update =
     let init p   =
         let model = {
             plan = FsOpCore.OPlan.Default
-            tasks = p.root.allTasks()
-            nodes = []
             root = p.root
+            prevRoot = None
+            undoStack = []
+            redoStack = []
         }
         model, Cmd.ofMsg (Init p)
 
@@ -58,11 +59,6 @@ module Update =
                     | _                    -> "unexpected"
         }
 
-    let addNode model nid =
-        match model.tasks |> List.tryFind(fun n -> n.id = nid) with
-        | Some n -> {model with nodes = n::model.nodes |> List.distinct}
-        | None -> model
-
     let newTaskId (n:ONode) =
         let sts = n.allTasks() |> List.map _.id |> set
         let rec loop c =
@@ -77,8 +73,31 @@ module Update =
         let t = {OTask.Create() with id = newTaskId root}
         ONode.addNode p (ONode.Leaf t) root
 
+    let stack (model:Model) =       
+        match model.prevRoot with 
+        | Some r -> {model with prevRoot=None; undoStack=r::model.undoStack; redoStack=[]}
+        | None -> model
+        
+    let updateRoot model root = {model with root=root; prevRoot=Some model.root} |> stack
+
     let droppedNodeOn (model:Model) (droppedNode,anchorNode) = 
-        {model with root = model.root |> ONode.moveNode droppedNode anchorNode}, Cmd.none
+        let root = model.root |> ONode.moveNode droppedNode anchorNode
+        updateRoot model root, Cmd.none
+
+    let undo (model:Model) =
+        let model =
+            match model.undoStack with 
+            | [] -> model
+            | x::rest -> {model with root=x; undoStack=rest; redoStack=model.root::model.redoStack}
+        model,Cmd.none
+
+    let redo (model:Model) =
+        let model =
+            match model.redoStack with 
+            | [] -> model
+            | x::rest -> {model with root=x; undoStack=model.root::model.undoStack; redoStack=rest}
+        model,Cmd.none
+
 
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
@@ -91,12 +110,14 @@ module Update =
             | Save  -> tcs.SetResult(Some model.plan); win.Close(); model,Cmd.none
             | EditTask t -> model,Cmd.none
 
-            | ConvertToChoose n -> {model with root = ONode.convertToChoose n model.root}, Cmd.none
-            | ConvertToSequence n -> {model with root = ONode.convertToSeq n model.root}, Cmd.none
-            | ReplaceParent n -> {model with root = ONode.replaceParent n model.root}, Cmd.none
-            | DeleteNode n -> {model with root = ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)}, Cmd.none
+            | ConvertToChoose n -> updateRoot model (ONode.convertToChoose n model.root), Cmd.none
+            | ConvertToSequence n -> updateRoot model (ONode.convertToSeq n model.root), Cmd.none
+            | ReplaceParent n -> updateRoot model (ONode.replaceParent n model.root), Cmd.none
+            | DeleteNode n -> updateRoot model (ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)), Cmd.none
             | EditNode n -> model, Cmd.none
-            | AddTask n -> {model with root = addTask model.root n}, Cmd.none
+            | AddTask n -> updateRoot model (addTask model.root n), Cmd.none
+            | Undo -> undo model
+            | Redo -> redo model
         with ex ->
             Log.exn(ex,"update")
             model,Cmd.none

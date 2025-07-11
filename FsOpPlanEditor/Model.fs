@@ -4,9 +4,10 @@ open Avalonia.Input
 
 type Model = {
     plan : OPlan
-    tasks : OTask list
-    nodes : OTask list
     root : FsOpCore.ONode
+    prevRoot : FsOpCore.ONode option
+    undoStack : FsOpCore.ONode list
+    redoStack : FsOpCore.ONode list
 }
 
 type Msg =
@@ -23,5 +24,6 @@ type Msg =
     | DeleteNode of ONode
     | EditNode of ONode
     | AddTask of ONode
-
+    | Redo
+    | Undo
 
