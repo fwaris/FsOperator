@@ -12,7 +12,7 @@ module Update =
     let init p   =
         let model = {
             plan = FsOpCore.OPlan.Default
-            tasks = p.root.allSubtasks()
+            tasks = p.root.allTasks()
             nodes = []
             root = p.root
         }
@@ -25,8 +25,8 @@ module Update =
             else
                 visited.Add p |> ignore
                 match p with
-                | ONode.Choose c -> let acc = acc @ (c.transition.nodes |> List.map (fun x -> Edge(p,x)))
-                                    ((visited,acc),c.transition.nodes) ||> List.fold loop
+                | ONode.Choose c -> let acc = acc @ (c.nodes |> List.map (fun x -> Edge(p,x)))
+                                    ((visited,acc),c.nodes) ||> List.fold loop
                 | ONode.Seq s    -> let acc = acc @ (s.nodes |> List.map (fun x -> Edge(p,x)))
                                     ((visited,acc),s.nodes) ||> List.fold loop
                 | ONode.Leaf l   -> (visited,acc)
@@ -59,7 +59,7 @@ module Update =
         | None -> model
 
     let newTaskId (n:ONode) =
-        let sts = n.allSubtasks() |> List.map _.id |> set
+        let sts = n.allTasks() |> List.map _.id |> set
         let rec loop c =
             let id = $"task {c}"
             if sts.Contains id then
@@ -69,12 +69,8 @@ module Update =
         loop 1
 
     let addTask (root:ONode) (p:ONode) =
-        if root = p then
-            root
-        else
-            ONode.addNode root parent {OTask.Create() with id=newTaskId root}
-
-
+        let t = {OTask.Create() with id = newTaskId root}
+        ONode.addNode p (ONode.Leaf t) root
 
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
@@ -87,11 +83,12 @@ module Update =
             | Save  -> tcs.SetResult(Some model.plan); win.Close(); model,Cmd.none
             | EditTask t -> model,Cmd.none
 
-            | ConvertToChoose n -> model, Cmd.none
-            | ConvertToSequence n -> model, Cmd.none
-            | DeleteNode n -> model, Cmd.none
+            | ConvertToChoose n -> {model with root = ONode.convertToChoose n model.root}, Cmd.none
+            | ConvertToSequence n -> {model with root = ONode.convertToSeq n model.root}, Cmd.none
+            | ReplaceParent n -> {model with root = ONode.replaceParent n model.root}, Cmd.none
+            | DeleteNode n -> {model with root = ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)}, Cmd.none
             | EditNode n -> model, Cmd.none
-            | AddTask n -> {model with root = addTask model.root n, Cmd.none
+            | AddTask n -> {model with root = addTask model.root n}, Cmd.none
 
 
         with ex ->

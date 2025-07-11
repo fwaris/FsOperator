@@ -85,7 +85,7 @@ type Views =
                             Views.iconButton Icons.sequence.Value (fun _ -> dispatch (ConvertToSequence n)) "Convert to 'sequence' node"
                         if not n.IsChoose then
                             Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) "Convert to 'choose' node"
-                        Views.iconButton Icons.plus (fun _ -> dispatch AddTask n) "Add a 'task' node"
+                        Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add a 'task' node"
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
                         Views.iconButton Icons.edit (fun _ -> dispatch (EditNode n))  "Edit node"
                     ]
@@ -133,7 +133,6 @@ type Views =
         DockPanel.create [
             Grid.row 0
             DockPanel.children [
-                Button.create [Button.content Icons.plus; DockPanel.dock Dock.Left; Button.onClick (fun _ -> dispatch AddTask)]
                 StackPanel.create [
                     DockPanel.dock Dock.Right;
                     StackPanel.orientation Orientation.Horizontal

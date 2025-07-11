@@ -2,6 +2,7 @@
 open Microsoft.SemanticKernel
 open System.Threading
 open Microsoft.Extensions.DependencyInjection
+open System.Collections.Generic
 
 ///represents the target computer environment (browser url or windows exe) for a task
 type OTaskTarget =
@@ -36,31 +37,23 @@ type OTask = {
                 allowedSec = 60*10
             }
 
-///Prompts to help transition to the next task after completion of the current task.
-///Note the 'next' task could be one of the available task choices
-type OTaskTransition =
-    {
-        ///<summary>
-        ///Prompt template to decide which one of the available tasks to run next.<br />
-        ///Must be a SK prompt template with the following variable slots:<br />
-        /// - {{taskDescriptions}} - will be used to supply the subtask descriptions<br />
-        /// - {{context}} - will be filled with message history from previous task
-        ///</summary>
-        transitionPrompt : string
-
-        ///list of available tasks to choose from
-        nodes            : ONode list
-
-    }
-
 ///Represents a 'choice' task node. One task of the available task is to be selected.
 and Choose = {
-    transition:OTaskTransition
+    ///<summary>
+    ///Prompt template to decide which one of the available tasks to run next.<br />
+    ///Must be a SK prompt template with the following variable slots:<br />
+    /// - {{taskDescriptions}} - will be used to supply the subtask descriptions<br />
+    /// - {{context}} - will be filled with message history from previous task
+    ///</summary>
+    transitionPrompt : string
+
+    nodes     : ONode list
 
     ///if the Choose node is a child of another Choose node
     ///then this description is used in the transition decision
     description:string option
 }
+with static member Default = {nodes=[]; transitionPrompt=""; description=None}
 
 ///represents a sequence of task nodes that are to be completed in order
 and Seq = {
@@ -70,6 +63,7 @@ and Seq = {
     ///then this description is used in the transition decision
     description:string option
 }
+with static member Default = {nodes=[]; description=None}
 
 ///task node tree structure
 and [<RequireQualifiedAccess; ReferenceEquality >] ONode =
@@ -77,20 +71,153 @@ and [<RequireQualifiedAccess; ReferenceEquality >] ONode =
     | Choose of Choose  //execute one of many sub nodes - based on LLM decision involving transition prompt
     | Seq of Seq        //execute all sub nodes in sequence
     with
-        member this.allSubtasks() =
-            let rec loop acc n =
-                match n with
-                | Leaf t -> (t::acc)
-                | Seq all -> (acc,all.nodes) ||> List.fold loop
-                | Choose {transition={nodes=ns}} -> (acc,ns) ||> List.fold loop
-            loop [] this
+        member this.allTasks() =
+            let rec loop (visited:HashSet<ONode>,acc:OTask list) (p:ONode) = //need to protect against possible cycles
+                if visited.Contains p then
+                    (visited,acc)
+                else
+                    visited.Add p |> ignore
+                    match p with
+                    | ONode.Choose c -> ((visited,acc),c.nodes) ||> List.fold loop                                        
+                    | ONode.Seq s    -> ((visited,acc),s.nodes) ||> List.fold loop
+                    | ONode.Leaf t   -> (visited,t::acc)
+            loop (HashSet(),[]) this |> snd
+
+        member this.tasks() =
+            match this with
+            | ONode.Choose c -> c.nodes |> List.choose (function ONode.Leaf t -> Some t | _ -> None)
+            | ONode.Seq s    -> s.nodes |> List.choose (function ONode.Leaf t -> Some t | _ -> None)
+            | ONode.Leaf t   -> [t]
 
 module ONode =
-    let addNode (root:ONode) (p:ONode) (t:OTask) =
+    ///Add a new node n
+    ///under the parent p
+    let addNode (parent:ONode) (n:ONode) (root:ONode) =
+        let rec loop (visited:HashSet<ONode>) (c:ONode) =
+            if visited.Contains c then 
+                c
+            else 
+                visited.Add c |> ignore
+                if parent = c then
+                    match c with
+                    | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes @ [n]}
+                    | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes @ [n]}
+                    | ONode.Leaf l -> failwith "a leaf node cannot be a parent"
+                else
+                    match c with
+                    | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes |> List.map (loop visited)}
+                    | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes |> List.map (loop visited)}
+                    | t -> t
+        loop (HashSet()) root
+
+    ///Delete node under root. Fails if node does not exist. Return None if root is deleted.
+    let deleteNode (n:ONode) (root:ONode) =
+        let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =
+            if visited.Contains c 
+                then Some c
+            else 
+                visited.Add c |> ignore
+                match c=n with
+                | true      -> None
+                | false     -> match c with
+                               | ONode.Seq s -> Some(ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
+                               | ONode.Choose s -> Some(ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
+                               | _ -> failwith "not expected"
+        loop (HashSet(),None) root
+
+    type Dir = Up | Down
+
+    let private move dir (n:ONode) (ns:ONode list) =
+        let i = ns |> List.tryFindIndex (fun n' -> n' = n)
+        match i with
+        | None -> ns
+        | Some i ->
+            match dir with
+            | Up when i <> 0              -> ns |> List.removeAt i |> List.insertAt (i-1) n
+            | Up                          -> ns
+            | Down when i < ns.Length - 1 -> ns |> List.removeAt i |> List.insertAt (i+1) n
+            | Down                        -> ns
+
+    let moveNode dir (n:ONode) (parent:ONode) =
+        match parent with
+        | ONode.Seq s -> ONode.Seq {s with nodes = move dir n s.nodes}
+        | ONode.Choose s -> ONode.Choose {s with nodes = move dir n s.nodes}
+        | n -> n
+
+    let rec duplicate (n:ONode) =
+        match n with
+        | ONode.Leaf t -> ONode.Leaf t
+        | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes |> List.map duplicate}
+        | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes |> List.map duplicate}
+
+    let convertToSeq (n:ONode) (root:ONode) =
         let rec loop (c:ONode) =
-            if p = c then
+            if c = n then
+                match c with
+                | ONode.Leaf t as n -> ONode.Seq {nodes=[n]; description=None}
+                | ONode.Seq _ -> n
+                | ONode.Choose c -> ONode.Seq {nodes=c.nodes; description=c.description}
+            else
+                match c with
+                | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes |> List.map loop}
+                | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes |> List.map loop}
+                | t -> t
+        loop root
+
+    let convertToChoose (n:ONode) (root:ONode) =
+        let rec loop (c:ONode) =
+            if c = n then
+                match c with
+                | ONode.Leaf t as n -> ONode.Choose {nodes=[n]; description=None; transitionPrompt=""}
+                | ONode.Seq s -> ONode.Choose {nodes=s.nodes; description=s.description; transitionPrompt=""}
+                | ONode.Choose c as x -> x
+            else
+                match c with
+                | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes |> List.map loop}
+                | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes |> List.map loop}
+                | t -> t
+        loop root
+
+    let replaceParent (n:ONode) (root:ONode) =
+        let rec loop (gp:ONode option) (p:ONode option) (c:ONode) =
+            match gp, p, c=n with
+            | None, None, true -> Choice1Of2(c) //already root
+            | None, Some _, true -> Choice1Of2(c) //just under root so replace root
+            | Some gp, Some p, true -> Choice1Of2 c
+            | _, p, false -> //recurse down
+                match c with
+                | ONode.Seq s as pn    -> let ns = s.nodes |> List.map (loop p (Some pn))
+                                          let rep = ns |> List.tryPick(function Choice1Of2 n -> Some n | _ -> None)
+                                          match rep with 
+                                          | Some n -> Choice2Of2 n  //this node is parent, it was replaced by a child
+                                          | _      -> let n = ONode.Seq {s with nodes = ns |> List.choose(function Choice2Of2 n -> Some n | _ -> None)}
+                                                      Choice2Of2 n
+                | ONode.Choose s as pn -> let ns = s.nodes |> List.map (loop p (Some pn))
+                                          let rep = ns |> List.tryPick(function Choice1Of2 n -> Some n | _ -> None)
+                                          match rep with 
+                                          | Some n -> Choice2Of2 n  //this node is parent it was replaced by a child
+                                          | _      -> let n = ONode.Choose {s with nodes = ns |> List.choose(function Choice2Of2 n -> Some n | _ -> None)}
+                                                      Choice2Of2 n
+                | _ -> failwith "not expected"
+            | _,_,_ -> failwith "not expected"
+        match loop None None root with 
+        | Choice1Of2 n | Choice2Of2 n -> n
+
+    ///All parent child relations
+    let allEdges (root:ONode) =
+        let rec loop (visited:HashSet<ONode>,acc:(ONode*ONode) list) (p:ONode) =
+            if visited.Contains p then
+                (visited,acc)
+            else
+                visited.Add p |> ignore
                 match p with
-                | ONode.Seq s -> s.nodes
+                | ONode.Choose c -> let acc = acc @ (c.nodes |> List.map (fun x -> (p,x)))
+                                    ((visited,acc),c.nodes) ||> List.fold loop
+                | ONode.Seq s    -> let acc = acc @ (s.nodes |> List.map (fun x -> (p,x)))
+                                    ((visited,acc),s.nodes) ||> List.fold loop
+                | ONode.Leaf l   -> (visited,acc)
+        loop (HashSet(),[]) root |> snd
+
 
 ///A collection of one or more tasks organized in a tree
 type OPlan = {
@@ -184,8 +311,8 @@ Use memory_save function to save each person's linked-in and twitter data into m
     /// </summary>
     let rec findNext (doneSet:Set<string>) = function
         | ONode.Leaf t -> if doneSet.Contains t.id then Choice1Of3 () else Choice2Of3 t
-        | ONode.Choose {transition={nodes=ts}} as cts ->
-            let subIds = cts.allSubtasks() |> List.map _.id |> set
+        | ONode.Choose {nodes=ts} as cts ->
+            let subIds = cts.allTasks() |> List.map _.id |> set
             let subsDone = Set.intersect doneSet subIds
             if subsDone.Count = 0 then
                 Choice3Of3 cts //none of the child tasks are yet done so need to make a transition here
@@ -201,7 +328,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
             |> Option.defaultValue (Choice1Of3 ())
 
     ///transition to the next task in the play
-    let transition (txn:OTaskTransition) (planRun:OPlanRun) = async {
+    let transition (c:Choose) (planRun:OPlanRun) = async {
         //TODO
         return None
     }
@@ -212,7 +339,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
         match findNext doneSet planRun.plan.root with
         | Choice1Of3 _                 -> return None
         | Choice2Of3 t                 -> return Some t
-        | Choice3Of3 (ONode.Choose c)  -> return! transition c.transition planRun
+        | Choice3Of3 (ONode.Choose c)  -> return! transition c planRun
         | x                            -> return failwith $"unexpected response in transitionToNext '{x}'"
     }
 

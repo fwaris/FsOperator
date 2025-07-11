@@ -18,9 +18,10 @@ type Msg =
     | Dragged of string
     | Dropped of OTask
     | ConvertToSequence of ONode
+    | ReplaceParent of ONode
     | ConvertToChoose of ONode
     | DeleteNode of ONode
     | EditNode of ONode
-    | AddTask of Node
+    | AddTask of ONode
 
 
