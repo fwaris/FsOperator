@@ -125,12 +125,12 @@ module ONode =
                 | false     -> match c with
                                | ONode.Seq s -> Some(ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
                                | ONode.Choose s -> Some(ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
-                               | _ -> failwith "not expected"
+                               | ONode.Leaf _ -> Some c
         loop (HashSet(),None) root
 
     type Dir = Up | Down
 
-    let private move dir (n:ONode) (ns:ONode list) =
+    let private reorder dir (n:ONode) (ns:ONode list) =
         let i = ns |> List.tryFindIndex (fun n' -> n' = n)
         match i with
         | None -> ns
@@ -141,10 +141,10 @@ module ONode =
             | Down when i < ns.Length - 1 -> ns |> List.removeAt i |> List.insertAt (i+1) n
             | Down                        -> ns
 
-    let moveNode dir (n:ONode) (parent:ONode) =
+    let reorderNode dir (n:ONode) (parent:ONode) =
         match parent with
-        | ONode.Seq s -> ONode.Seq {s with nodes = move dir n s.nodes}
-        | ONode.Choose s -> ONode.Choose {s with nodes = move dir n s.nodes}
+        | ONode.Seq s -> ONode.Seq {s with nodes = reorder dir n s.nodes}
+        | ONode.Choose s -> ONode.Choose {s with nodes = reorder dir n s.nodes}
         | n -> n
 
     let rec duplicate (n:ONode) =
@@ -220,3 +220,32 @@ module ONode =
                                     ((visited,acc),s.nodes) ||> List.fold loop
                 | ONode.Leaf l   -> (visited,acc)
         loop (HashSet(),[]) root |> snd
+
+    ///For internal use. Deletes a node but maintains a dictionary that maps old to new instances of all changed nodes.
+    ///Need this to 'move' a node from one parent to another because deleting a node can re-create all nodes on the path to the deleted node.
+    let _deleteNode (n:ONode) (root:ONode) =
+        let tracker = new Dictionary<ONode,ONode>()
+        let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =
+            if visited.Contains c 
+                then Some c
+            else 
+                visited.Add c |> ignore
+                match c=n with
+                | true      -> None
+                | false     -> match c with
+                               | ONode.Seq s -> let c' = ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
+                                                tracker.Add(c,c')
+                                                Some c'
+                               | ONode.Choose s -> let c' = ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
+                                                   tracker.Add(c,c')
+                                                   Some c'
+                               | ONode.Leaf _ -> Some c
+        let root = loop (HashSet(),None) root
+        root |> Option.map(fun r -> r,tracker)
+
+    let moveNode (n:ONode) (newParent:ONode) (root:ONode) = 
+        match _deleteNode n root with 
+        | None -> root
+        | Some (root,tracker) ->
+            let newParent' = match tracker.TryGetValue(newParent) with | true, np -> np | _ -> newParent
+            addNode newParent' n root

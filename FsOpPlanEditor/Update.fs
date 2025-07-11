@@ -35,22 +35,10 @@ module Update =
         }
         model, Cmd.ofMsg (Init p)
 
-    let edges (root:ONode) =
-        let rec loop (visited:HashSet<ONode>,acc:Edge list) (p:ONode) =
-            if visited.Contains p then
-                (visited,acc)
-            else
-                visited.Add p |> ignore
-                match p with
-                | ONode.Choose c -> let acc = acc @ (c.nodes |> List.map (fun x -> Edge(p,x)))
-                                    ((visited,acc),c.nodes) ||> List.fold loop
-                | ONode.Seq s    -> let acc = acc @ (s.nodes |> List.map (fun x -> Edge(p,x)))
-                                    ((visited,acc),s.nodes) ||> List.fold loop
-                | ONode.Leaf l   -> (visited,acc)
-        loop (HashSet(),[]) root
-
-    let graph (_,edges) =
+    let graph (root:ONode) =
         let g = Graph()
+        let e0 = Edge("",root)
+        let edges = e0 :: (ONode.allEdges root |> List.map(fun (p,c) -> Edge(p,c)))
         for e in edges do
             g.Edges.Add e
         g
@@ -90,12 +78,7 @@ module Update =
         ONode.addNode p (ONode.Leaf t) root
 
     let droppedNodeOn (model:Model) (droppedNode,anchorNode) = 
-        let root = 
-            model.root 
-            |> ONode.deleteNode droppedNode 
-            |> Option.map (ONode.addNode anchorNode droppedNode)
-            |> Option.defaultValue model.root
-        {model with root = root},Cmd.none
+        {model with root = model.root |> ONode.moveNode droppedNode anchorNode}, Cmd.none
 
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
@@ -114,8 +97,6 @@ module Update =
             | DeleteNode n -> {model with root = ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)}, Cmd.none
             | EditNode n -> model, Cmd.none
             | AddTask n -> {model with root = addTask model.root n}, Cmd.none
-
-
         with ex ->
             Log.exn(ex,"update")
             model,Cmd.none

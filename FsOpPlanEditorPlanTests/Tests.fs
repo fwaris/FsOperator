@@ -44,15 +44,34 @@ let ``replace parent: root`` () =
 
 [<Fact>]
 let ``delete node`` () =
-    let t = {OTask.Create() with id = "new task"}
-    let n = ONode.Leaf t
-    let p = ONode.Seq {Seq.Default with nodes = [n]}
+    let t1 = {OTask.Create() with id = "new task 1"}
+    let t2 = {OTask.Create() with id = "new task 2"}
+    let n1 = ONode.Leaf t1
+    let n2 = ONode.Leaf t2
+    let p = ONode.Seq {Seq.Default with nodes = [n1; n2]}
     let gp = ONode.Choose {Choose.Default with nodes = [p]}
-    let gp' = gp |> ONode.deleteNode n
+    let gp' = gp |> ONode.deleteNode n1
     let edges = match gp' with Some x -> ONode.allEdges x | _ -> []
-    Assert.True((edges.Length = 1))
+    Assert.True((edges.Length = 2))
     let (p,c) = edges.[0]    
     Assert.True((p.IsChoose && c.IsSeq))
+
+[<Fact>]
+let ``move node`` () =
+    let t1 = {OTask.Create() with id = "new task 1"}
+    let t2 = {OTask.Create() with id = "new task 2"}
+    let n1 = ONode.Leaf t1
+    let n2 = ONode.Leaf t2
+    let p = ONode.Seq {Seq.Default with nodes = [n1; n2]}
+    let gp = ONode.Choose {Choose.Default with nodes = [p]}
+    let gp' = gp |> ONode.moveNode n2 gp
+    //note that many of the previous instances are not part of the new graph gp'
+    //because nodes on the path from the root to the node n1 are reconstructed as new instances
+    let edges = ONode.allEdges gp'
+    let checkEdges = edges |> List.exists (fun (p,c) -> p.IsChoose && c.IsLeaf && c.displayStr().Contains("2") )
+    Assert.True(checkEdges)
+    let checkEdges2 = edges |> List.exists (fun (p,c) -> not (p.IsSeq && c.IsLeaf && c.displayStr().Contains("2")) )
+    Assert.True(checkEdges)
 
 [<Fact>]
 let ``delete intermediate node`` () =

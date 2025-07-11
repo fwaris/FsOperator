@@ -156,7 +156,7 @@ type Views =
                                     ])
                                 ds)
                             GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
-                            GraphPanel.graph (model.root |> Update.edges |> Update.graph)
+                            GraphPanel.graph (model.root |> Update.graph)
                         ]
                     ]
                 ]
