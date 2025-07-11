@@ -1,0 +1,239 @@
+﻿namespace FsOpCore
+open Microsoft.SemanticKernel
+open System.Threading
+open Microsoft.Extensions.DependencyInjection
+
+///A collection of one or more tasks organized in a tree
+type OPlan = {
+    description : string
+    root  : ONode
+}
+    with
+        static member Default = {
+                        description = ""
+                        root = ONode.Seq {nodes=[]; description=None}
+                    }
+
+///run time state required to run a task
+type OTaskRun = {
+    task     : OTask
+    driver   : IUIDriver
+    messages : ChatMsg list
+    usage    : Map<string,FsResponses.Usage>
+}
+with
+    static member Create task driver =
+                    {
+                        task = task
+                        driver = driver
+                        messages = []
+                        usage = Map.empty
+                    }
+
+    ///Configure the kernel so the functions run in the context of this task
+    member this.HookFunctions(kernel:Kernel) =
+        let nav = kernel.Services.GetService<Functions.FsOpNavigator>()
+        if nav = Unchecked.defaultof<_> then
+            failwith "FsOpNavigator service not found in kernel"
+        nav.SetDriver  this.driver
+        nav.SetStartUrl (this.task.target.TargetString())
+
+///runtime state required to run a plan
+type OPlanRun = {
+    plan : OPlan
+    kernel : Kernel
+    completedTasks : OTaskRun list
+    currentTask : OTaskRun option
+}
+with
+    static member Create plan kernel =
+                    {
+                        plan = plan
+                        kernel = kernel
+                        completedTasks = []
+                        currentTask = None
+                    }
+
+module OPlan =
+    ///minimal 2-task sample plan
+    let sample() =
+        let ln =
+            { OTask.Create() with
+                target = OLink "https://www.linkedin.com"
+                description = "find people who post about generative ai"
+                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """find individuals who have original posts
+related to generative AI and record their linkedin names and profile links.
+Use the memory_save function to record this data as you find it.
+Make sure to collect at least 5 names."""
+                }
+        let tw =
+            { OTask.Create() with
+                target = OLink "https://www.twitter.com"
+                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
+                description = "retrieve linkedIn people info from memory and get twitter handles"
+                reasoner = Some Prompts.``reasoner prompt for cua guidance``
+                cua = Some """Get the list of names and linked-in profile links from memory.
+Search each name on twitter and obtain their twitter handle.
+Use memory_save function to save each person's linked-in and twitter data into memory.
+"""
+            }
+        let plan =
+            { OPlan.Default with
+                description = "take linkedin people and find their twitter handle"
+                root = ONode.Seq {nodes= [ONode.Leaf ln; ONode.Leaf tw]; description=None}
+            }
+        plan
+
+    /// <summary>
+    /// Find the next task or transition to execute for the given OTaskNode.<br />
+    ///Choices:<br />
+    /// - 1of3 - nothing more to do<br />
+    /// - 2of3 - execute the OTask<br />
+    /// - 3of3 - transition to a Choose child
+    /// </summary>
+    let rec findNext (doneSet:Set<string>) = function
+        | ONode.Leaf t -> if doneSet.Contains t.id then Choice1Of3 () else Choice2Of3 t
+        | ONode.Choose {nodes=ts} as cts ->
+            let subIds = cts.allTasks() |> List.map _.id |> set
+            let subsDone = Set.intersect doneSet subIds
+            if subsDone.Count = 0 then
+                Choice3Of3 cts //none of the child tasks are yet done so need to make a transition here
+            else
+                ts
+                |> List.map (findNext doneSet)
+                |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
+                |> Option.defaultValue (Choice1Of3 ())
+        | ONode.Seq {nodes=ts} ->
+            ts
+            |> List.map (findNext doneSet)
+            |> List.tryPick (function Choice2Of3 t as c -> Some c | Choice3Of3 _ as c -> Some c | _ -> None)
+            |> Option.defaultValue (Choice1Of3 ())
+
+    ///transition to the next task in the play
+    let transition (c:Choose) (planRun:OPlanRun) = async {
+        //TODO
+        return None
+    }
+
+    let rec transitionToNext (planRun:OPlanRun)  = async {
+        let doneTasks = match planRun.currentTask with | Some t -> t::planRun.completedTasks | _ -> planRun.completedTasks
+        let doneSet = doneTasks |> List.map (fun tr -> tr.task.id) |> set
+        match findNext doneSet planRun.plan.root with
+        | Choice1Of3 _                 -> return None
+        | Choice2Of3 t                 -> return Some t
+        | Choice3Of3 (ONode.Choose c)  -> return! transition c planRun
+        | x                            -> return failwith $"unexpected response in transitionToNext '{x}'"
+    }
+
+    let appendTask (tr:OTaskRun option) ts =  tr |> Option.map (fun t -> t::ts) |> Option.defaultValue ts
+
+    let startTimer (n:int) (f:IFlow<_>) =
+        async {
+            do! Async.Sleep (n * 1000)
+            f.Post TaskFlow.TFi_EndAndReport
+        }
+        |> Async.Start
+
+    let reduceUsage (a:FsResponses.Usage) (b:FsResponses.Usage) =
+        {a with
+            input_tokens = a.input_tokens + b.input_tokens
+            output_tokens = a.output_tokens + b.output_tokens
+            total_tokens = a.total_tokens + b.total_tokens
+        }
+
+    let sumUsages (us:Map<string,FsResponses.Usage list>) =
+        us
+        |> Map.map (fun k vs ->
+            vs
+            |> List.reduce reduceUsage)
+
+    let collectUsages (uss:Map<string,FsResponses.Usage> list) =
+        uss
+        |> List.collect Map.toList
+        |> List.groupBy fst
+        |> List.map (fun (k,xs) -> k, List.map snd xs)
+        |> Map.ofList
+
+    let printTaskUsage (us:Map<string,FsResponses.Usage list>) =
+        sumUsages us
+        |> Map.iter (fun m u -> printfn $"{m} inp:{u.input_tokens}, out:{u.output_tokens}, tot:{u.total_tokens}")
+
+    ///Runs the current task set in planRun
+    let runCurrentTask (planRun:OPlanRun) = async{
+        match planRun.currentTask with
+        | None -> return failwith $"no task to run"
+        | Some ot ->
+            use h = new ManualResetEvent(false)
+            let completedTask = ref None
+            let driver = (PlaywrightDriver.create().driver)
+            let post = fun p ->
+                match p with
+                | TaskFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
+                | TaskFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | TaskFlow.TFo_Action a -> printfn "%A" a
+                | TaskFlow.TFo_Paused msgs -> printfn "%A" msgs
+                | TaskFlow.TFo_Usage us -> printTaskUsage us
+            let bus = WBus.Create<_,_> post
+            let t0 = TaskState.Create<_,_>  //initial task state
+                        ot.task.id
+                        (ot.task.target.TargetString())
+                        bus
+                        driver
+                        ot.task.cua.Value
+                        ot.task.reasoner
+                        planRun.kernel
+                        ot.task.tools
+            match ot.task.target with
+            | OLink url -> do! driver.start url
+            | OProcess (a,b) -> ()
+            let flow = TaskFlow.create t0
+            flow.Post TaskFlow.TFi_Start
+            startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
+            let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
+            match completedTask.Value with
+            | Some t -> return {ot with messages = t.cuaMessages; usage = sumUsages t.usage}
+            | None   -> return failwith "no output from step"
+    }
+
+    ///Single step the plan: Transition to next task and run it or end if no task.
+    let step planRun = async {
+        match! transitionToNext planRun with
+        | None ->
+            return
+                {planRun with
+                    currentTask = None
+                    completedTasks = appendTask planRun.currentTask planRun.completedTasks}
+        | Some t ->
+                let tr = OTaskRun.Create t (PlaywrightDriver.create().driver)
+                let planRun =
+                        {planRun with
+                            currentTask = Some tr
+                            completedTasks = appendTask planRun.currentTask planRun.completedTasks
+                         }
+                let! tr' = runCurrentTask planRun
+                return {planRun with currentTask = Some tr'}
+    }
+
+    ///Create a kernel with the required plugins and services for running tasks.
+    ///Optionally supply a function to perform additional configuration.
+    ///The initialMemory will be added to the memory plugin
+    let defaultKernel (initialMemory:Map<string,string list>) (build:(IKernelBuilder->unit) option) =
+        let b = Kernel.CreateBuilder()
+        match build with Some build -> build b | _ -> ()
+        let nav = Functions.FsOpNavigator()
+        let mem = Functions.FsOpMemory()
+        mem.SetMemory initialMemory
+        b.Plugins.AddFromObject(mem) |> ignore
+        b.Plugins.AddFromObject(nav) |> ignore
+        b.Services.AddSingleton(nav) |> ignore
+        b.Build()
+
+    let rec run planRun = async {
+        let! planRun = step planRun
+        if planRun.currentTask.IsSome then
+            return! run planRun
+        else
+            return planRun
+    }

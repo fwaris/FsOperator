@@ -7,6 +7,23 @@ open Elmish
 open FsOpCore
 open AvaloniaGraphControl
 
+module Msagl = 
+    open Microsoft.Msagl.Drawing
+    open System.Reflection
+
+    let dedge = lazy(
+        typeof<AvaloniaGraphControl.Edge>.GetField("DEdge",BindingFlags.NonPublic ||| BindingFlags.Instance))
+
+    ///this only works after the graph is rendered
+    let style (e:AvaloniaGraphControl.Edge) = 
+        let be = box e       
+        let de = try dedge.Value.GetValue(be) with _ -> null
+        match de with 
+        | null          -> e
+        | :? Edge as de -> de.Attr.Color <- Color.Azure
+                           e
+        | _             -> e
+
 module Update =
     open System.Collections.Generic
     let init p   =
@@ -72,12 +89,20 @@ module Update =
         let t = {OTask.Create() with id = newTaskId root}
         ONode.addNode p (ONode.Leaf t) root
 
+    let droppedNodeOn (model:Model) (droppedNode,anchorNode) = 
+        let root = 
+            model.root 
+            |> ONode.deleteNode droppedNode 
+            |> Option.map (ONode.addNode anchorNode droppedNode)
+            |> Option.defaultValue model.root
+        {model with root = root},Cmd.none
+
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
             match msg with
             | BeginDrag (e,t) -> model, Cmd.OfAsync.perform doDrag (e,t) Dragged
             | Dragged s -> model,Cmd.none
-            | Dropped t -> {model with nodes = (t::model.nodes) |> List.distinct}, Cmd.none
+            | DroppedNodeOn (droppedNode,anchorNode) -> droppedNodeOn model (droppedNode,anchorNode)
             | Init p -> {model with plan = p},Cmd.none
             | Close -> tcs.SetResult(None); win.Close(); model,Cmd.none
             | Save  -> tcs.SetResult(Some model.plan); win.Close(); model,Cmd.none

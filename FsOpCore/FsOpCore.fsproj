@@ -29,7 +29,8 @@
 		<Compile Include="Flows\Voice.fs" />
 		<Compile Include="Flows\TaskFlowInteractive.fs" />
 		<Compile Include="Flows\TaskFlow.fs" />
-		<Compile Include="Flows\Plan.fs" />
+		<Compile Include="Flows\OTask.fs" />
+		<Compile Include="Flows\OPlan.fs" />
 	</ItemGroup>
 
 	<ItemGroup>

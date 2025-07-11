@@ -1,5 +1,6 @@
 ﻿namespace FsOpPlanEditor
 
+
 module Icons =
     let iconFont = "Segoe UI Emoji"
     let stop = "\U0001F6D1"
@@ -23,4 +24,22 @@ module Icons =
     let mic = "\U0001F399"
     let mic2 = "\U0001F3A4"
 
+
+
+
+module Textures = 
+    open System
+    open Avalonia.Media
+    open Avalonia.Media.Imaging
+    open Avalonia.Platform
+
+    let grip =
+        let uri = Uri("avares://FsOpPlanEditor/Assets/grip.png")
+        use stream = AssetLoader.Open(uri)
+        let bitmap = new Bitmap(stream)
+        new ImageBrush(bitmap)
+
+module Cursors = 
+    open Avalonia.Input
+    let hand = new Cursor(StandardCursorType.Hand)
 

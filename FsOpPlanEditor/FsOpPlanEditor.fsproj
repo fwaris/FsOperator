@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
     <IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
@@ -11,8 +11,16 @@
   <PropertyGroup Condition="$(IsWindows)">
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
+
+	<ItemGroup>
+	    <None Include="Assets\grip.png" />
+		<AvaloniaResource Include="Assets\**\*" />
+		<None Include="app.manifest" />
+	</ItemGroup>
+
   <ItemGroup>
     <Compile Include="Icons.fs" />
+    <Compile Include="Styles.fs" />
     <Compile Include="DragDrop.fs" />
     <Compile Include="GraphPanel.fs" />
     <Compile Include="TextSticker.fs" />
@@ -20,6 +28,7 @@
     <Compile Include="Update.fs" />
     <Compile Include="View.fs" />
   </ItemGroup>
+	
   <ItemGroup>
     <PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
     <PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />

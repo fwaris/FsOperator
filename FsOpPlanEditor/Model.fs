@@ -14,9 +14,9 @@ type Msg =
     | Save
     | EditTask of OTask
     | Init of OPlan
-    | BeginDrag of PointerPressedEventArgs*OTask
+    | BeginDrag of PointerPressedEventArgs*ONode
     | Dragged of string
-    | Dropped of OTask
+    | DroppedNodeOn of ONode*ONode
     | ConvertToSequence of ONode
     | ReplaceParent of ONode
     | ConvertToChoose of ONode

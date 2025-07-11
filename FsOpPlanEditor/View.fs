@@ -18,50 +18,11 @@ open FsOpPlanEditor.DragDrop2
 
 [<AbstractClass; Sealed>]
 type Views =
-
-    static member task (t:OTask) dispatch =
-        Border.create [
-            Border.margin 3.0
-            Border.borderThickness 1.0
-            Border.borderBrush Brushes.AliceBlue
-            Border.cornerRadius 3.0
-            Border.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,t)))
-            Border.padding 3.0
-            Border.child (
-                DockPanel.create [
-                    DockPanel.margin 3.0
-                    DockPanel.children [
-                        Button.create [
-                            Button.margin 2.0
-                            Button.content Icons.pen
-                            Button.tip "Edit task properties"
-                            Button.onClick (fun _ -> dispatch (EditTask t))
-                            DockPanel.dock Dock.Left
-                        ]
-                        Button.create [
-                            Button.margin 2.0
-                            Button.content Icons.minus
-                            Button.tip "Remove task"
-                            Button.onClick (fun _ -> dispatch (EditTask t))
-                            DockPanel.dock Dock.Right
-                        ]
-                        TextBlock.create [
-                            TextBlock.margin 2.
-                            TextBlock.verticalAlignment VerticalAlignment.Center
-                            TextBlock.width 50.
-                            TextBlock.text t.id
-                            TextBlock.tip $"Task id: {t.id}"
-                        ]
-                    ]
-                ]
-            )
-        ]
-
     static member iconButton (content:string) clickHandler (tip:string) =
         Button.create [
-            Button.width 14.
-            Button.height 14.
-            Button.fontSize 10.0
+            Button.width 16.
+            Button.height 16.
+            Button.fontSize 12.0
             Button.verticalAlignment VerticalAlignment.Center
             Button.tip tip
             Button.background Brushes.Transparent
@@ -72,6 +33,7 @@ type Views =
 
     static member nodeMenu (n:ONode) dispatch =
         Border.create [
+            DockPanel.dock Dock.Bottom
             Border.borderBrush Brushes.DarkCyan
             Border.background Brushes.DarkSlateBlue
             Border.borderThickness 1.0
@@ -85,7 +47,8 @@ type Views =
                             Views.iconButton Icons.sequence.Value (fun _ -> dispatch (ConvertToSequence n)) "Convert to 'sequence' node"
                         if not n.IsChoose then
                             Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) "Convert to 'choose' node"
-                        Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add a 'task' node"
+                        if not n.IsLeaf then
+                            Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add a 'task' node"
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
                         Views.iconButton Icons.edit (fun _ -> dispatch (EditNode n))  "Edit node"
                     ]
@@ -93,42 +56,64 @@ type Views =
             )
         ]
 
-    static member choose (c:Choose) dispatch =
-        Border.create [
-            Border.borderBrush Brushes.DarkCyan
-            Border.borderThickness 1.0
-            Border.cornerRadius 3.0
-            Border.padding 2.0
-            Border.child (
-                StackPanel.create [
-                    StackPanel.children [
-                        TextSticker.create [
-                            TextSticker.shape TextSticker.Shapes.Diamond
-                            TextSticker.dataContext (c.description |> Option.map (shorten 30) |> Option.defaultValue "")
-                        ]
-                        Views.nodeMenu (ONode.Choose c) dispatch
-                    ]
-                ])
+    static member nodeColor = function ONode.Leaf _ -> Styles.c1 | ONode.Choose _ -> Styles.c2 | _ -> Styles.c3
+    static member nodeFontSz = function ONode.Leaf _ -> 15.| _ -> 25.
+    static member nodeTip = function ONode.Leaf _ -> "Task" | ONode.Choose _ -> "Choose 1 of n child" | ONode.Seq _ -> "Sequentially execute all children"
+
+    static member dragHeader (n:ONode) dispatch = 
+        Panel.create [
+            DockPanel.dock Dock.Top
+            Control.horizontalAlignment HorizontalAlignment.Stretch
+            Panel.background Brushes.DarkSlateBlue
+            Panel.children [
+                TextBlock.create [                            
+                    Control.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,n)))
+                    Control.cursor Cursors.hand
+                    Control.height 10.
+                    TextBlock.background Textures.grip
+                    Control.horizontalAlignment HorizontalAlignment.Stretch
+                ]                        
+            ]
         ]
 
-    static member sequence (s:FsOpCore.Seq) dispatch =
+    static member node (n:ONode) dispatch =
         Border.create [
-            Border.borderBrush Brushes.DarkCyan
+            Border.margin 3.0
             Border.borderThickness 1.0
+            Border.borderBrush Brushes.DarkSlateBlue
+            Border.background (Views.nodeColor n)
             Border.cornerRadius 3.0
-            Border.padding 2.0
+            Border.padding 3.0
+            Control.allowDrop true
+            Control.onDragEnter(fun e -> e.DragEffects <-
+                                            match e.Data.Get(DataFormats.Text) with
+                                            | :? OTask as t -> DragDropEffects.Move
+                                            | _ -> DragDropEffects.None)
+            Control.onDrop(fun e -> match e.Data.Get(DataFormats.Text) with
+                                    | :? ONode as d -> dispatch (DroppedNodeOn (d,n))
+                                    | _             -> ())
             Border.child (
-                StackPanel.create [
-                    StackPanel.children [
-                        TextSticker.create [
-                            TextSticker.shape TextSticker.Shapes.Rectangle
-                            TextSticker.dataContext (s.description |> Option.map (shorten 30) |> Option.defaultValue "")
+                DockPanel.create [
+                    DockPanel.margin 3.0
+                    DockPanel.children [                        
+                        Views.dragHeader n dispatch
+                        Views.nodeMenu n dispatch
+                        TextBlock.create [
+                            TextBlock.fontSize (Views.nodeFontSz n); 
+                            TextBlock.foreground Brushes.Black
+                            TextBlock.tip (Views.nodeTip n)
+                            TextBlock.text (
+                                match n with 
+                                | ONode.Leaf t -> t.id |> shorten 30
+                                | ONode.Choose _ -> Icons.forkedArrow
+                                | ONode.Seq _ -> Icons.sequence.Value
+                            )
                         ]
-                        Views.nodeMenu (ONode.Seq s) dispatch
                     ]
-                ])
+                ]
+            )
         ]
-
+        
     static member toolbar (model:Model) dispatch =
         DockPanel.create [
             Grid.row 0
@@ -146,10 +131,10 @@ type Views =
         ]
 
     static member planFlow (model:Model) dispatch =
-        let btns = model.nodes |> List.map (fun t -> Views.task t dispatch :> IView)
         Border.create [
             Border.borderThickness 1.0
             Border.borderBrush Brushes.LightGray
+            Border.margin 2.0
             Grid.row 2
             Border.child(
                 DockPanel.create [
@@ -160,31 +145,16 @@ type Views =
                             TextBlock.dock Dock.Top
                         ]
                         GraphPanel.create [
+                            GraphPanel.background Brushes.AntiqueWhite
                             GraphPanel.dataTemplates (
                                 let ds = DataTemplates()
                                 ds.AddRange(
                                     [
                                         DataTemplateView<ONode>.create (fun data ->
-                                            Border.create [
-                                                Control.allowDrop true
-                                                Control.onDragEnter(fun e -> e.DragEffects <-
-                                                                                match e.Data.Get(DataFormats.Text) with
-                                                                                | :? OTask as t -> DragDropEffects.Copy
-                                                                                | _ -> DragDropEffects.None)
-                                                Control.onDrop(fun e -> match e.Data.Get(DataFormats.Text) with
-                                                                        | :? OTask as t -> dispatch (Dropped t)
-                                                                        | _             -> ())
-                                                Border.child (
-
-                                                    match data with
-                                                    | ONode.Leaf t -> Views.task t dispatch :> IView
-                                                    | ONode.Choose c -> Views.choose c dispatch
-                                                    | ONode.Seq s -> Views.sequence s dispatch
-                                                )
-                                            ])
+                                            Views.node data dispatch
+                                        )
                                     ])
                                 ds)
-                            GraphPanel.background Brushes.DarkTurquoise
                             GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
                             GraphPanel.graph (model.root |> Update.edges |> Update.graph)
                         ]
@@ -221,7 +191,6 @@ type PlanEditor(plan:OPlan) as this =
         |> Program.withHost this
         //|> Program.withConsoleTrace
         |> Program.runWithAvaloniaSyncDispatch (plan)
-
 
     member this.ShowDialogAsync(parent: Window) =
         base.ShowDialog(parent) |> ignore

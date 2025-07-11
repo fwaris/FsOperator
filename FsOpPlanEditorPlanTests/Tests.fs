@@ -77,3 +77,25 @@ let ``replace parent: below root`` () =
     Assert.True((n0.IsChoose && n1.IsLeaf))
     let gp's = gp'.tasks() |> List.filter(fun t' -> t'.id = t.id)
     Assert.True((gp's.Length = 1))
+
+[<Fact>]
+let ``equality test`` () =
+    let t1 = {OTask.Create() with id = "new task 1"}
+    let t2 = {OTask.Create() with id = "new task 2"}
+    let n1 = ONode.Leaf t1
+    let n2 = ONode.Leaf t2
+    let p = ONode.Seq {Seq.Default with nodes = [n1;n2]}
+    let gp = ONode.Choose {Choose.Default with nodes = [p]}
+    let gp' = gp
+    Assert.True((gp' = gp))
+
+[<Fact>]
+let ``non equality test`` () =
+    let t1 = {OTask.Create() with id = "new task 1"}
+    let t2 = {OTask.Create() with id = "new task 2"}
+    let n1 = ONode.Leaf t1
+    let n2 = ONode.Leaf t2
+    let p = ONode.Seq {Seq.Default with nodes = [n1;n2]}
+    let gp = ONode.Choose {Choose.Default with nodes = [p]}
+    let gp' = ONode.duplicate gp
+    Assert.True((gp' <> gp))
