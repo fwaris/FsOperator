@@ -34,7 +34,8 @@ module Update =
             driver = ui.driver
             flow = Flow.Default
             voiceAsst = None
-            plan = None
+            plan = Some (SpreadsheetToEmailPlan.create())
+
         }
         model,Cmd.none
     

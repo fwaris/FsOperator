@@ -16,6 +16,7 @@
 	</PropertyGroup>		
 
 	<ItemGroup>
+		<Compile Include="TestPlan.fs" />
 		<None Include="Assets\save.png" />
 		<None Include="Assets\typing dot.json" />
 		<AvaloniaResource Include="Assets\**\*" />
