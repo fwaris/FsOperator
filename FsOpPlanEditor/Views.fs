@@ -48,7 +48,7 @@ type Views =
                 Flyout.create [
                     Flyout.placement PlacementMode.LeftEdgeAlignedTop
                     Flyout.showMode FlyoutShowMode.Standard
-                    Flyout.content (Editors.taskEdit n dispatch)
+                    Flyout.content (Editors.nodeEdit n dispatch)
                 ]
             )
         ]

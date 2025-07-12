@@ -135,9 +135,10 @@ module Update =
             | ReplaceParent n -> updateRoot model (ONode.replaceParent n model.root), Cmd.none
             | DeleteNode n -> updateRoot model (ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)), Cmd.none
             | EditNode n -> model, Cmd.none
-            | AddTask n -> updateRoot model (addTask model.root n), Cmd.none
+            | AddTask n -> updateRoot model (addTask model.root n), Cmd.none           
             | AddSequence n -> updateRoot model (addSequence model.root n), Cmd.none
             | AddChoose n -> updateRoot model (addChoose model.root n), Cmd.none
+            | UpdateNode (nOld,nNew) -> updateRoot model (model.root |> ONode.updateNode nOld nNew),Cmd.none
             | Undo -> undo model
             | Redo -> redo model
 

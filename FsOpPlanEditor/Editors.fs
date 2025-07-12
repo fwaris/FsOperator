@@ -17,11 +17,20 @@ open AvaloniaGraphControl
 open Avalonia.Controls.Templates
 open FsOpPlanEditor.DragDrop2
 
-module Cache =
+type EditorDialog(n:ONode,content:IView) as this =
+    inherit HostWindow()
+    let tcs = new System.Threading.Tasks.TaskCompletionSource<(ONode*ONode) option>()
 
-    let opTaskTexts : Ref<TextBox> list = 
-        [for _ in 1 .. ((FSharp.Reflection.FSharpType.GetRecordFields typeof<OTask>).Length - 1) -> //textboxes for all fields except id  
-            (ref Unchecked.defaultof<_>)]
+    do
+        base.Title <- "Plan Editor"
+        base.Width <- 400.0
+        base.Height <- 600.0
+
+        this.Content <- content
+
+    member this.ShowDialogAsync(parent: Window) =
+        base.ShowDialog(parent) |> ignore
+        tcs.Task
     
 (*
     id          : string
@@ -37,10 +46,12 @@ module Cache =
 [<AbstractClass; Sealed>]
 type Editors =
     static member taskEdit (n:ONode) dispatch = 
+        let cache : Ref<TextBox> list = 
+            [for _ in 1 .. ((FSharp.Reflection.FSharpType.GetRecordFields typeof<OTask>).Length - 1) -> //textboxes for all fields except id  
+                (ref Unchecked.defaultof<_>)]
         let task = match n with ONode.Leaf t -> t | _ -> failwith "leaf node expected"
-        let cache = Cache.opTaskTexts
         Grid.create [
-            Grid.rowDefinitions "*,*,*,*"
+            Grid.rowDefinitions "*,*,*,*,*"
             Grid.columnDefinitions "100,*"
             Grid.width 400.
             Grid.maxHeight 700.
@@ -89,11 +100,11 @@ type Editors =
                     TextBox.margin 3
                     TextBox.acceptsReturn true
                     TextBox.multiline true
-                    TextBox.minHeight 150.
+                    TextBox.minHeight 60.
                     TextBox.text task.description
                 ]
                 TextBlock.create [
-                    Grid.row 2
+                    Grid.row 3
                     Grid.column 0
                     TextBlock.text "CUA Instructions"                    
                     Control.margin 2
@@ -110,15 +121,8 @@ type Editors =
                     TextBox.acceptsReturn true
                     TextBox.multiline true
                 ]
-                TextBlock.create [
-                    Grid.row 2
-                    Grid.column 0
-                    TextBlock.text "CUA Instructions"                    
-                    Control.margin 2
-                    Control.horizontalAlignment HorizontalAlignment.Right
-                ]
                 Button.create [
-                    Grid.row 3
+                    Grid.row 4
                     Grid.column 0
                     Button.verticalAlignment VerticalAlignment.Bottom
                     Button.horizontalAlignment HorizontalAlignment.Left
@@ -154,3 +158,11 @@ type Editors =
                 Border.clipToBounds true
                 Border.child g
             ]
+        :> IView
+
+
+    static member nodeEdit (n:ONode) dispatch = 
+        match n with 
+        | ONode.Leaf _ -> Editors.taskEdit n dispatch
+        | ONode.Seq _ -> TextBlock.create [TextBlock.text "seq"]        
+        | ONode.Choose _ -> TextBlock.create [TextBlock.text "choose"]
