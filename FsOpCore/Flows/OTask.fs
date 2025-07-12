@@ -1,4 +1,5 @@
 ﻿namespace FsOpCore
+open System
 open System.Collections.Generic
 
 ///represents the target computer environment (browser url or windows exe) for a task
@@ -9,6 +10,23 @@ type OTaskTarget =
             match this with
             | OProcess (a,b) -> $"{a} {b}"
             | OLink s -> s
+
+module OTaskTarget =
+    let private _parseTarget (xs:string array) =
+        let a = xs.[0]
+        let b = if xs.Length > 1 then Some xs.[1] else None
+        if a.EndsWith ".exe" then 
+            OProcess (a,b)
+        else 
+            let a = if a.StartsWith("http") then a else "https://" + a
+            OLink a
+
+    let parseTarget (tgt:string) = 
+        let tgt = tgt.Trim()
+        let xs = tgt.Split(" ", StringSplitOptions.RemoveEmptyEntries)
+        _parseTarget xs
+
+
 
 ///definition of a single unit of work in a plan
 type OTask = {
@@ -115,7 +133,7 @@ module ONode =
 
     ///Delete node under root. Fails if node does not exist. Returns None if root itself is deleted.
     let deleteNode (n:ONode) (root:ONode) =
-        let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =
+        let rec loop (visited:HashSet<_>) (c:ONode) =
             if visited.Contains c 
                 then Some c
             else 
@@ -123,10 +141,26 @@ module ONode =
                 match c=n with
                 | true      -> None
                 | false     -> match c with
-                               | ONode.Seq s -> Some(ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
-                               | ONode.Choose s -> Some(ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))})
+                               | ONode.Seq s -> Some(ONode.Seq {s with nodes = s.nodes |> List.choose (loop visited)})
+                               | ONode.Choose s -> Some(ONode.Choose {s with nodes = s.nodes |> List.choose (loop visited)})
                                | ONode.Leaf _ -> Some c
-        loop (HashSet(),None) root
+        loop (HashSet()) root
+
+    ///Replace oldN with newN
+    let updateNode (oldN:ONode) (newN:ONode) (root:ONode) =
+        let rec loop (visited:HashSet<_>) (c:ONode) =
+            if visited.Contains c 
+                then c
+            else 
+                visited.Add c |> ignore
+                match c=oldN with
+                | true      -> newN
+                | false     -> match c with
+                               | ONode.Seq s -> ONode.Seq {s with nodes = s.nodes |> List.map (loop visited)}
+                               | ONode.Choose s -> ONode.Choose {s with nodes = s.nodes |> List.map (loop visited)}
+                               | ONode.Leaf _ -> c
+        loop (HashSet()) root
+
 
     type Dir = Up | Down
 
@@ -231,7 +265,7 @@ module ONode =
     ///If the new parent happens to be on this path then the old instance is now not part of the new tree.
     let _deleteNode (n:ONode) (root:ONode) =
         let tracker = new Dictionary<ONode,ONode>()
-        let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =
+        let rec loop (visited:HashSet<_>) (c:ONode) =
             if visited.Contains c 
                 then Some c
             else 
@@ -239,14 +273,14 @@ module ONode =
                 match c=n with
                 | true      -> None
                 | false     -> match c with
-                               | ONode.Seq s    -> let c' = ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
+                               | ONode.Seq s    -> let c' = ONode.Seq {s with nodes = s.nodes |> List.choose (loop visited)}
                                                    tracker.Add(c,c')
                                                    Some c'
-                               | ONode.Choose s -> let c' = ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
+                               | ONode.Choose s -> let c' = ONode.Choose {s with nodes = s.nodes |> List.choose (loop visited)}
                                                    tracker.Add(c,c')
                                                    Some c'
                                | ONode.Leaf _   -> Some c
-        let root = loop (HashSet(),None) root
+        let root = loop (HashSet()) root
         root |> Option.map(fun r -> r,tracker)
 
     ///Move a node to a new parent
@@ -256,3 +290,4 @@ module ONode =
         | Some (root,tracker) ->
             let newParent' = match tracker.TryGetValue(newParent) with | true, np -> np | _ -> newParent
             addNode newParent' n root
+

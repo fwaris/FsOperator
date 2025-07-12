@@ -19,7 +19,7 @@ open FsOpPlanEditor.DragDrop2
 
 [<AbstractClass; Sealed>]
 type Views =
-    static member iconButton (content:string) clickHandler (tip:string) =
+    static member iconButton (content:string) clickHandler (tip:string)  =
         Button.create [
             //Button.width 16.
             Button.height 16.
@@ -31,6 +31,26 @@ type Views =
             Button.margin (0.,0.,0.5,0.)
             Button.content content
             Button.onClick clickHandler
+        ]
+
+    static member editButton (n:ONode) dispatch =
+        Button.create [
+            //Button.width 16.
+            Button.height 16.
+            Button.fontSize 12.0
+            Button.verticalAlignment VerticalAlignment.Center
+            Button.tip "Edit node"
+            Button.background Brushes.Transparent
+            Button.padding 0.0
+            Button.margin (0.,0.,0.5,0.)
+            Button.content Icons.edit
+            Button.flyout(
+                Flyout.create [
+                    Flyout.placement PlacementMode.LeftEdgeAlignedTop
+                    Flyout.showMode FlyoutShowMode.Standard
+                    Flyout.content (Editors.taskEdit n dispatch)
+                ]
+            )
         ]
 
     static member nodeMenu (n:ONode) dispatch =
@@ -62,7 +82,7 @@ type Views =
                                 ]
                             ]
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
-                        Views.iconButton Icons.edit (fun _ -> dispatch (EditNode n))  "Edit node"
+                        Views.editButton n dispatch
                     ]
                 ]
             )

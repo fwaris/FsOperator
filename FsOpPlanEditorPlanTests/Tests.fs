@@ -118,3 +118,16 @@ let ``non equality test`` () =
     let gp = ONode.Choose {Choose.Default with nodes = [p]}
     let gp' = ONode.duplicate gp
     Assert.True((gp' <> gp))
+
+[<Fact>]
+let ``update node`` () =
+    let t = {OTask.Create() with id = "old task"}
+    let n = ONode.Leaf t
+    let p = ONode.Seq {Seq.Default with nodes = [n]}
+    let gp = ONode.Choose {Choose.Default with nodes = [p]}
+    let t2 = {OTask.Create() with id = "new task"}
+    let n2 = ONode.Leaf t2
+    let gp' = gp |> ONode.updateNode n n2
+    let ts = gp'.allTasks()
+    Assert.True((ts.Length=1))
+    Assert.True(ts.[0].id=t2.id)
