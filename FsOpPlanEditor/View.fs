@@ -21,13 +21,14 @@ open FsOpPlanEditor.DragDrop2
 type Views =
     static member iconButton (content:string) clickHandler (tip:string) =
         Button.create [
-            Button.width 16.
+            //Button.width 16.
             Button.height 16.
             Button.fontSize 12.0
             Button.verticalAlignment VerticalAlignment.Center
             Button.tip tip
             Button.background Brushes.Transparent
             Button.padding 0.0
+            Button.margin (0.,0.,0.5,0.)
             Button.content content
             Button.onClick clickHandler
         ]
@@ -49,9 +50,17 @@ type Views =
                             Views.iconButton Icons.ellipsis (fun _ -> dispatch (ConvertToSequence n)) tip
                         if not n.IsChoose then
                             let tip = if n.IsLeaf then "Put this task under a 'choose' node" else "Convert to 'choose' node"
-                            Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) tip
+                            Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) tip        
                         if not n.IsLeaf then
-                            Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add a 'task' node"
+                            StackPanel.create [
+                                StackPanel.orientation Orientation.Horizontal
+                                StackPanel.background Brushes.SlateBlue
+                                StackPanel.children [
+                                    Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add 'task' node"
+                                    Views.iconButton Icons.plusEllipsis (fun _ -> dispatch (AddSequence n)) "Add 'sequence' node"
+                                    Views.iconButton Icons.plusForkedArrow (fun _ -> dispatch (AddChoose n)) "Add 'choose' node"
+                                ]
+                            ]
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
                         Views.iconButton Icons.edit (fun _ -> dispatch (EditNode n))  "Edit node"
                     ]
@@ -68,14 +77,25 @@ type Views =
             DockPanel.dock Dock.Top
             Control.horizontalAlignment HorizontalAlignment.Stretch
             Panel.background Brushes.DarkSlateBlue
+            Control.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,n)))
+            Control.cursor Cursors.hand
             Panel.children [
+                Image.create [
+                    Image.margin 1.0
+                    Image.height 5.0
+                    Image.width 10.
+                    Image.source Textures.grip
+                    Image.stretch Stretch.UniformToFill
+                    Image.clipToBounds true
+                ]
+                (*
                 TextBlock.create [
-                    Control.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,n)))
-                    Control.cursor Cursors.hand
                     Control.height 10.
+                    TextBlock.padding 2.
                     TextBlock.background Textures.grip
                     Control.horizontalAlignment HorizontalAlignment.Stretch
                 ]
+                *)
             ]
         ]
 
@@ -110,7 +130,7 @@ type Views =
                                 match n with
                                 | ONode.Leaf t -> t.id |> shorten 30
                                 | ONode.Choose _ -> Icons.forkedArrow
-                                | ONode.Seq _ -> Icons.sequence.Value
+                                | ONode.Seq _ -> Icons.sequence
                             )
                         ]
                     ]

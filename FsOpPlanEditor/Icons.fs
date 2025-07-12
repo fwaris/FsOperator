@@ -20,15 +20,14 @@ module Icons =
     let redo = "\u21BB"
     let ``1`` = "\u2460"
     let ``2`` = "\u2461"
-    let sequence = lazy(``1`` + ``2`` + ellipsis)
     let forkedArrow = "\u2387"
-
     let mic = "\U0001F399"
     let mic2 = "\U0001F3A4"
 
-
-
-
+    let sequence =  $"{``1``}{``2``}{ellipsis}"
+    let plusEllipsis = $"{plus}{ellipsis}"
+    let plusForkedArrow = $"{plus}{forkedArrow}"
+    
 module Textures = 
     open System
     open Avalonia.Media
@@ -39,7 +38,8 @@ module Textures =
         let uri = Uri("avares://FsOpPlanEditor/Assets/grip.png")
         use stream = AssetLoader.Open(uri)
         let bitmap = new Bitmap(stream)
-        new ImageBrush(bitmap)
+        bitmap
+        //new ImageBrush(bitmap)
 
 module Cursors = 
     open Avalonia.Input

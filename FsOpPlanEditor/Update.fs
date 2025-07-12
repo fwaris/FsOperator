@@ -80,6 +80,12 @@ module Update =
         let t = {OTask.Create() with id = newTaskId root}
         ONode.addNode p (ONode.Leaf t) root
 
+    let addSequence (root:ONode) (p:ONode) =
+        ONode.addNode p (ONode.Seq Seq.Default) root
+
+    let addChoose (root:ONode) (p:ONode) =
+        ONode.addNode p (ONode.Choose Choose.Default) root
+
     let stack (model:Model) =       
         match model.prevRoot with 
         | Some r -> {model with prevRoot=None; undoStack=r::model.undoStack; redoStack=[]}
@@ -130,6 +136,8 @@ module Update =
             | DeleteNode n -> updateRoot model (ONode.deleteNode n model.root |> Option.defaultValue (ONode.Seq Seq.Default)), Cmd.none
             | EditNode n -> model, Cmd.none
             | AddTask n -> updateRoot model (addTask model.root n), Cmd.none
+            | AddSequence n -> updateRoot model (addSequence model.root n), Cmd.none
+            | AddChoose n -> updateRoot model (addChoose model.root n), Cmd.none
             | Undo -> undo model
             | Redo -> redo model
 
