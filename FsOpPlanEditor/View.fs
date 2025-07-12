@@ -63,19 +63,19 @@ type Views =
     static member nodeFontSz = function ONode.Leaf _ -> 15.| _ -> 25.
     static member nodeTip = function ONode.Leaf _ -> "Task" | ONode.Choose _ -> "Choose 1 of n child" | ONode.Seq _ -> "Sequentially execute all children"
 
-    static member dragHeader (n:ONode) dispatch = 
+    static member dragHeader (n:ONode) dispatch =
         Panel.create [
             DockPanel.dock Dock.Top
             Control.horizontalAlignment HorizontalAlignment.Stretch
             Panel.background Brushes.DarkSlateBlue
             Panel.children [
-                TextBlock.create [                            
+                TextBlock.create [
                     Control.onPointerPressed (fun e -> e.Handled <- true; dispatch (BeginDrag (e,n)))
                     Control.cursor Cursors.hand
                     Control.height 10.
                     TextBlock.background Textures.grip
                     Control.horizontalAlignment HorizontalAlignment.Stretch
-                ]                        
+                ]
             ]
         ]
 
@@ -98,16 +98,16 @@ type Views =
             Border.child (
                 DockPanel.create [
                     DockPanel.margin 3.0
-                    DockPanel.children [                        
+                    DockPanel.children [
                         Views.dragHeader n dispatch
                         Views.nodeMenu n dispatch
                         TextBlock.create [
-                            TextBlock.fontSize (Views.nodeFontSz n); 
+                            TextBlock.fontSize (Views.nodeFontSz n);
                             TextBlock.foreground Brushes.Black
                             TextBlock.tip (Views.nodeTip n)
                             TextBlock.textAlignment TextAlignment.Center
                             TextBlock.text (
-                                match n with 
+                                match n with
                                 | ONode.Leaf t -> t.id |> shorten 30
                                 | ONode.Choose _ -> Icons.forkedArrow
                                 | ONode.Seq _ -> Icons.sequence.Value
@@ -117,7 +117,7 @@ type Views =
                 ]
             )
         ]
-        
+
     static member toolbar (model:Model) dispatch =
         DockPanel.create [
             DockPanel.margin 1.0

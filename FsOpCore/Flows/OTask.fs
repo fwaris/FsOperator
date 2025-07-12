@@ -181,6 +181,8 @@ module ONode =
                 | t -> t
         loop root
 
+    ///Move node n one level up to replace its parent. 
+    ///Parent node is deleted and it replaced with n.
     let replaceParent (n:ONode) (root:ONode) =
         let rec loop (gp:ONode option) (p:ONode option) (c:ONode) =
             match gp, p, c=n with
@@ -206,20 +208,23 @@ module ONode =
         match loop None None root with 
         | Choice1Of2 n | Choice2Of2 n -> n
 
-    ///All parent child relations
-    let allEdges (root:ONode) =
-        let rec loop (visited:HashSet<ONode>,acc:(ONode*ONode) list) (p:ONode) =
+    ///All parent child relations along with the child's position index under parent
+    let indexedEdges (root:ONode) =
+        let rec loop (visited:HashSet<ONode>,acc:(ONode*(int*ONode)) list) (p:ONode) =
             if visited.Contains p then
                 (visited,acc)
             else
                 visited.Add p |> ignore
                 match p with
-                | ONode.Choose c -> let acc = acc @ (c.nodes |> List.map (fun x -> (p,x)))
+                | ONode.Choose c -> let acc = acc @ (c.nodes |> List.mapi (fun i x -> (p,(i,x))))
                                     ((visited,acc),c.nodes) ||> List.fold loop
-                | ONode.Seq s    -> let acc = acc @ (s.nodes |> List.map (fun x -> (p,x)))
+                | ONode.Seq s    -> let acc = acc @ (s.nodes |> List.mapi (fun i x -> (p,(i,x))))
                                     ((visited,acc),s.nodes) ||> List.fold loop
                 | ONode.Leaf l   -> (visited,acc)
         loop (HashSet(),[]) root |> snd
+
+    ///All parent child relations
+    let allEdges root = indexedEdges root |> List.map (fun (p,(_,c)) -> p,c)
 
     ///For internal use. Deletes a node but maintains a dictionary that maps old to new instances for all changed nodes.
     ///Need this to 'move' a node from one parent to another because deleting a node can re-create all nodes on the path to the deleted node.
@@ -234,16 +239,17 @@ module ONode =
                 match c=n with
                 | true      -> None
                 | false     -> match c with
-                               | ONode.Seq s -> let c' = ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
-                                                tracker.Add(c,c')
-                                                Some c'
+                               | ONode.Seq s    -> let c' = ONode.Seq {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
+                                                   tracker.Add(c,c')
+                                                   Some c'
                                | ONode.Choose s -> let c' = ONode.Choose {s with nodes = s.nodes |> List.choose (loop (visited,(Some c)))}
                                                    tracker.Add(c,c')
                                                    Some c'
-                               | ONode.Leaf _ -> Some c
+                               | ONode.Leaf _   -> Some c
         let root = loop (HashSet(),None) root
         root |> Option.map(fun r -> r,tracker)
 
+    ///Move a node to a new parent
     let moveNode (n:ONode) (newParent:ONode) (root:ONode) = 
         match _deleteNode n root with 
         | None -> root
