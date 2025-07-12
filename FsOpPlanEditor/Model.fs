@@ -5,6 +5,7 @@ open Avalonia.Input
 type Model = {
     plan : OPlan
     root : FsOpCore.ONode
+    orientation : AvaloniaGraphControl.Graph.Orientations
     prevRoot : FsOpCore.ONode option
     undoStack : FsOpCore.ONode list
     redoStack : FsOpCore.ONode list
@@ -26,4 +27,4 @@ type Msg =
     | AddTask of ONode
     | Redo
     | Undo
-
+    | ToggleOrientation

@@ -149,7 +149,15 @@ type Views =
                         ]
                     ]
                 ]
-                TextBlock.create [] //dock filler
+                ToggleButton.create [
+                    Primitives.ToggleButton.content (
+                        match model.orientation with 
+                        | Graph.Orientations.Vertical   -> "Vertical"
+                        | Graph.Orientations.Horizontal -> "Horizontal"
+                        | _                             -> ""
+                    )
+                    Primitives.ToggleButton.onClick (fun _ -> dispatch ToggleOrientation)
+                ]
             ]
         ]
 
@@ -175,6 +183,7 @@ type Views =
                                     ZoomBorder.panButton ButtonName.Right
                                     ZoomBorder.child (
                                         GraphPanel.create [
+                                            GraphPanel.foreground Brushes.DarkBlue
                                             GraphPanel.dataTemplates (
                                                 let ds = DataTemplates()
                                                 ds.AddRange(
@@ -185,7 +194,7 @@ type Views =
                                                     ])
                                                 ds)
                                             GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
-                                            GraphPanel.graph (model.root |> Update.graph)
+                                            GraphPanel.graph (Update.graph model)
                                         ]
                                     )
                                 ]

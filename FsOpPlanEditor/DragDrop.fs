@@ -2,7 +2,7 @@
 open Avalonia.Controls
 open Avalonia.Input
 
-//the drag and drop functions in the funcui package are not being picked up by the tooling - this is a copy
+//the drag and drop functions in the funcui package are not being picked up by the tooling - this is a copy for local compilation
 
 module DragDrop2 =
     open Avalonia.FuncUI.Builder

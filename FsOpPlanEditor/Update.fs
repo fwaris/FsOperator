@@ -11,6 +11,8 @@ module Msagl =
     open Microsoft.Msagl.Drawing
     open System.Reflection
 
+    let label (s:string) = Microsoft.Msagl.Drawing.Label(s)
+
     let dedge = lazy(
         typeof<AvaloniaGraphControl.Edge>.GetField("DEdge",BindingFlags.NonPublic ||| BindingFlags.Instance))
 
@@ -29,6 +31,7 @@ module Update =
     let init p   =
         let model = {
             plan = FsOpCore.OPlan.Default
+            orientation = Graph.Orientations.Vertical
             root = p.root
             prevRoot = None
             undoStack = []
@@ -36,10 +39,14 @@ module Update =
         }
         model, Cmd.ofMsg (Init p)
 
-    let graph (root:ONode) =
+    let graph (model:Model) =
+        let root = model.root
         let g = Graph()
+        g.Orientation <- model.orientation
+        let edges = ONode.indexedEdges root 
+        let edges = edges |> List.sortByDescending (fun (p,(i,_)) -> p.GetHashCode(),i)
         let e0 = Edge("",root)
-        let edges = e0 :: (ONode.allEdges root |> List.map(fun (p,c) -> Edge(p,c)))
+        let edges = e0 :: (edges |> List.map(fun (p,(i,c)) -> if p.IsSeq then Edge(p,c,$"{i}") else Edge(p,c)))
         for e in edges do
             g.Edges.Add e
         g
@@ -98,6 +105,13 @@ module Update =
             | x::rest -> {model with root=x; undoStack=model.root::model.undoStack; redoStack=rest}
         model,Cmd.none
 
+    let toggleOrientation (model:Model) = 
+        {model with 
+            orientation = 
+                match model.orientation with 
+                | Graph.Orientations.Vertical -> Graph.Orientations.Horizontal 
+                | _ -> Graph.Orientations.Vertical
+        }, Cmd.none
 
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
@@ -118,6 +132,8 @@ module Update =
             | AddTask n -> updateRoot model (addTask model.root n), Cmd.none
             | Undo -> undo model
             | Redo -> redo model
+
+            | ToggleOrientation -> toggleOrientation model
         with ex ->
             Log.exn(ex,"update")
             model,Cmd.none
