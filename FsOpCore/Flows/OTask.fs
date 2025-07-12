@@ -113,7 +113,7 @@ module ONode =
                     | t -> t
         loop (HashSet()) root
 
-    ///Delete node under root. Fails if node does not exist. Return None if root is deleted.
+    ///Delete node under root. Fails if node does not exist. Returns None if root itself is deleted.
     let deleteNode (n:ONode) (root:ONode) =
         let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =
             if visited.Contains c 
@@ -221,8 +221,9 @@ module ONode =
                 | ONode.Leaf l   -> (visited,acc)
         loop (HashSet(),[]) root |> snd
 
-    ///For internal use. Deletes a node but maintains a dictionary that maps old to new instances of all changed nodes.
+    ///For internal use. Deletes a node but maintains a dictionary that maps old to new instances for all changed nodes.
     ///Need this to 'move' a node from one parent to another because deleting a node can re-create all nodes on the path to the deleted node.
+    ///If the new parent happens to be on this path then the old instance is now not part of the new tree.
     let _deleteNode (n:ONode) (root:ONode) =
         let tracker = new Dictionary<ONode,ONode>()
         let rec loop (visited:HashSet<_>,p:ONode option) (c:ONode) =

@@ -2,6 +2,7 @@
 open System
 open Elmish
 open FsOpCore
+open Avalonia.Controls.PanAndZoom
 open Avalonia.FuncUI.Hosts
 open Avalonia.Media
 open Avalonia.Controls
@@ -44,9 +45,11 @@ type Views =
                     StackPanel.orientation Orientation.Horizontal
                     StackPanel.children [
                         if not n.IsSeq then
-                            Views.iconButton Icons.sequence.Value (fun _ -> dispatch (ConvertToSequence n)) "Convert to 'sequence' node"
+                            let tip = if n.IsLeaf then "Put this task under a 'sequence' node" else "Convert to 'sequence' node"
+                            Views.iconButton Icons.ellipsis (fun _ -> dispatch (ConvertToSequence n)) tip
                         if not n.IsChoose then
-                            Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) "Convert to 'choose' node"
+                            let tip = if n.IsLeaf then "Put this task under a 'choose' node" else "Convert to 'choose' node"
+                            Views.iconButton Icons.forkedArrow (fun _ -> dispatch (ConvertToChoose n)) tip
                         if not n.IsLeaf then
                             Views.iconButton Icons.plus (fun _ -> dispatch (AddTask n)) "Add a 'task' node"
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
@@ -102,6 +105,7 @@ type Views =
                             TextBlock.fontSize (Views.nodeFontSz n); 
                             TextBlock.foreground Brushes.Black
                             TextBlock.tip (Views.nodeTip n)
+                            TextBlock.textAlignment TextAlignment.Center
                             TextBlock.text (
                                 match n with 
                                 | ONode.Leaf t -> t.id |> shorten 30
@@ -116,6 +120,7 @@ type Views =
         
     static member toolbar (model:Model) dispatch =
         DockPanel.create [
+            DockPanel.margin 1.0
             Grid.row 0
             DockPanel.children [
                 StackPanel.create [
@@ -126,7 +131,25 @@ type Views =
                         Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
                     ]
                 ]
-                TextBlock.create []
+                StackPanel.create [
+                    DockPanel.dock Dock.Left;
+                    StackPanel.orientation Orientation.Horizontal
+                    StackPanel.children [
+                        Button.create [
+                            Button.isEnabled (not model.undoStack.IsEmpty)
+                            Button.tip "Undo"
+                            Button.content Icons.undo
+                            Button.onClick (fun _ -> dispatch Undo)
+                        ]
+                        Button.create [
+                            Button.tip "Redo"
+                            Button.isEnabled (not model.redoStack.IsEmpty)
+                            Button.content Icons.redo
+                            Button.onClick (fun _ -> dispatch Redo)
+                        ]
+                    ]
+                ]
+                TextBlock.create [] //dock filler
             ]
         ]
 
@@ -144,19 +167,29 @@ type Views =
                             TextBlock.horizontalAlignment HorizontalAlignment.Center
                             TextBlock.dock Dock.Top
                         ]
-                        GraphPanel.create [
-                            GraphPanel.background Brushes.AntiqueWhite
-                            GraphPanel.dataTemplates (
-                                let ds = DataTemplates()
-                                ds.AddRange(
-                                    [
-                                        DataTemplateView<ONode>.create (fun data ->
-                                            Views.node data dispatch
-                                        )
-                                    ])
-                                ds)
-                            GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
-                            GraphPanel.graph (model.root |> Update.graph)
+                        ScrollViewer.create [
+                            ScrollViewer.background Brushes.AntiqueWhite
+                            ScrollViewer.content (
+                                ZoomBorder.create [
+                                    ZoomBorder.enablePan true
+                                    ZoomBorder.panButton ButtonName.Right
+                                    ZoomBorder.child (
+                                        GraphPanel.create [
+                                            GraphPanel.dataTemplates (
+                                                let ds = DataTemplates()
+                                                ds.AddRange(
+                                                    [
+                                                        DataTemplateView<ONode>.create (fun data ->
+                                                            Views.node data dispatch
+                                                        )
+                                                    ])
+                                                ds)
+                                            GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
+                                            GraphPanel.graph (model.root |> Update.graph)
+                                        ]
+                                    )
+                                ]
+                            )
                         ]
                     ]
                 ]
