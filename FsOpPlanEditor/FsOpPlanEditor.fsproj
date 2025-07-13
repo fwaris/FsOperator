@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+    <ProjectReference Include="..\FsOpTaskRunner\FsOpTaskRunner.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="9.0.300" />

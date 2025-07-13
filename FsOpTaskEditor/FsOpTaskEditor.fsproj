@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
+		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
+		<TargetFrameworks>
+		</TargetFrameworks>
+		<TargetFrameworks Condition="$(IsOSX)">net9.0;$(TargetFrameworks)</TargetFrameworks>
+		<TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+	</PropertyGroup>
+	<PropertyGroup Condition="$(IsWindows)">
+		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+	</PropertyGroup>
+
+	<ItemGroup>
+    <Compile Include="Editor.fs" />
+    <Compile Include="Program.fs" />
+		
+  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
+		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.1" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.3.1" />
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.1" />
+		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.3.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.6" />
+		<PackageReference Include="System.Drawing.Common" Version="9.0.6" />
+		<PackageReference Include="System.Private.Uri" Version="4.3.2" />
+		<PackageReference Include="System.Text.Json" Version="9.0.6" />
+		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Update="FSharp.Core" Version="9.0.300" />
+	</ItemGroup>
+</Project>

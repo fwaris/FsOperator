@@ -206,7 +206,7 @@ type Views =
             Border.borderThickness 1.0
             Border.borderBrush Brushes.LightGray
             Border.margin 2.0
-            Grid.row 2
+            Grid.row 1
             Border.child(
                 DockPanel.create [
                     DockPanel.children [
@@ -249,12 +249,18 @@ type Views =
         DockPanel.create [
             DockPanel.children [
                 Grid.create [
-                    Grid.rowDefinitions "50,*"
+                    Grid.rowDefinitions "50,*,30"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
                         Views.toolbar model dispatch
                         Views.planFlow model dispatch
+                        Panel.create [
+                            Grid.row 2
+                            Panel.children [
+                                FsOpTaskRunner.CounterComponent.counterView()
+                            ]
+                        ]
                     ]
                 ]
             ]
