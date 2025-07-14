@@ -71,7 +71,7 @@ type FsOpMemory() =
             Log.exn(ex, nameof FsOpMemory.LoadState)
             new FsOpMemory()
 
-    member this.Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=FsOpMemory.serOpts.Value)
+    static member Serialize<'t>(o:'t) = JsonSerializer.Serialize(o,options=FsOpMemory.serOpts.Value)
 
     static member private _SaveState(map:Map<string,string list>) =
         try
@@ -98,21 +98,23 @@ type FsOpMemory() =
     [<Description("Retrieve all key value pairs saved in memory")>]
     member this.memory_get_all() =
         Log.info (nameof this.memory_get_all)
-        this.Serialize(bag)
+        FsOpMemory.Serialize(bag)
 
     [<KernelFunction("memory_get_all_keys")>]
     [<Description("retrieve all keys in the memory store ")>]
     member this.memory_get_all_keys() =
         let ks = Map.keys bag |> Seq.toList
         Log.info $"{nameof this.memory_get_all_keys}: {ks}"
-        this.Serialize(ks)
+        FsOpMemory.Serialize(ks)
 
     [<KernelFunction("memory_get_value")>]
     [<Description("retrieve a value for the given key")>]
     member this.memory_get_value(key:string) =
         let v = bag |> Map.tryFind key
         Log.info $"{nameof this.memory_get_value} {key} = {v}"
-        this.Serialize(v)
+        FsOpMemory.Serialize(v)
+
+    member this.getMemory() = bag
 
 
 type VoiceFuncImpl = {

@@ -48,6 +48,37 @@ module FlUtils =
         return {snapshot=snapshot; width=w; height=h; url=url;environment=driver.environment}
     }
 
+    let parseMemory (memoryString:string) =
+        try 
+            JsonSerializer.Deserialize<Map<string,string list>>(memoryString)
+        with ext ->
+            let lines = 
+                seq {
+                    use rdr = new System.IO.StringReader(memoryString)
+                    let mutable line = rdr.ReadLine()
+                    while line <> null do                           
+                        yield line          
+                        line <- rdr.ReadLine()              
+                }
+                |> Seq.toList
+            lines 
+            |> List.map (fun l -> l.Split(":")) 
+            |> List.map (fun xs -> if xs.Length = 1 then [|xs.[0];""|] else xs)
+            |> List.map (fun xs -> xs.[0],xs.[1..] |> String.concat " ")
+            |> List.groupBy fst
+            |> List.map (fun (k,vs) -> k,vs |> Seq.map snd |> Seq.toList)
+            |> Map.ofList
+
+(*
+let memoryString = "a:b\nc:d"
+parseMemory memoryString
+parseMemory ""
+parseMemory ":"
+parseMemory "a:"
+parseMemory "a:b"
+parseMemory "a:b:c"
+*)
+
     /// <summary>
     /// Convert metadata to 'function' tool for use with <see cref="FsResponses.Request" />.
     /// Also see <see cref="FlUtils.functionMetadata" />.
@@ -150,8 +181,17 @@ module FlUtils =
         | W_Cua (resp) when noCC resp -> Some resp
         | _                            -> None
 
-
     let getUsage (resp:Response) = resp.model,resp.usage
+
+    let getMemory (k:Kernel) = 
+        let svc = k.Services.GetService(typeof<Functions.FsOpMemory>)
+        let mem = 
+            if svc = Unchecked.defaultof<_> then 
+                Map.empty
+            else 
+                let svc = svc :?> Functions.FsOpMemory
+                svc.getMemory()
+        Functions.FsOpMemory.Serialize(mem)
 
 //utility functions for working Responses API messsages
 module FlResps =
@@ -252,4 +292,5 @@ module FlResps =
             do! sendRequest W_Cua replyChannel req
         }
         |> catch replyChannel
+
 

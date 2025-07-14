@@ -47,8 +47,8 @@
     <PackageReference Include="AvaloniaGraphControl" Version="0.6.1" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FsOpCoreUI\FsOpCoreUI.fsproj" />
     <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
-    <ProjectReference Include="..\FsOpTaskRunner\FsOpTaskRunner.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="9.0.300" />

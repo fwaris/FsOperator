@@ -8,15 +8,17 @@
 		<TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 	</PropertyGroup>
-	
 	<PropertyGroup Condition="$(IsWindows)">
 		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Compile Include="TaskRunner.fs" />
-
-	</ItemGroup>
+    <Compile Include="Subscriptions.fs" />
+    <Compile Include="TaskRunner.fs" />
+    <Compile Include="Editor.fs" />
+    <Compile Include="Program.fs" />
+		
+  </ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
 		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />

@@ -255,12 +255,6 @@ type Views =
                     Grid.children [
                         Views.toolbar model dispatch
                         Views.planFlow model dispatch
-                        Panel.create [
-                            Grid.row 2
-                            Panel.children [
-                                FsOpTaskRunner.CounterComponent.counterView()
-                            ]
-                        ]
                     ]
                 ]
             ]
