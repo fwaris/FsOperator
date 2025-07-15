@@ -23,7 +23,9 @@ module Icons =
     let forkedArrow = "\u2387"
     let mic = "\U0001F399"
     let mic2 = "\U0001F3A4"
-
+    let microscoope = "\U0001F52C"
+    let testTube = "\U0001F9EA"
+    let petridish = "\U0001F9EB"
     let sequence =  $"{``1``}{``2``}{ellipsis}"
     let plusEllipsis = $"{plus}{ellipsis}"
     let plusForkedArrow = $"{plus}{forkedArrow}"

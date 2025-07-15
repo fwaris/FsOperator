@@ -27,7 +27,9 @@ type Msg =
     | AddTask of ONode
     | AddSequence of ONode
     | AddChoose of ONode
+    | TestTask of ONode
     | UpdateNode of (ONode*ONode) //old,new
+    | Error of exn
     | Redo
     | Undo
     | ToggleOrientation

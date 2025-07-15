@@ -15,8 +15,7 @@
 	<ItemGroup>
     <Compile Include="Subscriptions.fs" />
     <Compile Include="TaskRunner.fs" />
-    <Compile Include="Editor.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="TaskTester.fs" />
 		
   </ItemGroup>
 	<ItemGroup>

@@ -83,6 +83,9 @@ type Views =
                             ]
                         Views.iconButton Icons.minus (fun _ -> dispatch (DeleteNode n))  "Delete this node"
                         Views.editButton n dispatch
+                        if n.IsLeaf then 
+                            Views.iconButton Icons.testTube (fun _ -> dispatch (TestTask n)) "Test task"
+                            
                     ]
                 ]
             )

@@ -4,14 +4,15 @@ open System.Threading.Channels
 open FSharp.Control
 
 module Subscriptions = 
+    let mailbox = Channel.CreateBounded<ClientMsg>(10)
 
-    let subscribeMailbox<'model,'msg> (mailbox:Channel<'msg>) (model:'model)=
+    let subscribeBackground (model:Model) =
         let backgroundEvent dispatch =
             let ctx = new System.Threading.CancellationTokenSource()
             let comp =
                 async{
                     let comp =
-                            mailbox.Reader.ReadAllAsync()
+                            model.mailbox.Reader.ReadAllAsync()
                             |> AsyncSeq.ofAsyncEnum
                             |> AsyncSeq.iter dispatch
                     match! Async.Catch(comp) with
@@ -22,10 +23,11 @@ module Subscriptions =
             {new IDisposable with member _.Dispose() = ctx.Dispose(); printfn "disposing subscription backgroundEvent";}
         backgroundEvent
 
-    let subscription mailbox model =
+    let subscriptions model =
 
-        let sub2 = subscribeMailbox mailbox model
+        let sub2 = subscribeBackground model
         [
             [nameof sub2], sub2
         ]
+
 
