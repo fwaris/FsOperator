@@ -2,6 +2,7 @@
 open System
 open Elmish
 open FsOpCore
+open FsOpCoreUI
 open Avalonia.Controls.PanAndZoom
 open Avalonia.FuncUI.Hosts
 open Avalonia.Media

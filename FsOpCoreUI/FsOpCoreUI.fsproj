@@ -13,6 +13,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+    <Compile Include="Icons.fs" />
     <Compile Include="Subscriptions.fs" />
     <Compile Include="TaskRunner.fs" />
     <Compile Include="TaskTester.fs" />

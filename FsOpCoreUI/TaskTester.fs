@@ -10,6 +10,7 @@ open Avalonia.FuncUI.Types
 open Avalonia.FuncUI.Elmish.ElmishHook
 open Avalonia.Layout
 open Avalonia.Media
+open System.Threading.Tasks
 open System.Threading.Channels
 open Avalonia.FuncUI.Hosts
 
@@ -17,26 +18,42 @@ module TaskTester =
     type MsgOut = Update of (ONode*ONode) //old update node
     
     module internal TaskTester =
-        type Msg = StartTest | StopTest | Update of ONode
+        type Msg = 
+            | StartTest 
+            | StopTest 
+            | Error of string
+            | Update of OTask
+            | Close 
+            | Save 
+            | MsgFromRunner of TaskRunner.MsgOut
+
         type Model = 
             {
                     refNode          : ONode
                     task             : IWritable<OTask>
+                    running          : IWritable<bool>
                     dispatchToRunner : Ref<TaskRunner.MsgIn -> unit>
             }
 
 
-        let init (n:ONode,task:IWritable<OTask>) ()=             
+        let init (n:ONode,task:IWritable<OTask>,running:IWritable<bool>) ()=             
             {
                 refNode = n
                 task = task
+                running = running
                 dispatchToRunner = ref(fun _ -> ())
             }, 
             Cmd.none
 
-        let update (dispatchOut:MsgOut -> unit) msg model = 
+        let update (win:HostWindow,tcs:TaskCompletionSource<(ONode*ONode) option>) msg model = 
             match msg with 
-            | StartTest -> model,Cmd.none
+            | StopTest -> model.dispatchToRunner.Value TaskRunner.Stop; model,Cmd.none
+            | StartTest -> model.dispatchToRunner.Value TaskRunner.Start; model,Cmd.none
+            | Update t -> model.task.Set(t); model, Cmd.none
+            | Close -> tcs.SetResult(None);win.Close(); model,Cmd.none
+            | Save -> tcs.SetResult(Some(model.refNode,ONode.Leaf model.task.Current));win.Close(); model,Cmd.none
+            | Error e -> Log.info e; model, Cmd.none
+            | MsgFromRunner (TaskRunner.Error e) -> model,Cmd.ofMsg (Error e)
 
         let taskEdit model dispatch = 
             let cache : Ref<TextBox> list = 
@@ -44,9 +61,8 @@ module TaskTester =
                     (ref Unchecked.defaultof<_>)]
             let task = model.task.Current
             Grid.create [
-                Grid.rowDefinitions "*,*,*,*,*"
+                Grid.rowDefinitions "30,30,150,*,30"
                 Grid.columnDefinitions "100,*"
-                Grid.width 400.
                 Grid.maxHeight 700.
                 Grid.children [                
                     TextBlock.create [
@@ -141,56 +157,81 @@ module TaskTester =
                     ]
                 ]
             ]
-            |> fun g -> 
-                Border.create [
-                    Border.borderThickness 1.
-                    Border.padding 5.
-                    Border.cornerRadius 1.
-                    Border.borderBrush Brushes.LightBlue
-                    Border.background Brushes.Transparent
-                    Border.clipToBounds true
-                    Border.child g
-                ]
             :> IView
 
-        let view model dispatch =
-            Grid.create [
-                Grid.columnDefinitions "2*,1*"
-                Grid.children [
-                    taskEdit model dispatch
-                    Panel.create [
-                        Grid.column 1
-                        Panel.children [
-                            TaskRunner.view (model.task,(fun x ->()),(ref(fun x->()))) 
+        let toolbar model dispatch = 
+            DockPanel.create [
+                DockPanel.margin 1.0
+                Grid.row 0
+                DockPanel.children [
+                    StackPanel.create [
+                        DockPanel.dock Dock.Left;
+                        StackPanel.orientation Orientation.Horizontal
+                        StackPanel.children [
+                            Button.create [Button.content Icons.cancel; Button.onClick (fun _ -> dispatch Close)]
+                            Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
+                        ]
+                    ]
+                    StackPanel.create [
+                        DockPanel.dock Dock.Left;
+                        StackPanel.orientation Orientation.Horizontal
+                        StackPanel.children [
+                            Button.create [Button.content Icons.start; Button.onClick (fun _ -> dispatch Close)]
+                            Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
                         ]
                     ]
                 ]
             ]
 
+        let view model dispatch =
+            Grid.create [
+                Grid.columnDefinitions "2*,1*"
+                Grid.children [
+                    Border.create [
+                        Grid.column 0
+                        Border.borderThickness 1.
+                        Border.padding 5.
+                        Border.cornerRadius 1.
+                        Border.borderBrush Brushes.LightBlue
+                        Border.background Brushes.Transparent
+                        Border.clipToBounds true
+                        Border.child (taskEdit model dispatch )
+                    ]                   
+                    Border.create [
+                        Grid.column 1
+                        Border.borderThickness 1.
+                        Border.padding 5.
+                        Border.cornerRadius 1.
+                        Border.borderBrush Brushes.LightBlue
+                        Border.background Brushes.Transparent
+                        Border.clipToBounds true
+                        Border.child (TaskRunner.view (model.task,model.running,(MsgFromRunner>>dispatch),model.dispatchToRunner) )
+                    ]                   
+                ]
+            ]
+
     // The Component wrapper: uses useElmish to run the MVU loop internally
-    let view (n:ONode,dispatchOut:MsgOut->unit) =
-        Component( fun ctx ->
+    let view (win:HostWindow,n:ONode,tcs:TaskCompletionSource<(ONode*ONode) option>) =
+        Component( fun ctx ->            
             let t = match n with ONode.Leaf t -> t | _ -> failwith "expecting leaf node"
-            let state = ctx.useState t
-            let post = ref(fun m -> ())
-            let sub _ = Subscriptions.create $"ta.{n.displayStr()}" post
-            let model, dispatch = ctx.useElmish (TaskTester.init (n,state),  TaskTester.update dispatchOut, Program.withSubscription sub)
+            let task = ctx.useState t
+            let running = ctx.useState false
+            let model, dispatch = ctx.useElmish (TaskTester.init (n,task,running),  TaskTester.update (win,tcs) )
             // The view renders the current state and dispatch function
             let v : IView = TaskTester.view model dispatch
             v
-        )
-        
+        )        
 
 type TaskTester(n:ONode) as this =
     inherit HostWindow()
-    let tcs = new System.Threading.Tasks.TaskCompletionSource<ONode*ONode>()
+    let tcs = new TaskCompletionSource<(ONode*ONode) option>()
 
     do
         base.Title <- "Task Tester"
         base.Width <- 400.0
         base.Height <- 600.0
 
-        this.Content <- TaskTester.view  (n,fun _ ->())
+        this.Content <- TaskTester.view  (this,n,tcs)
 
     member this.ShowDialogAsync(parent: Window) =
         base.ShowDialog(parent) |> ignore

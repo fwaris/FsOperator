@@ -143,7 +143,7 @@ type Editors =
                                 cua = cua |> checkEmpty
                             }
                         if task' <> task then  
-                            dispatch (UpdateNode (n, ONode.Leaf task'))
+                            dispatch (UpdateNode (Some(n, ONode.Leaf task')))
                         )
                 ]
             ]

@@ -11,14 +11,15 @@ open Avalonia.Media
 open System.Threading.Channels
 
 module TaskRunner = 
-    type MsgOut = Error of string | Started | Stopped //external component can receive these via bus
-    type MsgIn = Stop | Start      //external component can send these via bus
+    type MsgOut = Error of string  //parent component can receive these messasges
+    type MsgIn = Stop | Start      //parent component can send these messages
     
     module internal TaskRunner =
         type Msg = Start | Stop | SetMemory of string | Error of string | MsgFromFlow of TaskFlow.TaskFlowMsgOut | MsgIn of MsgIn
         type Model = 
             {
-                    task:IWritable<OTask>; 
+                    task:IReadable<OTask>
+                    running : IWritable<bool>
                     flow:IFlow<TaskFlow.TaskFlowMsgIn> option; 
                     memory:string
                     log : string list
@@ -43,9 +44,10 @@ module TaskRunner =
                         kernel
                         tools
 
-        let init (t,postToSub) ()= 
+        let init (t,r,postToSub) ()= 
             {
                 task        = t 
+                running     = r
                 flow        = None
                 memory      = ""
                 action      = ""
@@ -62,11 +64,14 @@ module TaskRunner =
                 let mem = FlUtils.parseMemory model.memory
                 let t = taskState mem model 
                 let flow = TaskFlow.create t
+                model.running.Set(true)
                 {model with flow = Some flow},Cmd.none
         
         let stopFlow (model:Model) =
             match model.flow with 
-            | Some f -> f.Terminate(); {model with flow = None}, Cmd.none
+            | Some f -> 
+                model.running.Set(false)
+                f.Terminate(); {model with flow = None}, Cmd.none
             | None -> model, Cmd.none
 
         let getMemory (t:TaskState<_,_>) =
@@ -122,8 +127,8 @@ module TaskRunner =
                                     ]
                                     TextBlock.create [
                                         DockPanel.dock Dock.Top
-                                        TextBlock.text "(ewest item at top)"
-                                        TextBlock.fontSize 9.0
+                                        TextBlock.text "(newest item at top)"
+                                        TextBlock.fontSize 10.0
                                     ]
                                     ListBox.create [
                                         ListBox.dataItems model.log
@@ -136,13 +141,14 @@ module TaskRunner =
             ]            
 
     // The Component wrapper: uses useElmish to run the MVU loop internally
-    let view ((state:IWritable<OTask>),dispatchOut:MsgOut->unit,dispatchIn:Ref<MsgIn->unit>) : IView =
+    let view (task:IReadable<OTask>,running:IWritable<bool>,dispatchOut:MsgOut->unit,dispatchIn:Ref<MsgIn->unit>) : IView =
         Component.create($"taskRunner", fun ctx ->
-            let state = ctx.usePassed state
+            let task = ctx.usePassedRead task
+            let running = ctx.usePassed running
             let post = ref(fun m -> ())
-            let sub _ = Subscriptions.create $"taskRunner {state.Current.id}" post
+            let sub _ = Subscriptions.create $"taskRunner {task.Current.id}" post
             dispatchIn.Value <- (TaskRunner.MsgIn>>post.Value)
-            let model, dispatch = ctx.useElmish (TaskRunner.init (state,post),  TaskRunner.update dispatchOut, Program.withSubscription sub)
+            let model, dispatch = ctx.useElmish (TaskRunner.init (task,running,post),  TaskRunner.update dispatchOut, Program.withSubscription sub)
             // The view renders the current state and dispatch function
             TaskRunner.view model dispatch
         )

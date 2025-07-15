@@ -28,7 +28,7 @@ type Msg =
     | AddSequence of ONode
     | AddChoose of ONode
     | TestTask of ONode
-    | UpdateNode of (ONode*ONode) //old,new
+    | UpdateNode of ((ONode*ONode) option) //old,new
     | Error of exn
     | Redo
     | Undo

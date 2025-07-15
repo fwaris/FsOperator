@@ -123,7 +123,7 @@ module Update =
     let testTask (win:HostWindow,n:ONode)  =
         task {
             return!
-                Dispatcher.UIThread.InvokeAsync<ONode*ONode>(fun _ ->
+                Dispatcher.UIThread.InvokeAsync<(ONode*ONode) option>(fun _ ->
                     task {
                         let dlg = FsOpCoreUI.TaskTester(n)
                         return! dlg.ShowDialogAsync(win)
@@ -150,7 +150,7 @@ module Update =
             | AddTask n -> updateRoot model (addTask model.root n), Cmd.none           
             | AddSequence n -> updateRoot model (addSequence model.root n), Cmd.none
             | AddChoose n -> updateRoot model (addChoose model.root n), Cmd.none
-            | UpdateNode (nOld,nNew) -> updateRoot model (model.root |> ONode.updateNode nOld nNew),Cmd.none
+            | UpdateNode upd -> (match upd with Some(nOld,nNew) -> updateRoot model (model.root |> ONode.updateNode nOld nNew) | _ -> model),Cmd.none
             | TestTask n -> model, Cmd.OfTask.either testTask (win,n) UpdateNode Error 
             | Undo -> undo model
             | Redo -> redo model

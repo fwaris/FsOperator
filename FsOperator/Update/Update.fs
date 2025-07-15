@@ -38,7 +38,6 @@ module Update =
 
         }
         model,Cmd.none
-    
 
     let update (win:HostWindow) msg (model:Model) =
         try

@@ -19,7 +19,7 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Icons.fs" />
+    <Compile Include="Textures.fs" />
     <Compile Include="Styles.fs" />
     <Compile Include="DragDrop.fs" />
     <Compile Include="GraphPanel.fs" />
