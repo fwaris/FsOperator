@@ -19,8 +19,7 @@ module TaskTester =
     
     module internal TaskTester =
         type Msg = 
-            | StartTest 
-            | StopTest 
+            | StartStopTest 
             | Error of string
             | Update of OTask
             | Close 
@@ -32,23 +31,28 @@ module TaskTester =
                     refNode          : ONode
                     task             : IWritable<OTask>
                     running          : IWritable<bool>
-                    dispatchToRunner : Ref<TaskRunner.MsgIn -> unit>
+                    sendToRunner     : IReadable<Ref<TaskRunner.MsgIn -> unit>>
             }
 
 
-        let init (n:ONode,task:IWritable<OTask>,running:IWritable<bool>) ()=             
+        let init (n:ONode,task:IWritable<OTask>,running:IWritable<bool>,sendToRunner) ()=             
+            printfn "init TaskTester model"
             {
                 refNode = n
                 task = task
                 running = running
-                dispatchToRunner = ref(fun _ -> ())
+                sendToRunner = sendToRunner
             }, 
             Cmd.none
 
+        let startStopTest (model:Model) = 
+            let msg = if model.running.Current then TaskRunner.Stop else TaskRunner.Start
+            model.sendToRunner.Current.Value msg
+            model,Cmd.none
+
         let update (win:HostWindow,tcs:TaskCompletionSource<(ONode*ONode) option>) msg model = 
             match msg with 
-            | StopTest -> model.dispatchToRunner.Value TaskRunner.Stop; model,Cmd.none
-            | StartTest -> model.dispatchToRunner.Value TaskRunner.Start; model,Cmd.none
+            | StartStopTest -> startStopTest model
             | Update t -> model.task.Set(t); model, Cmd.none
             | Close -> tcs.SetResult(None);win.Close(); model,Cmd.none
             | Save -> tcs.SetResult(Some(model.refNode,ONode.Leaf model.task.Current));win.Close(); model,Cmd.none
@@ -63,7 +67,6 @@ module TaskTester =
             Grid.create [
                 Grid.rowDefinitions "30,30,150,*,30"
                 Grid.columnDefinitions "100,*"
-                Grid.maxHeight 700.
                 Grid.children [                
                     TextBlock.create [
                         Grid.row 0
@@ -115,7 +118,9 @@ module TaskTester =
                     TextBlock.create [
                         Grid.row 3
                         Grid.column 0
-                        TextBlock.text "CUA Instructions"                    
+                        TextBlock.text "CUA Instructions"     
+                        TextBlock.multiline true
+                        TextBlock.textWrapping TextWrapping.Wrap
                         Control.margin 2
                         Control.horizontalAlignment HorizontalAlignment.Right
                     ]
@@ -172,23 +177,30 @@ module TaskTester =
                             Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
                         ]
                     ]
+                    
                     StackPanel.create [
-                        DockPanel.dock Dock.Left;
+                        DockPanel.dock Dock.Right;
                         StackPanel.orientation Orientation.Horizontal
                         StackPanel.children [
-                            Button.create [Button.content Icons.start; Button.onClick (fun _ -> dispatch Close)]
-                            Button.create [Button.content Icons.accept; Button.onClick (fun _ -> dispatch Save)]
+                            Button.create [
+                                Button.content (if model.running.Current then Icons.stop else Icons.start)
+                                Button.onClick (fun _ -> dispatch StartStopTest)
+                            ]
                         ]
                     ]
+                    TextBlock.create [] //filler
                 ]
             ]
 
         let view model dispatch =
             Grid.create [
+                Grid.rowDefinitions "40,*"
                 Grid.columnDefinitions "2*,1*"
                 Grid.children [
+                    toolbar model dispatch
                     Border.create [
                         Grid.column 0
+                        Grid.row 1
                         Border.borderThickness 1.
                         Border.padding 5.
                         Border.cornerRadius 1.
@@ -199,13 +211,14 @@ module TaskTester =
                     ]                   
                     Border.create [
                         Grid.column 1
+                        Grid.row 1
                         Border.borderThickness 1.
                         Border.padding 5.
                         Border.cornerRadius 1.
                         Border.borderBrush Brushes.LightBlue
                         Border.background Brushes.Transparent
                         Border.clipToBounds true
-                        Border.child (TaskRunner.view (model.task,model.running,(MsgFromRunner>>dispatch),model.dispatchToRunner) )
+                        Border.child (TaskRunner.view (model.task,model.running,model.sendToRunner,(MsgFromRunner>>dispatch)))
                     ]                   
                 ]
             ]
@@ -216,10 +229,9 @@ module TaskTester =
             let t = match n with ONode.Leaf t -> t | _ -> failwith "expecting leaf node"
             let task = ctx.useState t
             let running = ctx.useState false
-            let model, dispatch = ctx.useElmish (TaskTester.init (n,task,running),  TaskTester.update (win,tcs) )
-            // The view renders the current state and dispatch function
-            let v : IView = TaskTester.view model dispatch
-            v
+            let sendToRunner = ctx.useStateLazy ((fun _ -> ref(fun (x:TaskRunner.MsgIn) -> printfn $"'{x}' was not handled correctly")),renderOnChange=false)
+            let model, dispatch = ctx.useElmish (TaskTester.init (n,task,running,sendToRunner), TaskTester.update (win,tcs) )
+            TaskTester.view model dispatch            
         )        
 
 type TaskTester(n:ONode) as this =

@@ -141,13 +141,17 @@ module TaskRunner =
             ]            
 
     // The Component wrapper: uses useElmish to run the MVU loop internally
-    let view (task:IReadable<OTask>,running:IWritable<bool>,dispatchOut:MsgOut->unit,dispatchIn:Ref<MsgIn->unit>) : IView =
+    let view (task:IReadable<OTask>,running:IWritable<bool>,sendToMe:IReadable<Ref<MsgIn->unit>>,dispatchOut:MsgOut->unit) : IView =
         Component.create($"taskRunner", fun ctx ->
             let task = ctx.usePassedRead task
             let running = ctx.usePassed running
-            let post = ref(fun m -> ())
-            let sub _ = Subscriptions.create $"taskRunner {task.Current.id}" post
-            dispatchIn.Value <- (TaskRunner.MsgIn>>post.Value)
+            let sendToMe = ctx.usePassedRead sendToMe
+            let post = ref(fun m -> printfn $"TaskRunner.view default got {m}")
+            let sub _ = 
+                Subscriptions.create $"taskRunner {task.Current.id}" 
+                    (fun poster -> 
+                        sendToMe.Current.Value <- (TaskRunner.MsgIn>>poster)
+                        post.Value <- poster)
             let model, dispatch = ctx.useElmish (TaskRunner.init (task,running,post),  TaskRunner.update dispatchOut, Program.withSubscription sub)
             // The view renders the current state and dispatch function
             TaskRunner.view model dispatch

@@ -7,10 +7,11 @@ open Elmish
 
 module Subscriptions =     
 
-    let subscribe<'msg> (name:string) (post:Ref<'msg->unit>)  =
-        let mailbox = Channel.CreateBounded<'msg>(10)
-        post.Value <- fun msg -> mailbox.Writer.TryWrite msg |> ignore
+    let subscribe<'msg> (name:string) (hookPoster:('msg->unit) -> unit)  =
         let backgroundEvent dispatch =
+            let mailbox = Channel.CreateBounded<'msg>(10)
+            let post msg = mailbox.Writer.TryWrite msg |> ignore
+            hookPoster post
             let ctx = new System.Threading.CancellationTokenSource()
             let comp =
                 async{
