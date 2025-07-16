@@ -1,82 +1,63 @@
 ﻿#load "packages.fsx"
+open System.Text.Json
+open System.Text.Json.Serialization
+open System
+open System.ComponentModel
 open FsResponses
 open FsOpCore
 open Microsoft.SemanticKernel
+open FsResponses
 
-1855.00 - 285.00
+let p1 = OPlan.sample()
+let ts = p1.root.allTasks().Head
+ts.cua
 
-let testWorkFlow() = 
-    let post x = printfn "%A" x
-    let ui = PlaywrightDriver.create()
-    let ch = Chat.Default
+let prompt1 = Prompts.renderPrompt Prompts.``divide cua instructions into granular chunks`` ( Prompts.kernelArgs [Vars.cuaInstructions, ts.cua])
 
-    let fl = TaskFlow.create post ui.driver ch
-    fl.Post TaskFlow.TFi_Start
-    fl.Terminate()
+type Status =  ToDo = 0 | Done = 1
+type CuaInstructionStep =
+    {
+        step_num: int
+        step_instructions: string
 
-let fns = OPlanMemory.functions() |> Seq.toList
-let f0 = fns.[0]
-f0.Parameters.[0]
-f0.AdditionalProperties
-f0.Description
-f0.Name
-f0.Parameters 
-
-let toFunction (metadata:KernelFunctionMetadata) =     
-    {Function.Default with 
-        name = metadata.Name
-        description = metadata.Description
-        parameters = 
-            {Parameters.Default with 
-                properties = 
-                    metadata.Parameters
-                    |> Seq.map (fun (mp:KernelParameterMetadata)  -> 
-                        mp.Name,
-                        {
-                            Property.``type`` = mp.ParameterType.Name.ToLower()
-                            Property.description = mp.Description |> checkEmpty
-                        }
-                    )
-                    |> Map.ofSeq           
-                required = 
-                    metadata.Parameters 
-                    |> Seq.choose (fun p -> if p.IsRequired then Some p.Name else None)
-                    |> Seq.toList
-            }        
+        //[<Description("0=ToDo, 1=Done")>]
+        step_status : Status
     }
 
-let kernelArgsDefault (args:(string*obj) seq) =
-    let sttngs = PromptExecutionSettings()
-    let kargs = KernelArguments(sttngs)
-    for (k,v) in args do
-        kargs.Add(k,v)
-    kargs
+type CuaInstructions = {
+    steps: CuaInstructionStep list
+}
+
+type CuaInstructionsResponse = {
+    task_complete : bool
+    cua_guidance : string
+}
+
+match RUtils.structuredFormat (typeof<CuaInstructions>) with {format=Json_schema f} -> f.schema
+
+let req =
+    {Request.Default with
+        input = [IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt1|}]}]
+        text = RUtils.structuredFormat (typeof<CuaInstructions>) |> Some
+    }
+
+let resp = (Api.create req (Api.defaultClient())).Result
+let outT = RUtils.outputText resp
+sprintf "%s" outT
+
+let serOpts =
+    let o = JsonSerializerOptions(JsonSerializerDefaults.General)
+    o.Converters.Add(JsonStringEnumConverter())
+    o.WriteIndented <- true
+    o.ReadCommentHandling <- JsonCommentHandling.Skip
+    let opts = JsonFSharpOptions.Default()
+    opts
+        .WithSkippableOptionFields(true)
+        .AddToJsonSerializerOptions(o)
+    o
+
+let steps = System.Text.Json.JsonSerializer.Deserialize<Reasoner.CuaInstructions>(outT,serOpts)
 
 
-let sch = toFunction fns.[0]
-
-let b = Kernel.CreateBuilder()
-b.Plugins.AddFromType<OPlanMemory>()
-let k = b.Build()
-let save_memory = k.Plugins.GetFunction(f0.PluginName,f0.Name)
-let get_memory = k.Plugins.GetFunction(f0.PluginName,"get_memory")
-
-let ks  : KernelArguments = kernelArgsDefault ["key","a"; "value", "b"]
-let r = save_memory.InvokeAsync(k,arguments=ks).Result
-
-open System.Collections.Generic
-open System.Text.Json
-let save_memory_arg = """{"key":"a", "value":"b"}""" |> JsonSerializer.Deserialize<IDictionary<string,obj>>
-let get_memory_arg =  """{"key":"a"}"""  |> JsonSerializer.Deserialize<IDictionary<string,obj>>
-let k2 = Kernel.CreateBuilder().Build()
-let plugin = OPlanMemory()
-k2.ImportPluginFromObject(plugin)
-k2.InvokeAsync(save_memory,KernelArguments( save_memory_arg)).Result.GetValue<string>()
-let rslt = k2.InvokeAsync(get_memory,KernelArguments(get_memory_arg)).Result
-let rslts = rslt.GetValue() |> JsonSerializer.Serialize
-let rsltso : obj = rslt.GetValue()
-JsonSerializer.Serialize(rsltso,options=FsResponses.Api.serOpts)
 
 
-
-    

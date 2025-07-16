@@ -15,6 +15,8 @@
 #r "nuget: System.Net.Http"
 #r "nuget: System.Text.RegularExpressions"
 #r "nuget: Microsoft.SemanticKernel"
+#r "nuget: Microsoft.SemanticKernel.Plugins.Core, 1.57.0-preview"
+
 //#r "nuget: WindowsInput"
 
 #r @"..\..\RTOpenAI.Api\bin\Debug\net9.0-windows10.0.19041.0\RTOpenAI.Api.dll"
@@ -24,15 +26,22 @@
 #load "..\Misc\Constants.fs"
 #load "..\Misc\Log.fs"
 #load "..\Misc\Utils.fs"
+
 #load "..\UIDrivers\UITypes.fs"
 //#load "..\UIDrivers\NativeDriver.fs" 
 #load "..\UIDrivers\PlaywrightDriver.fs"
+
 #load "..\Flows\Prompts.fs"
 #load "..\Flows\Actions.fs"
 #load "..\Flows\Workflow.fs"
-#load "..\Flows\Chat.fs"
+#load "..\Flows\ChatMsg.fs"
+#load "..\Flows\Functions.fs"
 #load "..\Flows\FlowsCommon.fs"
-#load "..\Flows\PlanFlow.fs"
-#load "..\Flows\Plan.fs"
+#load "..\Flows\TaskState.fs"
+#load "..\Flows\Reasoner.fs"
+#load "..\Flows\Cua.fs"
+#load "..\Flows\Voice.fs"
+#load "..\Flows\TaskFlowInteractive.fs"
 #load "..\Flows\TaskFlow.fs"
-
+#load "..\Flows\OTask.fs"
+#load "..\Flows\OPlan.fs"

@@ -163,3 +163,17 @@ You can follow user's direction to give CUA additional guiance by using the 'voi
 {{{{${Vars.startUrl}}}}}
 
 """
+
+    ///<summary>
+    /// Variables: <see cref="Vars.cuaInstructions" /><br />
+    ///</summary>
+    let ``divide cua instructions into granular chunks`` = $"""You are to look at a set of 
+instructions for a COMPUTER USE AGENT (CUA) task.
+CUA has the capability to perform computer actions if instructed, e.g. goto web pages and take actions such as click, type, keystrokes, etc.
+Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into smaller step-by-step instructions:
+
+[TASK_INSTRUCTIONS]
+{{{{${Vars.cuaInstructions}}}}}
+
+"""
+

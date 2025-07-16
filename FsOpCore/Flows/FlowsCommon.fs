@@ -39,6 +39,7 @@ type CuaReq =
 
 
 module FlUtils =
+    open System.Text.Json.Serialization
     ///utility operator to create default workflow states
     let (!!) s = F(s,[])
 
@@ -49,20 +50,20 @@ module FlUtils =
     }
 
     let parseMemory (memoryString:string) =
-        try 
+        try
             JsonSerializer.Deserialize<Map<string,string list>>(memoryString)
         with ext ->
-            let lines = 
+            let lines =
                 seq {
                     use rdr = new System.IO.StringReader(memoryString)
                     let mutable line = rdr.ReadLine()
-                    while line <> null do                           
-                        yield line          
-                        line <- rdr.ReadLine()              
+                    while line <> null do
+                        yield line
+                        line <- rdr.ReadLine()
                 }
                 |> Seq.toList
-            lines 
-            |> List.map (fun l -> l.Split(":")) 
+            lines
+            |> List.map (fun l -> l.Split(":"))
             |> List.map (fun xs -> if xs.Length = 1 then [|xs.[0];""|] else xs)
             |> List.map (fun xs -> xs.[0],xs.[1..] |> String.concat " ")
             |> List.groupBy fst
@@ -126,7 +127,7 @@ parseMemory "a:b:c"
     ///</summary>
     let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunctionTool |> Seq.toList
 
-    ///call an indivudal function
+    ///call an individual function
     let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
         let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
         let args = args |> Map.toSeq |> Prompts.kernelArgs
@@ -144,7 +145,7 @@ parseMemory "a:b:c"
             | _                -> None)
         |> List.tryHead
 
-    ///returns true if no compter call present
+    ///returns true if no computer call present
     let noCC resp = (computerCall resp).IsNone
 
     ///log that a message was ignored in some state
@@ -183,17 +184,33 @@ parseMemory "a:b:c"
 
     let getUsage (resp:Response) = resp.model,resp.usage
 
-    let getMemory (k:Kernel) = 
+    let getMemory (k:Kernel) =
         let svc = k.Services.GetService(typeof<Functions.FsOpMemory>)
-        let mem = 
-            if svc = Unchecked.defaultof<_> then 
+        let mem =
+            if svc = Unchecked.defaultof<_> then
                 Map.empty
-            else 
+            else
                 let svc = svc :?> Functions.FsOpMemory
                 svc.getMemory()
         Functions.FsOpMemory.Serialize(mem)
 
-//utility functions for working Responses API messsages
+
+    ///<summary>
+    ///Json serialization options suitable for deserializing OpenAI 'structured output'.<br />
+    ///Note: can use simple enums, in such types but not F# DUs
+    ///</summary>
+    let openAIResponseSerOpts =
+        let o = JsonSerializerOptions(JsonSerializerDefaults.General)
+        o.Converters.Add(JsonStringEnumConverter())
+        o.WriteIndented <- true
+        o.ReadCommentHandling <- JsonCommentHandling.Skip
+        let opts = JsonFSharpOptions.Default()
+        opts
+            .WithSkippableOptionFields(true)
+            .AddToJsonSerializerOptions(o)
+        o
+
+//utility functions for working Responses API messages
 module FlResps =
     open FsResponses
 
@@ -222,7 +239,7 @@ module FlResps =
         }
         |> Async.Start
 
-    ///extract any text message in resonse
+    ///extract any text message in response
     let extractText (response:FsResponses.Response) =
         RUtils.outputText response
         |> checkEmpty
@@ -250,30 +267,32 @@ module FlResps =
             Log.exn(ex, errMsg)
 
     ///send a request to the responses api (with retry) and post response back to input channel
-    let rec private sendWithRetry<'t> count msgWrap (replyChannel:W_Msg<'t>->unit) (req:Request) =
+    let rec private sendWithRetry count (req:Request) =
         async {
             try
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
-                replyChannel (msgWrap response)
+                return response
             with ex ->
                 if count < 5 then
                     logApiException ex
                     do! Async.Sleep 2000
-                    return! sendWithRetry (count + 1) msgWrap replyChannel req
+                    return! sendWithRetry (count + 1) req
                 else
                     Log.error $"responses api unable to reconnect aborting"
                     return raise ex
         }
 
-    ///post request to respones api
-    let sendRequest msgWrap replyChannel msg =
-        sendWithRetry 0 msgWrap replyChannel msg
+    ///post request to responses api
+    let sendReqAndReplyToChnnl msgWrap (replyChannel:W_Msg<'t>->unit) req =
+        async {
+            let! response = sendWithRetry 0 req
+            replyChannel (msgWrap response)
+        }
 
 
     ///send an initial 'computer tool call' request
     let postStartCua replyChannel cuaReq =
        let vs = cuaReq.visualState
-       //let (sanpshot,width,height,url,environment) = cuaReq.visualState
        async {
             let contImg = Input_image {|image_url = vs.snapshot|}
             let input = { Message.Default with content=[contImg]}
@@ -289,7 +308,7 @@ module FlResps =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! sendRequest W_Cua replyChannel req
+            do! sendReqAndReplyToChnnl W_Cua replyChannel req
         }
         |> catch replyChannel
 

@@ -1,8 +1,21 @@
 ﻿namespace FsOpCore
 open System
 open FsResponses
+open System.ComponentModel
 
 module Reasoner =
+
+    type Status =  ToDo = 0 | Done = 1
+    type CuaInstructionStep =
+        {
+            step_num: int
+            step_instructions: string
+            step_status : Status
+        }
+
+    type CuaInstructions = {
+        steps: CuaInstructionStep list
+    }
 
     type CuaInstructionsResponse = {
         task_complete : bool
@@ -41,7 +54,7 @@ module Reasoner =
                                 truncation = Some Truncation.auto
                                 metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                             }
-            do! FlResps.sendRequest Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
+            do! FlResps.sendReqAndReplyToChnnl Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
         }
         |> FlResps.catch task.bus.PostInput
 

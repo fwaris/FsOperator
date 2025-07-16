@@ -7,7 +7,7 @@ module Cua =
     ///if there is text content in resp then add that to chat history as asst. msg, also return the text
     let prependAsstMsg (task:TaskState<_,_>) resp =
         FlResps.extractText resp
-        |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}),Some text) 
+        |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}),Some text)
         |> Option.defaultValue (task,None)
 
     ///if there is text content in resp then add that to chat history as user msg
@@ -60,7 +60,7 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! FlResps.sendRequest W_Cua ss.bus.PostInput req
+            do! FlResps.sendReqAndReplyToChnnl W_Cua ss.bus.PostInput req
         }
         |> FlResps.catch ss.bus.PostInput
 
@@ -91,9 +91,9 @@ module Cua =
                             previous_response_id = Some cuaResp.id
                             store = true
                             model=Models.computer_use_preview
-                            truncation = Some Truncation.auto                           
+                            truncation = Some Truncation.auto
                         }
-            FlResps.sendRequest W_Cua ss.bus.PostInput req
+            FlResps.sendReqAndReplyToChnnl W_Cua ss.bus.PostInput req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch ss.bus.PostInput
