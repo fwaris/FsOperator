@@ -118,7 +118,8 @@ module TaskFlow =
             match ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
-            | Cont (ss,ms, W_App TFi_Start)  -> let! vs = snapshot ss.task.driver
+            | Cont (ss,ms, W_App TFi_Start)  -> do! ss.task.driver.start ss.task.target
+                                                let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)
                                                 let ss = ss.setTask (ss.task.prependSnapshot vs.snapshot)
                                                 FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}

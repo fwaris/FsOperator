@@ -25,13 +25,13 @@ module TaskRunner =
                     log : string list
                     action : string
                     error : string option
-                    postToSub : Ref<Msg->unit>
+                    wfReceiver : IReadable<Ref<TaskFlow.TaskFlowMsgOut->unit>>
             }
     
         let taskState memory (model:Model) =
             let task = model.task.Current
             let driver = PlaywrightDriver.create()
-            let bus = WBus.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut> (MsgFromFlow>>(model.postToSub.Value))
+            let bus = WBus.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut> model.wfReceiver.Current.Value
             let kernel = OPlan.defaultKernel memory None
             let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
             TaskState.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut>  //initial task state
@@ -44,7 +44,7 @@ module TaskRunner =
                         kernel
                         tools
 
-        let init (t,r,postToSub) ()= 
+        let init (t,r,wfReceiver) ()= 
             {
                 task        = t 
                 running     = r
@@ -52,7 +52,7 @@ module TaskRunner =
                 memory      = ""
                 action      = ""
                 error       = None
-                postToSub   = postToSub
+                wfReceiver   = wfReceiver
                 log         = []
             }, 
             Cmd.none
@@ -65,6 +65,7 @@ module TaskRunner =
                 let t = taskState mem model 
                 let flow = TaskFlow.create t
                 model.running.Set(true)
+                flow.Post TaskFlow.TaskFlowMsgIn.TFi_Start //posting this starts the flow
                 {model with flow = Some flow},Cmd.none
         
         let stopFlow (model:Model) =
@@ -112,6 +113,7 @@ module TaskRunner =
                     TextBox.create [                       
                         DockPanel.dock Dock.Top
                         TextBox.multiline true                    
+                        TextBox.acceptsReturn true
                         TextBox.height 150.
                         TextBox.text $"{model.memory}"
                         TextBox.onTextChanged (fun t ->  dispatch (SetMemory t))
@@ -140,19 +142,25 @@ module TaskRunner =
                 ]
             ]            
 
-    // The Component wrapper: uses useElmish to run the MVU loop internally
+    ///Parent component supplies IReadable,IWritable state variables that are shared with this component
     let view (task:IReadable<OTask>,running:IWritable<bool>,sendToMe:IReadable<Ref<MsgIn->unit>>,dispatchOut:MsgOut->unit) : IView =
         Component.create($"taskRunner", fun ctx ->
+            
+            //use 'usePassed/Read' hooks to re-wire this instance of the control to shared state from parent
             let task = ctx.usePassedRead task
             let running = ctx.usePassed running
-            let sendToMe = ctx.usePassedRead sendToMe
-            let post = ref(fun m -> printfn $"TaskRunner.view default got {m}")
+            let sendToMe = ctx.usePassedRead sendToMe 
+            
+            let wfSendToMe = ctx.useStateLazy((fun () ->ref(fun m -> printfn $"TaskRunner.view default got {m}")), renderOnChange=false)
+            //also create a subscription to post messages to the dispatch loop of this control,
+            //from outside the control
             let sub _ = 
                 Subscriptions.create $"taskRunner {task.Current.id}" 
-                    (fun poster -> 
-                        sendToMe.Current.Value <- (TaskRunner.MsgIn>>poster)
-                        post.Value <- poster)
-            let model, dispatch = ctx.useElmish (TaskRunner.init (task,running,post),  TaskRunner.update dispatchOut, Program.withSubscription sub)
+                    (fun poster ->                                              //this function is invoked when the scription is created
+                        sendToMe.Current.Value <- (TaskRunner.MsgIn>>poster)    //Wire the 'poster' function to parent so parent can send messages to this
+                        wfSendToMe.Current.Value <- (TaskRunner.MsgFromFlow>>poster)) //Wire the poster to receive mesages from workflow
+
+            let model, dispatch = ctx.useElmish (TaskRunner.init (task,running,wfSendToMe),  TaskRunner.update dispatchOut, Program.withSubscription sub)
             // The view renders the current state and dispatch function
             TaskRunner.view model dispatch
         )
