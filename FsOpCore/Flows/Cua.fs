@@ -3,17 +3,28 @@ open FsResponses
 
 //functions for Cua model
 module Cua =
-
     ///if there is text content in resp then add that to chat history as asst. msg, also return the text
     let prependAsstMsg (task:TaskState<_,_>) resp =
         FlResps.extractText resp
         |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}),Some text)
         |> Option.defaultValue (task,None)
 
+    ///if there is text content in resp then add that to the step chat history as asst. msg, also return the text
+    let stepPrependAsstMsg (task:TaskState<_,_>) resp =
+        FlResps.extractText resp
+        |> Option.map (fun text -> {task with steps = task.steps.PrependCuaMessage (Assistant {id=resp.id; content=text})},Some text)
+        |> Option.defaultValue (task,None)
+
     ///if there is text content in resp then add that to chat history as user msg
     let prependUserMsg (task:TaskState<_,_>) resp =
         FlResps.extractText resp
         |> Option.map (fun text -> task.prependCuaMessage (User text))
+        |> Option.defaultValue task
+
+    ///if there is text content in resp then add that to the step chat history as user msg
+    let stepPrependUserMsg (task:TaskState<_,_>) resp =
+        FlResps.extractText resp
+        |> Option.map (fun text -> {task with steps = task.steps.PrependCuaMessage (User text)})
         |> Option.defaultValue task
 
     ///handle Cua respones to potentially perform a computer call
@@ -99,11 +110,19 @@ module Cua =
         |> FlResps.catch ss.bus.PostInput
 
 
-
     ///resume with a new cua loop (after the old loop ended with no 'computer call')
     let postResumeCua task snapshot =
         async {
             let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
             FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
+        }
+        |> FlResps.catch task.bus.PostInput
+
+    ///resume with a new cua loop (after the old loop ended with no 'computer call'), for the current step
+    let postResumeCuaStep task snapshot =
+        async {
+            let chatHistory = FlResps.truncatedChatHistory (task.steps.CurrentStep() |> Option.map (fun s->s.cuaMessages) |> Option.defaultValue [])
+            let instruction = task.steps.CurrentInstruction()
+            FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=Some instruction; visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput
