@@ -132,7 +132,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
     let startTimer (n:int) (f:IFlow<_>) =
         async {
             do! Async.Sleep (n * 1000)
-            f.Post TaskFlow.TFi_EndAndReport
+            f.Post TaskFlowStepped.TFi_EndAndReport
         }
         |> Async.Start
 
@@ -170,11 +170,11 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let driver = (PlaywrightDriver.create().driver)
             let post = fun p ->
                 match p with
-                | TaskFlow.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
-                | TaskFlow.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | TaskFlow.TFo_Action a -> printfn "%A" a
-                | TaskFlow.TFo_Paused msgs -> printfn "%A" msgs
-                | TaskFlow.TFo_Usage us -> printTaskUsage us
+                | TaskFlowStepped.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
+                | TaskFlowStepped.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | TaskFlowStepped.TFo_Action a -> printfn "%A" a
+                | TaskFlowStepped.TFo_Paused msgs -> printfn "%A" msgs
+                | TaskFlowStepped.TFo_Usage us -> printTaskUsage us
             let bus = WBus.Create<_,_> post
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
@@ -185,11 +185,11 @@ Use memory_save function to save each person's linked-in and twitter data into m
                         ot.task.reasoner
                         planRun.kernel
                         ot.task.tools
-            match ot.task.target with
-            | OLink url -> do! driver.start url
-            | OProcess (a,b) -> ()
-            let flow = TaskFlow.create t0
-            flow.Post TaskFlow.TFi_Start
+            //match ot.task.target with
+            //| OLink url -> do! driver.start url
+            //| OProcess (a,b) -> ()
+            let flow = TaskFlowStepped.create t0
+            flow.Post TaskFlowStepped.TFi_Start
             startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with

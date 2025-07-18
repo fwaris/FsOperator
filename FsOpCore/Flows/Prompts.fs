@@ -44,6 +44,7 @@ module Prompts =
     /// - <see cref="Vars.cuaInstructions" /><br />
     /// - <see cref="Vars.actionHistory" />
     /// - <see cref="Vars.cuaMessageHistory" />
+    /// - <see cref="Vars.memory" />
     ///</summary>
     let ``reasoner prompt for cua guidance`` = $"""
 The Computer Use Agent (CUA) follows a set of instructions to complete a task by issuing commands like click, move, or type text based on screenshots.
@@ -80,6 +81,10 @@ To save and retrieve memory, use the functions provided.
 Extract relevant textual information from the screenshots images provided and save to memory if needed
 CUA cannot focus on the browser's address bar; to get the browser page url use the 'get_url' function.
 
+## Memory:
+You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
+However, any existing memory saved before this task is already provided in [MEMORY_CONTENTS].
+
 ## Termination
 **Check to make sure that all steps of the Task are done.**
 If the task is complete, respond accordingly.
@@ -93,10 +98,20 @@ If the task is complete, respond accordingly.
 # [ACTION_HISTROY]
 {{{{${Vars.actionHistory}}}}}
 
+# [MEMORY_CONTENTS]
+{{{{${Vars.memory}}}}}
+
 Today is {{time.today}}
 
 """
 
+    ///<summary>
+    ///Template variables: <br />
+    /// - <see cref="Vars.cuaInstructions" /><br />
+    /// - <see cref="Vars.actionHistory" />
+    /// - <see cref="Vars.cuaMessageHistory" />
+    /// - <see cref="Vars.memory" />
+    ///</summary>
     let ``resume cua after pause`` = $"""
 The Computer Use Agent (CUA) follows a set of instructions [CUA_INSTRUCTIONS] to complete a task by issuing commands like click, move, or type text based on screenshots.
 
@@ -104,11 +119,10 @@ The CUA models has moved through multiple turns but now not issued a new command
 that it might be done.
 
 Your task:
-Review the [CUA_MESSAGE_HISTORY]; [ACTION_HISTORY]; the previous screenshots in the context; and determine if the
+Review the [CUA_MESSAGE_HISTORY]; [ACTION_HISTORY]; [MEMORY_CONTENT] the previous screenshots in the context; and determine if the
 task as stated in [CUA_INSTRUCTIONS] has been accomplished.
 
 If the task has not be accomplished, issue brief instructions so that cua an continue forward to accomplish the task.
-
 
 [CUA_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
@@ -118,6 +132,9 @@ If the task has not be accomplished, issue brief instructions so that cua an con
 
 [ACTION_HISTROY]
 {{{{${Vars.actionHistory}}}}}
+
+[MEMORY_CONTENTS]
+{{{{${Vars.memory}}}}}
 
 Today is {{time.today}}
 """

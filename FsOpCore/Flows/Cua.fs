@@ -71,7 +71,7 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! FlResps.sendReqAndReplyToChnnl W_Cua ss.bus.PostInput req
+            do! FlResps.postRequestAndReplyToChannel W_Cua ss.bus.PostInput req
         }
         |> FlResps.catch ss.bus.PostInput
 
@@ -104,7 +104,7 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            FlResps.sendReqAndReplyToChnnl W_Cua ss.bus.PostInput req
+            FlResps.postRequestAndReplyToChannel W_Cua ss.bus.PostInput req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch ss.bus.PostInput
@@ -126,3 +126,5 @@ module Cua =
             FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=Some instruction; visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput
+
+

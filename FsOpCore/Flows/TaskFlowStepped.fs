@@ -78,13 +78,13 @@ module TaskFlowStepped =
             return ss
         }
 
-        let getSteps ss =
-            if ss.task.steps.steps.IsEmpty then
-                let corrId = Reasoner.breakTaskIntoSteps ss.task //ask reasoner what to do next
-                let ss = ss.setCorrId corrId
-                Some ss
+        let getOrGenerateSteps (ss:SubState) =
+            if ss.task.steps.steps.IsEmpty then 
+                let id = Reasoner.generateSteps ss.task.bus.PostInput ss.task.cuaPrompt
+                let ss = ss.setCorrId id
+                Choice1Of2 ss  //no steps yet, getting them
             else
-                None
+                Choice2Of2 ss //have steps
 
         ///matches if we guidance from reasoner before responding to CUA
         let (|GetReasonerGuidance|_|) (ss:SubState) msg =
@@ -99,7 +99,7 @@ module TaskFlowStepped =
             | _                                     -> None
 
         ///matches if reasoner response contains steps
-        let (|Steps|_|) (ss:SubState) msg =
+        let (|GotSteps|_|) (ss:SubState) msg =
             match msg with
             | W_Reasoner (id,resp) when id = ss.corrId ->
                     let text = RUtils.outputText resp
@@ -111,7 +111,6 @@ module TaskFlowStepped =
             match msg with
             | W_App (TFi_Resume tx) -> Some tx
             | _                     -> None
-
 
         ///capture common state processing here
         let rec (|Txn|TxnAsync|Cont|) (ss:SubState,msg) =
@@ -146,15 +145,15 @@ module TaskFlowStepped =
             match ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
-            | Cont (ss,ms, W_App TFi_Start)  -> let ss' = getSteps ss
+            | Cont (ss,ms, W_App TFi_Start)  -> let ss' = getOrGenerateSteps ss
                                                 do! ss.task.driver.start ss.task.target
                                                 match ss' with
-                                                | Some ss -> return F(s_start ss,ms)  //need to wait for steps
-                                                | None    -> ss.task.bus.PostInput (W_App TFi_Step)
-                                                             return F(s_step ss,ms)   //start processing steps
-            | Cont (ss,ms,Steps ss xs)       -> let ss = ss.setTask (ss.task.setSteps (xs |> List.map CuaStep.Create))
+                                                | Choice1Of2 ss -> return F(s_start ss,ms)  //no steps yet, need to wait for 'GotSteps'
+                                                | Choice2Of2 ss -> ss.task.bus.PostInput (W_App TFi_Step)
+                                                                   return F(s_step ss,ms)   //start processing steps
+            | Cont (ss,ms,GotSteps ss xs)    -> let ss = ss.setTask (ss.task.setSteps (xs |> List.map CuaStep.Create))
                                                 return F(s_step ss,ms)
-            | Cont(ss,ms,x)                  -> Log.warn $"{nameof s_start}: expecting {TFi_Start} message to start flow but got {x}"
+            | Cont(ss,ms,x)                  -> Log.warn $"{nameof s_start}: expecting TFi_Start or W_Reasoner with steps message to start flow but got {x}"
                                                 return F(s_start ss,ms)
         }
 
@@ -165,11 +164,11 @@ module TaskFlowStepped =
             | TxnAsync st                    -> return! st
             | Cont (ss,ms,W_App TFi_Step)    -> match ss.task.steps.NextToDo() with
                                                 | Some step ->
+                                                    Log.info $"step {step.step.step_num}: {step.step.step_instructions |> shorten 120}"
                                                     let ss = {ss with task.steps = ss.task.steps.SetCurrentStep step.step.step_num}
-                                                    let! ss = snapshot ss
                                                     let ss = ss.setTask (ss.task.clearReasonerHistory())
-                                                    let req = {CuaReq.Default with instructions=Some step.step.step_instructions; visualState=ss.visualState.Value}
-                                                    FlResps.postStartCua ss.task.bus.PostInput req
+                                                    let! ss = snapshot ss
+                                                    FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=ss.visualState.Value}
                                                     return F(s_cua ss,ms)
                                                 | None ->
                                                     return F(s_terminate ss,TFo_Done ss.task::ms)

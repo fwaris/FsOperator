@@ -283,7 +283,7 @@ module FlResps =
         }
 
     ///post request to responses api
-    let sendReqAndReplyToChnnl msgWrap (replyChannel:W_Msg<'t>->unit) req =
+    let postRequestAndReplyToChannel msgWrap (replyChannel:W_Msg<'t>->unit) req =
         async {
             let! response = sendWithRetry 0 req
             replyChannel (msgWrap response)
@@ -308,8 +308,7 @@ module FlResps =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! sendReqAndReplyToChnnl W_Cua replyChannel req
+            do! postRequestAndReplyToChannel W_Cua replyChannel req
         }
         |> catch replyChannel
-
 

@@ -34,7 +34,7 @@ module Reasoner =
                                 truncation = Some Truncation.auto
                                 metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                             }
-            do! FlResps.sendReqAndReplyToChnnl Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
+            do! FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
         }
         |> FlResps.catch task.bus.PostInput
 
@@ -56,7 +56,7 @@ module Reasoner =
                                 truncation = Some Truncation.auto
                                 metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                             }
-            do! FlResps.sendReqAndReplyToChnnl Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
+            do! FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
         }
         |> FlResps.catch task.bus.PostInput
 
@@ -99,6 +99,7 @@ module Reasoner =
                         Vars.cuaInstructions, task.steps.steps
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
+                        Vars.memory, FlUtils.getMemory task.kernel
                     ]
             let instructions = Prompts.renderPrompt reasonerPrompt args
             postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
@@ -122,6 +123,7 @@ module Reasoner =
                         Vars.cuaInstructions, task.cuaPrompt
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
+                        Vars.memory, FlUtils.getMemory task.kernel
                     ]
             let instructions = Prompts.renderPrompt reasonerPrompt args
             postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
@@ -145,6 +147,7 @@ module Reasoner =
                         Vars.cuaInstructions, task.cuaPrompt
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
+                        Vars.memory, FlUtils.getMemory task.kernel
                     ]
             let instructions = Prompts.renderPrompt Prompts.``resume cua after pause`` args
             postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
@@ -171,6 +174,7 @@ module Reasoner =
                         Vars.cuaInstructions, task.steps.CurrentInstruction()
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
+                        Vars.memory, FlUtils.getMemory task.kernel
                     ]
             let instructions = Prompts.renderPrompt Prompts.``resume cua after pause`` args
             postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
@@ -206,3 +210,21 @@ module Reasoner =
                 else
                     Some cuaInstr.cua_guidance
         with ex -> Some "unable to parse model response. Please retry"
+
+    ///generate finer grained steps for the cua instructions
+    let generateSteps replyChannel cuaInstructions =
+        let correlationId = newId()
+        let prompt = 
+            [Vars.cuaInstructions, cuaInstructions]  
+            |> Prompts.kernelArgs
+            |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
+        let req =
+            {Request.Default with
+                input = [IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}]
+                model = Models.o4_mini
+                metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
+                text = RUtils.structuredFormat (typeof<CuaInstructions>) |> Some
+            }
+        FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId replyChannel req
+        |> FlResps.catch replyChannel
+        correlationId
