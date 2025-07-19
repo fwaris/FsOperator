@@ -7,7 +7,7 @@ open FlUtils
 
 module TaskFlowStepped =
     ///controls how many CUA turns to do before getting reasoner guidance
-    let MAXC = 1
+    let MAXC = 5
 
     ///flow input messages
     type TaskFlowMsgIn =
@@ -80,7 +80,7 @@ module TaskFlowStepped =
 
         let getOrGenerateSteps (ss:SubState) =
             if ss.task.steps.steps.IsEmpty then 
-                let id = Reasoner.generateSteps ss.task.bus.PostInput ss.task.cuaPrompt
+                let id = Reasoner.breakTaskIntoSteps ss.task
                 let ss = ss.setCorrId id
                 Choice1Of2 ss  //no steps yet, getting them
             else
@@ -103,7 +103,13 @@ module TaskFlowStepped =
             match msg with
             | W_Reasoner (id,resp) when id = ss.corrId ->
                     let text = RUtils.outputText resp
-                    try let s = Text.Json.JsonSerializer.Deserialize<CuaInstructions>(text) in Some s.steps with _ -> None
+                    try 
+                        let s = Text.Json.JsonSerializer.Deserialize<CuaInstructions>(text, FlUtils.openAIResponseSerOpts) 
+                        s.steps |> List.iter (fun x -> Log.info $"{x.step_num}: {x.step_instructions}")
+                        Some s.steps 
+                    with ex -> 
+                        Log.exn(ex,nameof GotSteps)
+                        None
             | _ ->  None
 
         ///resume with CUA loop after receiving guidance
@@ -113,7 +119,7 @@ module TaskFlowStepped =
             | _                     -> None
 
         ///capture common state processing here
-        let rec (|Txn|TxnAsync|Cont|) (ss:SubState,msg) =
+        let rec (|Txn|TxnAsync|Cont|)  (s_ret,ss:SubState,msg) =
             let ss = ss.appendUsage msg
             match msg with
             | W_Err e                        -> let ss = ss.setError e
@@ -126,14 +132,14 @@ module TaskFlowStepped =
                                                         let! fouts = Cua.callFunctions ss.task resp
                                                         let ss = ss.setCuaResponse resp
                                                         Cua.postCuaFuncResults ss.task resp fouts
-                                                        return F(s_cua ss,[TFo_Usage ss.task.usage])
+                                                        return F(s_ret ss,[TFo_Usage ss.task.usage])
                                                     })
             | FuncCall ss.corrId (resp)      -> TxnAsync (
                                                     async {
                                                         let ss = ss.setTask (ss.task.resetReasonerState resp.id)
                                                         let! ss = ss.callFunctions resp
                                                         Reasoner.postFunctionCall ss.corrId ss.task
-                                                        return F(s_reason ss, [TFo_Usage ss.task.usage])
+                                                        return F(s_ret ss, [TFo_Usage ss.task.usage])
                                                     })
             | _                              -> Cont (ss,[TFo_Usage ss.task.usage],msg)
 
@@ -142,7 +148,7 @@ module TaskFlowStepped =
 
         and s_start ss msg = async {
             Log.info $"in {nameof s_start} task '{ss.task.id}'"
-            match ss,msg with
+            match s_start,ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
             | Cont (ss,ms, W_App TFi_Start)  -> let ss' = getOrGenerateSteps ss
@@ -152,6 +158,7 @@ module TaskFlowStepped =
                                                 | Choice2Of2 ss -> ss.task.bus.PostInput (W_App TFi_Step)
                                                                    return F(s_step ss,ms)   //start processing steps
             | Cont (ss,ms,GotSteps ss xs)    -> let ss = ss.setTask (ss.task.setSteps (xs |> List.map CuaStep.Create))
+                                                ss.task.bus.PostInput (W_App TFi_Step)
                                                 return F(s_step ss,ms)
             | Cont(ss,ms,x)                  -> Log.warn $"{nameof s_start}: expecting TFi_Start or W_Reasoner with steps message to start flow but got {x}"
                                                 return F(s_start ss,ms)
@@ -159,7 +166,7 @@ module TaskFlowStepped =
 
         and s_step ss msg = async {
             Log.info $"in {nameof s_step} task '{ss.task.id}'"
-            match ss,msg with
+            match s_step,ss,msg with
             | Txn st                         -> return st
             | TxnAsync st                    -> return! st
             | Cont (ss,ms,W_App TFi_Step)    -> match ss.task.steps.NextToDo() with
@@ -168,7 +175,13 @@ module TaskFlowStepped =
                                                     let ss = {ss with task.steps = ss.task.steps.SetCurrentStep step.step.step_num}
                                                     let ss = ss.setTask (ss.task.clearReasonerHistory())
                                                     let! ss = snapshot ss
-                                                    FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=ss.visualState.Value}
+                                                    let req =
+                                                        {CuaReq.Default with 
+                                                          instructions=(Some step.step.step_instructions)
+                                                          visualState=ss.visualState.Value
+                                                          nonCuaTools=ss.task.toolDefs |> List.map Tool.Function
+                                                        }
+                                                    FlResps.postCuaRequest ss.task.bus.PostInput req
                                                     return F(s_cua ss,ms)
                                                 | None ->
                                                     return F(s_terminate ss,TFo_Done ss.task::ms)
@@ -178,16 +191,18 @@ module TaskFlowStepped =
         and s_cua ss msg = async {
             let ss = ss.incrCuaLoopCount()
             Log.info $"in {nameof s_cua} {ss.cuaLoopCount} task '{ss.task.id}'"
-            match ss,msg with
+            match s_cua,ss,msg with
             | Txn st                                    -> return st
             | TxnAsync st                               -> return! st
 
             | Cont (ss,ms, NoComputerCall resp)         -> let ss,_ = ss.setTask2 (Cua.stepPrependAsstMsg ss.task resp)
-                                                           let corrId = Reasoner.getGuidanceAfterCuaStepPause ss.task //ask reasoner what to do next
-                                                           let ss = ss.setCorrId corrId
-                                                           return F(s_pause ss,ms)
+                                                           let ss = {ss with task.steps = ss.task.steps.AdvanceStep()}
+                                                           let ss = ss.resetCuaLoopCount()
+                                                           ss.task.bus.PostInput (W_App TFi_Step) //start next step, if any
+                                                           return F(s_step ss,ms)
             | Cont (ss,ms, GetReasonerGuidance ss resp) -> //should get guidance from reasoner before responding to CUA
-                                                           let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
+                                                           let ss = {ss with task = ss.task.clearReasonerHistory()}
+                                                           let ss,_ = ss.setTask2 (Cua.stepPrependAsstMsg ss.task resp)
                                                            let! ss = ss.performComputerCall resp
                                                            let outMsgs = if ss.visualState.IsSome then ss.lastActionM() else []
                                                            let corrId = Reasoner.getGuidanceForCuaStep ss.task ss.task.reasonerPrompt.Value
@@ -206,7 +221,7 @@ module TaskFlowStepped =
         and s_reason ss msg  = async {
             let ss = ss.resetCuaLoopCount()
             Log.info $"in {nameof s_reason} task '{ss.task.id}'"
-            match ss,msg with
+            match s_reason,ss,msg with
             | Txn st                               -> return st
             | TxnAsync st                          -> return! st
             | Cont (ss,ms,Reasoner ss.corrId resp) -> let ss = ss.setTask (ss.task.resetReasonerState resp.id)
@@ -222,30 +237,9 @@ module TaskFlowStepped =
             | Cont(ss,_,x)                         -> return ignoreMsg (s_reason ss) x (nameof s_reason)
         }
 
-        and s_pause ss msg = async {
-            Log.info $"in {nameof s_pause} task '{ss.task.id}'"
-            match ss,msg with
-            | Txn st                             -> return st
-            | TxnAsync st                        -> return! st
-            | Cont (ss,ms, Resume tx)            -> let ss = ss.setTask (ss.task.prependCuaMessage (User tx))
-                                                    let! ss = snapshot ss
-                                                    Cua.postResumeCuaStep ss.task ss.visualState.Value //resume chat (note server history is gone so use local history)
-                                                    return F(s_cua ss,ms)
-            | Cont (ss,ms, Reasoner ss.corrId resp) ->
-                                                    let ss = ss.setTask (ss.task.resetReasonerState resp.id)
-                                                    match Reasoner.reasonerGuidance resp with
-                                                    | None ->
-                                                            Log.info $"task {ss.task.id} completed"
-                                                            return F(s_terminate ss, [TFo_Done ss.task])
-                                                    | Some guidance ->
-                                                            ss.task.bus.PostInput (W_App (TFi_Resume guidance))
-                                                            return F(s_pause ss,ms)
-            | Cont (ss,_,x)                         -> return ignoreMsg (s_pause ss) x (nameof s_pause)
-        }
-
         and s_summarizing ss msg = async {
             Log.info $"in {nameof s_summarizing} task '{ss.task.id}'"
-            match ss,msg with
+            match s_summarizing,ss,msg with
             | Txn st                                -> return st
             | TxnAsync st                           -> return! st
             | Cont (ss,ms, Reasoner ss.corrId resp) -> let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp)

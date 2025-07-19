@@ -287,16 +287,16 @@ module FlResps =
         async {
             let! response = sendWithRetry 0 req
             replyChannel (msgWrap response)
+
         }
 
-
-    ///send an initial 'computer tool call' request
-    let postStartCua replyChannel cuaReq =
+    ///send a cua request 'computer tool call' request
+    let postCuaRequest replyChannel cuaReq =
        let vs = cuaReq.visualState
        async {
             let contImg = Input_image {|image_url = vs.snapshot|}
             let input = { Message.Default with content=[contImg]}
-            let cuaTool = Tool_Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
+            let cuaTool = Tool.Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
             let req = {Request.Default with
                             input = [IOitem.Message input] @ (cuaReq.chatHistory |> List.map IOitem.Message)
                             tools= cuaTool :: cuaReq.nonCuaTools
@@ -311,4 +311,5 @@ module FlResps =
             do! postRequestAndReplyToChannel W_Cua replyChannel req
         }
         |> catch replyChannel
+
 

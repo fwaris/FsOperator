@@ -57,8 +57,8 @@ module Voice =
         |> SessionUpdate
 
     let voiceTools = lazy(
-        let tools = FlUtils.makeFunctionTools<Functions.FsOpVoice>() |> List.map FsResponses.Tool_Function
-        tools |> List.choose (function FsResponses.Tool_Function f -> toVoiceTool f |> Some | _ -> None))
+        let tools = FlUtils.makeFunctionTools<Functions.FsOpVoice>() |> List.map FsResponses.Tool.Function
+        tools |> List.choose (function FsResponses.Tool.Function f -> toVoiceTool f |> Some | _ -> None))
 
     let sendUpdateSession instructions conn session =
         session

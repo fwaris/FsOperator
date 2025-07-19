@@ -105,13 +105,14 @@ type Function =
     }
     static member Default = {name = ""; description = ""; parameters = Parameters.Default; strict=true}
 
+[<RequireQualifiedAccess>]
 type Tool =
-  | [<JsonName "file_search" >] Tool_File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
-  | [<JsonName "function" >] Tool_Function of Function
-  | [<JsonName "web_search_preview" >] Tool_Web_search of {|search_context_size : string; user_location : User_Location option|}
-  | [<JsonName "computer_use_preview" >] Tool_Computer_use of {|display_height : int; display_width: int; environment:string;|}
+  | [<JsonName "file_search" >] File_search of {|vector_store_ids : string list; filters: JsonElement option; maximum_num_results: int option; ranking_options : JsonElement option|}
+  | [<JsonName "function" >] Function of Function
+  | [<JsonName "web_search_preview" >] Web_search of {|search_context_size : string; user_location : User_Location option|}
+  | [<JsonName "computer_use_preview" >] Computer_use of {|display_height : int; display_width: int; environment:string;|}
 with
-    static member DefaultWebSearch = Tool_Web_search {|search_context_size=SearchSizeContextSize.medium; user_location = None|}
+    static member DefaultWebSearch = Tool.Web_search {|search_context_size=SearchSizeContextSize.medium; user_location = None|}
 
 type OutputText = {
     text : string

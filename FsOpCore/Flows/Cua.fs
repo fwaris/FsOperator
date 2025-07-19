@@ -77,11 +77,12 @@ module Cua =
 
 
     ///send the results of performing action to cua (along with optional additional guidance)
-    let postCuaNext ss vs (cuaResp:Response) cuaInstr =
+    let postCuaNext task vs (cuaResp:Response) cuaInstr =
 
         match vs, FlUtils.computerCall cuaResp with
         | Some vs, Some cc ->
-            let cuaTool = Tool_Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
+            let cuaTool = Tool.Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
+            let otherTools = task.toolDefs |> List.map Tool.Function
             let cc_out =
                 {
                     call_id = cc.call_id
@@ -98,23 +99,23 @@ module Cua =
                     [cc_out;IOitem.Message textMsg]
                 | None -> [cc_out]
             let req = {Request.Default with
-                            input = input; tools=[cuaTool]
+                            input = input; tools= cuaTool::otherTools
                             previous_response_id = Some cuaResp.id
                             store = true
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            FlResps.postRequestAndReplyToChannel W_Cua ss.bus.PostInput req
+            FlResps.postRequestAndReplyToChannel W_Cua task.bus.PostInput req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
-        |> FlResps.catch ss.bus.PostInput
+        |> FlResps.catch task.bus.PostInput
 
 
     ///resume with a new cua loop (after the old loop ended with no 'computer call')
     let postResumeCua task snapshot =
         async {
             let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
-            FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
+            FlResps.postCuaRequest task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput
 
@@ -123,8 +124,6 @@ module Cua =
         async {
             let chatHistory = FlResps.truncatedChatHistory (task.steps.CurrentStep() |> Option.map (fun s->s.cuaMessages) |> Option.defaultValue [])
             let instruction = task.steps.CurrentInstruction()
-            FlResps.postStartCua task.bus.PostInput {CuaReq.Default with instructions=Some instruction; visualState=snapshot; chatHistory=chatHistory}
+            FlResps.postCuaRequest task.bus.PostInput {CuaReq.Default with instructions=Some instruction; visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput
-
-

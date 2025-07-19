@@ -27,7 +27,7 @@ module Reasoner =
             let req = {Request.Default with
                                 input = List.rev task.reasonerItems
                                 instructions = None
-                                tools = task.toolDefs |> List.map Tool_Function
+                                tools = task.toolDefs |> List.map Tool.Function
                                 previous_response_id = task.reasonerPrevId
                                 store = true
                                 model=Models.o4_mini
@@ -48,7 +48,7 @@ module Reasoner =
             let req = {Request.Default with
                                 input = List.rev task.reasonerItems
                                 instructions = reasonerInstructions
-                                tools = task.toolDefs |> List.map Tool_Function
+                                tools = task.toolDefs |> List.map Tool.Function
                                 previous_response_id = task.reasonerPrevId
                                 store = true
                                 model=Models.o4_mini
@@ -60,14 +60,22 @@ module Reasoner =
         }
         |> FlResps.catch task.bus.PostInput
 
-    ///cua may be stuck; use this to terminate early and summarize the progress the plan can continue
-    let stopAndSummarize task =
-        let id = newId()
-        Prompts.kernelArgs [Vars.taskInstructions,task.cuaPrompt]
-        |> Prompts.renderPrompt Prompts.``cua early termination prompt``
-        |> Some
-        |> postToReasoner id task None
-        id
+    ///<summary>
+    ///Send a request to the reasoner model with the give correlationId (returned in response).<br />
+    ///The request 'input' items are obtained from <see cref="TaskState.reasonerState" />
+    ///</summary>
+    let postPromptToReasoner correlationId task (responseFormat : Type option) prompt  =
+        async {
+            let req =
+                {Request.Default with
+                    input = [IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}]
+                    model = Models.o4_mini
+                    metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
+                    text = responseFormat |> Option.map (fun t -> RUtils.structuredFormat t) 
+                }
+            do! FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
+        }
+        |> FlResps.catch task.bus.PostInput
 
     ///cua may be stuck; use this to terminate early and summarize the progress the plan can continue
     let stopAndSummarizeStep task =
@@ -79,8 +87,21 @@ module Reasoner =
         ]
         |> Prompts.kernelArgs
         |> Prompts.renderPrompt Prompts.``cua early termination prompt step``
-        |> Some
-        |> postToReasoner id task None
+        |> postPromptToReasoner id task None
+        id
+
+    ///ask reasoner to break the CUA instructions into multiple smaller steps
+    let breakTaskIntoSteps task =
+        let id = newId()
+        async {
+            [
+                Vars.cuaInstructions, task.cuaPrompt :> obj
+            ]
+            |> Prompts.kernelArgs
+            |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
+            |> postPromptToReasoner id task (Some typeof<CuaInstructions>)
+        }
+        |> FlResps.catch task.bus.PostInput
         id
 
     ///send message to reasoner to get guidance for cua for
@@ -88,7 +109,9 @@ module Reasoner =
         let id = newId()
         async {
             let cuaMessageHistory =
-                task.cuaMessages
+                task.steps.CurrentStep()
+                |> Option.map(fun s -> s.cuaMessages)
+                |> Option.defaultValue []
                 |> List.map (function
                     | User c -> $"user: {c}"
                     | Assistant m -> $"assistant: {m.content}")
@@ -96,7 +119,7 @@ module Reasoner =
             let args =
                 Prompts.kernelArgs
                     [
-                        Vars.cuaInstructions, task.steps.steps
+                        Vars.cuaInstructions, task.steps.CurrentInstruction()
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
                         Vars.memory, FlUtils.getMemory task.kernel
@@ -182,21 +205,6 @@ module Reasoner =
         |> FlResps.catch task.bus.PostInput
         id
 
-    ///ask reasoner to break the CUA instructions into multiple smaller steps
-    let breakTaskIntoSteps task =
-        let id = newId()
-        async {
-            let args =
-                Prompts.kernelArgs
-                    [
-                        Vars.cuaInstructions, task.cuaPrompt
-                    ]
-            let instructions = Prompts.renderPrompt Prompts.``divide cua instructions into steps`` args
-            postToReasoner id task (Some typeof<CuaInstructions>) (Some instructions)
-        }
-        |> FlResps.catch task.bus.PostInput
-        id
-
     ///returns None if reasoner says task is done otherwise Some 'new instructions'
     let reasonerGuidance resp =
         try
@@ -211,20 +219,13 @@ module Reasoner =
                     Some cuaInstr.cua_guidance
         with ex -> Some "unable to parse model response. Please retry"
 
-    ///generate finer grained steps for the cua instructions
-    let generateSteps replyChannel cuaInstructions =
-        let correlationId = newId()
-        let prompt = 
-            [Vars.cuaInstructions, cuaInstructions]  
-            |> Prompts.kernelArgs
-            |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
-        let req =
-            {Request.Default with
-                input = [IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}]
-                model = Models.o4_mini
-                metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
-                text = RUtils.structuredFormat (typeof<CuaInstructions>) |> Some
-            }
-        FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId replyChannel req
-        |> FlResps.catch replyChannel
-        correlationId
+
+    ///cua may be stuck; use this to terminate early and summarize the progress the plan can continue
+    let stopAndSummarize task =
+        let id = newId()
+        Prompts.kernelArgs [Vars.taskInstructions,task.cuaPrompt]
+        |> Prompts.renderPrompt Prompts.``cua early termination prompt``
+        |> Some
+        |> postToReasoner id task None
+        id
+

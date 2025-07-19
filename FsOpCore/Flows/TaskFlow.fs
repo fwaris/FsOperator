@@ -122,7 +122,7 @@ module TaskFlow =
                                                 let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)
                                                 let ss = ss.setTask (ss.task.prependSnapshot vs.snapshot)
-                                                FlResps.postStartCua ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}
+                                                FlResps.postCuaRequest ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}
                                                 return F(s_cua ss,ms)
             | Cont(ss,ms,x)                  -> Log.warn $"{nameof s_start}: expecting {TFi_Start} message to start flow but got {x}"
                                                 return !!(s_start ss)

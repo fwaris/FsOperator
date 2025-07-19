@@ -85,6 +85,8 @@ CUA cannot focus on the browser's address bar; to get the browser page url use t
 You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
 However, any existing memory saved before this task is already provided in [MEMORY_CONTENTS].
 
+Assume that CUA only has access to a Web Brower (not the whole computer).
+
 ## Termination
 **Check to make sure that all steps of the Task are done.**
 If the task is complete, respond accordingly.
@@ -220,7 +222,10 @@ You can follow user's direction to give CUA additional guiance by using the 'voi
     let ``divide cua instructions into steps`` = $"""You are to look at a set of
 instructions for a COMPUTER USE AGENT (CUA) task.
 CUA has the capability to perform computer actions if instructed, e.g. goto web pages and take actions such as click, type, keystrokes, etc.
-Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into smaller step-by-step instructions:
+Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into more granular instructions, if required. 
+Assume that the CUA is starting at the target page.
+
+Stay true to the [TASK_INSTRUCTIONS].
 
 [TASK_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}
