@@ -303,6 +303,7 @@ module FlResps =
                             instructions = cuaReq.instructions
                             previous_response_id = None
                             store = true
+                            tool_choice = ToolChoice.Required
                             temperature = temperature
                             reasoning = Some {Reasoning.Default with effort=Some Reasoning.Medium}
                             model=Models.computer_use_preview
@@ -311,5 +312,4 @@ module FlResps =
             do! postRequestAndReplyToChannel W_Cua replyChannel req
         }
         |> catch replyChannel
-
 

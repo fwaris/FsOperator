@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open System
+open System.Text.Json
 open FsResponses
 open System.ComponentModel
 
@@ -96,6 +97,49 @@ module Reasoner =
         async {
             [
                 Vars.cuaInstructions, task.cuaPrompt :> obj
+            ]
+            |> Prompts.kernelArgs
+            |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
+            |> postPromptToReasoner id task (Some typeof<CuaInstructions>)
+        }
+        |> FlResps.catch task.bus.PostInput
+        id
+
+
+    let postUpdateSteps task =
+        let correlationId = newId()
+        async {
+            let prompt = 
+                [
+                    Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
+                ]
+                |> Prompts.kernelArgs
+                |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
+            
+            let inp = IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}
+
+            let req = {Request.Default with
+                                input = inp :: List.rev task.reasonerItems
+                                tools = task.toolDefs |> List.map Tool.Function
+                                previous_response_id = task.reasonerPrevId
+                                store = true
+                                model=Models.o4_mini
+                                text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
+                                truncation = Some Truncation.auto
+                                metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
+                      }
+            do! FlResps.postRequestAndReplyToChannel Workflow.ReasonerMsgWithCorrId task.bus.PostInput req
+        }
+        |> FlResps.catch task.bus.PostInput
+        correlationId
+
+
+    ///ask reasoner to break the CUA instructions into multiple smaller steps
+    let postUpdateSteps_ task =
+        let id = newId()
+        async {
+            [
+                Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
             ]
             |> Prompts.kernelArgs
             |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``

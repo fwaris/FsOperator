@@ -27,22 +27,26 @@ module Cua =
         |> Option.map (fun text -> {task with steps = task.steps.PrependCuaMessage (User text)})
         |> Option.defaultValue task
 
+    let snapshot task = async {
+        let! visualState = FlUtils.snapshot task.driver
+        let task = task.prependSnapshot visualState.snapshot //save screenshot for reasoner also
+        return task,visualState
+    }
+
     ///handle Cua respones to potentially perform a computer call
-    let performComputerCall task resp = async {
+    let doActionAndSnapshot task resp = async {
         //process computer call
         let! (ss,visualState) =
             match FlUtils.computerCall resp with
             | Some cb ->
                 async {
                     do! Actions.doAction 2 task.driver cb.action
-                    let! visualState = FlUtils.snapshot task.driver
-                    let task = task.prependSnapshot visualState.snapshot //save screenshot for reasoner also
+                    let! task,visualState = snapshot task
                     let actStr = Actions.actionToString cb.action
                     let task = task.prependAction actStr
                     return task,Some visualState
                 }
             | None -> async{ return task,None }
-
         return ss,visualState
     }
 
@@ -62,18 +66,19 @@ module Cua =
     }
 
     ///send the function call results back to CUA model
-    let postCuaFuncResults ss (cuaResp:FsResponses.Response) fnouts =
+    let postCuaFuncResults id task (cuaResp:FsResponses.Response) fnouts =
         async {
             let req = {Request.Default with
                             input = fnouts
                             previous_response_id = Some cuaResp.id
                             store = true
+                            metadata = [C.CORR_ID,id] |> Map.ofList |> Some
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! FlResps.postRequestAndReplyToChannel W_Cua ss.bus.PostInput req
+            do! FlResps.postRequestAndReplyToChannel W_Cua task.bus.PostInput req
         }
-        |> FlResps.catch ss.bus.PostInput
+        |> FlResps.catch task.bus.PostInput
 
 
     ///send the results of performing action to cua (along with optional additional guidance)
@@ -102,6 +107,7 @@ module Cua =
                             input = input; tools= cuaTool::otherTools
                             previous_response_id = Some cuaResp.id
                             store = true
+                            tool_choice = ToolChoice.Required
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }

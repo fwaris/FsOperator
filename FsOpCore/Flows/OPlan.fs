@@ -224,10 +224,14 @@ Use memory_save function to save each person's linked-in and twitter data into m
         match build with Some build -> build b | _ -> ()
         let nav = Functions.FsOpNavigator()
         let mem = Functions.FsOpMemory()
+        let ttls = Functions.FsOpTaskTools()
         mem.SetMemory initialMemory
+        b.Plugins.AddFromObject(ttls) |> ignore
         b.Plugins.AddFromObject(mem) |> ignore
         b.Plugins.AddFromObject(nav) |> ignore
-        b.Services.AddSingleton(nav) |> ignore
+        //some of the plugins are also added as services so that they can be accessed internally
+        b.Services.AddSingleton(nav) |> ignore 
+        b.Services.AddSingleton(ttls) |> ignore
         b.Build()
 
     let rec run planRun = async {

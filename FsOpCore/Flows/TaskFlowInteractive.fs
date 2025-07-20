@@ -89,8 +89,14 @@ module TaskFlowInteractive =
 
             member this.performComputerCall resp =
                 async{
-                    let! t,vstate = Cua.performComputerCall this.task resp
+                    let! t,vstate = Cua.doActionAndSnapshot this.task resp
                     return {this with task = t; visualState=vstate}
+                }
+
+            member this.snapshot() =
+                async{
+                    let! t,vstate = Cua.snapshot this.task
+                    return {this with task = t; visualState=Some vstate}
                 }
 
             member this.callFunctions resp =
@@ -135,7 +141,7 @@ module TaskFlowInteractive =
                                                     async {
                                                         let! fouts = Cua.callFunctions ss.task resp
                                                         let ss = ss.setCuaResponse resp
-                                                        Cua.postCuaFuncResults ss.task resp fouts
+                                                        Cua.postCuaFuncResults ss.corrId ss.task resp fouts
                                                         return F(s_cua ss,[TFo_Usage ss.task.usage])
                                                     })
             | FuncCall ss.corrId (resp)      -> TxnAsync (

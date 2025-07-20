@@ -9,7 +9,7 @@ let runPlan = SpreadsheetToEmailPlan.create()
 //let runPlan = TimesheetPlan.create()
 //let runPlan = OPlan.sample()
 
-//FsResponses.Log.debug_logging <- true
+//Responses.Log.debug_logging <- true
 
 let initMem = 
     """

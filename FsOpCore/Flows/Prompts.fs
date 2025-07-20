@@ -11,6 +11,8 @@ module Vars =
     let steps = "steps"
     let memory = "memory"
     let startUrl = "startUrl"
+    let currentStep = "stepCurrentTask"
+    let taskSteps = "stepAllTasks" 
 
 ///a collection of default prompts for various uses and some prompt utilities
 module Prompts =
@@ -38,6 +40,68 @@ module Prompts =
             let! rslt = pt.RenderAsync(k,args) |> Async.AwaitTask
             return rslt
         }).Result //async not needed as all local
+
+
+
+    //a modification of OAI sample: see https://github.com/openai/openai-testing-agent-demo
+    ///<summary>
+    ///Template variables: <br />
+    /// - <see cref="Vars.currentStep" /><br />
+    /// - <see cref="Vars.taskSteps" />
+    /// - <see cref="Vars.memory" />
+    ///</summary>
+    let ``cua prompt`` = $"""
+You will be given a list of instructions with steps to operate a web application. 
+You will need to navigate the web application and perform the actions described in the [CURRENT_STEP].
+The complete steps in the current task are given under [TASK_STEPS].
+
+Try to accomplish the [CURRENT_STEP] in the simplest way possible.
+Once you believe your are done with all the tasks required or you are blocked and cannot progress
+(for example, you have tried multiple times to accomplish a task but keep getting errors or blocked),
+use the task_done tool to let the user know you have finished the task.
+You do not need to authenticate on user's behalf, the user will authenticate and your flow starts after that.`;
+
+## Memory:
+You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
+However, any existing memory saved before this task is already provided in [MEMORY_CONTENTS].
+Use the memory functions to save any additional content as per [TASK_STEPS].
+
+# [CURRENT_STEP]
+{{{{${Vars.currentStep}}}}}
+
+# [TASK_STEPS]
+{{{{${Vars.taskSteps}}}}}
+
+# [MEMORY_CONTENTS]
+{{{{${Vars.memory}}}}}
+
+"""
+
+    //a modification of OAI sample: see https://github.com/openai/openai-testing-agent-demo
+    ///<summary>
+    ///Template variables: <br />
+    /// - <see cref="Vars.currentStep" /><br />
+    /// - <see cref="Vars.taskSteps" />
+    /// - <see cref="Vars.memory" />
+    ///</summary>
+    let ``review states`` = $"""
+Your job is to review the steps and the accompanying screenshots to determine which of the steps have been completed.
+
+# Schema of the Step
+type Status =  ToDo = 0 | Done = 1
+type CuaInstructionStep =
+{{ 
+    step_num: int
+    step_instructions: string
+    step_status : Status
+}}
+
+[STEPS]
+{{{{${Vars.steps}}}}}
+
+ Do not add or remove any steps. Do not modify any step that already has a "Done" status. Keep "ToDo" steps as needed. 
+  Keep the same step_number order.
+"""
 
     ///<summary>
     ///Template variables: <br />

@@ -221,6 +221,13 @@ type Usage =
         total_tokens : int    
     }
 
+[<RequireQualifiedAccess>]
+[<JsonFSharpConverter(UnionUnwrapFieldlessTags=true)>]
+type ToolChoice = 
+| [<JsonName "none">]      None
+| [<JsonName "auto" >]     Auto
+| [<JsonName "required" >] Required
+
 type Request = {
     model : string
     input : IOitem list
@@ -235,7 +242,7 @@ type Request = {
     stream : bool
     temperature : float32
     text : TextOutput option
-    tool_choice : string //none; auto; required
+    tool_choice : ToolChoice
     tools : Tool list
     top_p : float32
     truncation : string option //auto, disabled
@@ -255,7 +262,7 @@ type Request = {
             stream = false
             temperature = 1.0f
             text = None
-            tool_choice = "auto"
+            tool_choice = ToolChoice.Auto
             tools = []
             top_p = 1.0f
             truncation = None
@@ -410,6 +417,7 @@ module Api =
                 .WithUnionTagCaseInsensitive()
                 .WithAllowNullFields()
                 .WithAllowOverride()
+                .WithUnionUnwrapFieldlessTags()
                 .ToJsonSerializerOptions()
         opts.WriteIndented <- true
         opts

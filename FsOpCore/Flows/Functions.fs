@@ -4,6 +4,10 @@ open Microsoft.SemanticKernel
 open System.ComponentModel
 open System.Text.Json
 
+(*
+Put all function tools here as SK plugins
+*)
+
 ///plugin that provides navigation related functions
 type FsOpNavigator() =
     let startUrl:Ref<string> = ref Unchecked.defaultof<_>
@@ -117,6 +121,7 @@ type FsOpMemory() =
     member this.getMemory() = bag
 
 
+///Implmentation of voice functions that can be attached to the FsOpVoice 'wrapper' plugin
 type VoiceFuncImpl = {
     gotoUrl : string -> Async<unit>
     addGuidance : string -> Async<unit>
@@ -151,5 +156,29 @@ type FsOpVoice() = //need parameterless constructor so SK can extract function t
             with ex ->
                 Log.exn(ex, nameof this.addGuidance)
                 return $"addGuidance failed: {ex.Message}"
+        }
+        Async.StartAsTask comp
+
+///Implmentation of task functions that can be attached to the FsOpTaskTools 'wrapper' plugin
+type TaskToolImpl = {
+    taskDone : unit -> Async<unit>
+}
+
+///Semantic kernel 'plugin' class that implements task related functions
+type FsOpTaskTools() = //need parameterless constructor so SK can extract function tool defs by dynamically creating an instance of this class
+    let taskToolFuncs = ref Unchecked.defaultof<_>
+
+    member this.SetFunctions(ttls:TaskToolImpl) = taskToolFuncs.Value <- ttls
+
+    [<KernelFunction("task_done")>]
+    [<Description("Mark the current task as done")>]
+    member this.task_done() = 
+        let comp = async {
+            try
+                do! taskToolFuncs.Value.taskDone()
+                return "task marked done"
+            with ex ->
+                Log.exn(ex, nameof this.task_done)
+                return $"error occured while try"
         }
         Async.StartAsTask comp
