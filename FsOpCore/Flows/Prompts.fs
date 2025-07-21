@@ -52,22 +52,18 @@ module Prompts =
     ///</summary>
     let ``cua prompt`` = $"""
 You will be given a list of instructions with steps to operate a web application. 
-You will need to navigate the web application and perform the actions described in the [CURRENT_STEP].
 The complete steps in the current task are given under [TASK_STEPS].
 
-Try to accomplish the [CURRENT_STEP] in the simplest way possible.
+Try to accomplish the steps in the simplest way possible.
 Once you believe your are done with all the tasks required or you are blocked and cannot progress
 (for example, you have tried multiple times to accomplish a task but keep getting errors or blocked),
 use the task_done tool to let the user know you have finished the task.
-You do not need to authenticate on user's behalf, the user will authenticate and your flow starts after that.`;
 
-## Memory:
-You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
-However, any existing memory saved before this task is already provided in [MEMORY_CONTENTS].
-Use the memory functions to save any additional content as per [TASK_STEPS].
+# Normally, you do not need to authenticate on user's behalf, the user will authenticate and your flow starts after that.
 
-# [CURRENT_STEP]
-{{{{${Vars.currentStep}}}}}
+# Memory:
+You can read/write from/to memory using the **xxx_memory tools** provided to save relevant facts for later tasks and steps.
+However, any existing memory saved before this step is already provided in [MEMORY_CONTENTS].
 
 # [TASK_STEPS]
 {{{{${Vars.taskSteps}}}}}
@@ -80,14 +76,15 @@ Use the memory functions to save any additional content as per [TASK_STEPS].
     //a modification of OAI sample: see https://github.com/openai/openai-testing-agent-demo
     ///<summary>
     ///Template variables: <br />
-    /// - <see cref="Vars.currentStep" /><br />
-    /// - <see cref="Vars.taskSteps" />
-    /// - <see cref="Vars.memory" />
+    /// - <see cref="Vars.steps" /><br />
+    /// - <see cref="Vars.memory" /><br />
+    /// - <see cref="Vars.actionHistory" />
     ///</summary>
     let ``review steps`` = $"""
-Your job is to review the steps and the accompanying screenshots to determine which of the steps have been completed.
+Your job is to review the list of CUA [STEPS], the accompanying screenshots, CUA [ACTION_HISTORY] and the [MEMORY_CONTENTS] to determine which of the steps have been completed.
 
 # Schema of the Step
+```F#
 type Status =  ToDo = 0 | Done = 1
 type CuaInstructionStep =
 {{ 
@@ -95,12 +92,26 @@ type CuaInstructionStep =
     step_instructions: string
     step_status : Status
 }}
+```
+
+# Step Instructions
+Do not add or remove any steps. 
+Keep the same step_number order.
+Do not modify any step that already has a "Done" status. 
+if you think a step is done then mark it as 'Done'. 
+You may modify the instructions of the ToDo steps as per the current context.
+
+# Memory instructions
+If you feel CUA is not commiting the facts to memory, use the xxx_memory tools to save relevant facts to memory for future needs.
 
 [STEPS]
 {{{{${Vars.steps}}}}}
 
- Do not add or remove any steps. Do not modify any step that already has a "Done" status. Keep "ToDo" steps as needed. 
-  Keep the same step_number order.
+[MEMORY_CONTENTS]
+{{{{${Vars.memory}}}}}
+
+[ACTION_HISTORY] 
+{{{{${Vars.actionHistory}}}}}
 """
 
     ///<summary>
@@ -286,7 +297,10 @@ You can follow user's direction to give CUA additional guiance by using the 'voi
     let ``divide cua instructions into steps`` = $"""You are to look at a set of
 instructions for a COMPUTER USE AGENT (CUA) task.
 CUA has the capability to perform computer actions if instructed, e.g. goto web pages and take actions such as click, type, keystrokes, etc.
-Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into more granular instructions, if required. 
+Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into more granular instructions, if required.
+
+Create the minimum number of steps possible. If the task is very simple, create only one step.
+
 Assume that the CUA is starting at the target page.
 
 Stay true to the [TASK_INSTRUCTIONS].

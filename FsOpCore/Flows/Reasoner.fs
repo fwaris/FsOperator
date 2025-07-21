@@ -71,6 +71,7 @@ module Reasoner =
                 {Request.Default with
                     input = [IOitem.Message (Message.OfText prompt)]
                     model = Models.o4_mini
+                    store = true
                     metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                     text = responseFormat |> Option.map (fun t -> RUtils.structuredFormat t) 
                 }
@@ -112,6 +113,7 @@ module Reasoner =
             let prompt = 
                 [
                     Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
+                    Vars.memory, FlUtils.getMemory task.kernel
                 ]
                 |> Prompts.kernelArgs
                 |> Prompts.renderPrompt Prompts.``review steps``
@@ -119,9 +121,11 @@ module Reasoner =
             let inp = IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}
 
             let req = {Request.Default with
-                                input = inp :: List.rev task.reasonerItems                                
+                                input = inp :: List.rev task.reasonerItems
+                                tools = task.toolDefs |> List.map Tool.Function
                                 previous_response_id = task.reasonerPrevId
                                 store = true
+                                parallel_tool_calls = true
                                 model=Models.o4_mini
                                 text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
                                 truncation = Some Truncation.auto

@@ -180,7 +180,7 @@ parseMemory "a:b:c"
     ///Cua message with no computer call requested
     let (|NoComputerCall|_|) = function
         | W_Cua (resp) when noCC resp -> Some resp
-        | _                            -> None
+        | _                           -> None
 
     let getUsage (resp:Response) = resp.model,resp.usage
 
@@ -272,10 +272,13 @@ module FlResps =
             try
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
                 return response
-            with ex ->
+            with ex -> 
+                match ex with 
+                | :? NoFuncCallOuput as ex -> Log.info "Api was expecting function call output(s) which are not provided"
+                | _                        -> ()                
                 if count < 5 then
                     logApiException ex
-                    do! Async.Sleep 2000
+                    do! Async.Sleep 3000
                     return! sendWithRetry (count + 1) req
                 else
                     Log.error $"responses api unable to reconnect aborting"
@@ -283,15 +286,14 @@ module FlResps =
         }
 
     ///post request to responses api
-    let postRequestAndReplyToChannel msgWrap (replyChannel:W_Msg<'t>->unit) req =
+    let postRequestAndReplyToChannel msgWrap replyChannel req =
         async {
             let! response = sendWithRetry 0 req
             replyChannel (msgWrap response)
-
         }
 
-    ///send a cua request 'computer tool call' request
-    let postCuaRequest replyChannel cuaReq =
+    ///send a new cua request with 'computer tool call' - no prev state or history
+    let postStartCuaRequest replyChannel cuaReq =
        let vs = cuaReq.visualState
        async {
             let contImg = Content.Input_image {|image_url = vs.snapshot|}

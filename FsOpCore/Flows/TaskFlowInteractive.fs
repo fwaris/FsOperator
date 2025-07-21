@@ -137,13 +137,6 @@ module TaskFlowInteractive =
             | W_App TFi_EndAndReport         -> let corrId = Reasoner.stopAndSummarize ss.task
                                                 let ss = ss.setCorrId corrId
                                                 Txn(F(s_summarizing ss,[TFo_Usage ss.task.usage]))
-            | Cua_FuncCall (resp)            -> TxnAsync (
-                                                    async {
-                                                        let! fouts = Cua.callFunctions ss.task resp
-                                                        let ss = ss.setCuaResponse resp
-                                                        Cua.postCuaFuncResults ss.task resp fouts
-                                                        return F(s_cua ss,[TFo_Usage ss.task.usage])
-                                                    })
             | FuncCall (corrId,resp)        -> TxnAsync (
                                                     async {
                                                         let ss = ss.setTask (ss.task.resetReasonerState resp.id)
@@ -223,7 +216,7 @@ module TaskFlowInteractive =
                                                 let! vs = snapshot ss.task.driver
                                                 let ss = ss.setVisualState (Some vs)
                                                 let ss = ss.setTask (ss.task.prependSnapshot vs.snapshot)
-                                                FlResps.postCuaRequest ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}
+                                                FlResps.postStartCuaRequest ss.task.bus.PostInput {CuaReq.Default with instructions=(Some ss.task.cuaPrompt); visualState=vs}
                                                 return F(s_cua ss,ms)
             | Cont(ss,ms,x)                  -> Log.warn $"{nameof s_start}: expecting TFi_Start, TFi_Prime, got {x}"
                                                 return !!(s_start ss)

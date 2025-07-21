@@ -37,15 +37,16 @@ with
         this.CurrentStep()
         |> Option.map (fun s ->
             let s = {s with cuaMessages = msg::s.cuaMessages}
-            {this with steps = this.steps |> List.updateAt this.stepIndex s})
+            {this with steps = this.steps |> List.map(fun s' -> if s'.step.step_num = this.stepIndex then s else s')})
         |> Option.defaultValue this
     member this.AdvanceStep() =
-        if this.stepIndex <= this.steps.Length - 1 then
-            let s = this.steps.[this.stepIndex]
-            let steps = this.steps |> List.updateAt this.stepIndex {s with step.step_status = Status.Done}
-            {steps = steps ; stepIndex = this.stepIndex + 1 }
-        else
-            this
+        let pairs = this.steps |> List.pairwise |> List.filter (fun (p,n) -> p.step.step_num = this.stepIndex)
+        match List.tryHead pairs with 
+        | Some(p,n) -> 
+            let p = {p with step.step_status = Status.Done}
+            let steps = this.steps |> List.map(fun p' -> if p'.step.step_num = p.step.step_num then p else p')
+            {this with steps = steps; stepIndex = n.step.step_num}
+        | None -> this
 
 type CuaInstructionsResponse = {
     task_complete : bool
@@ -60,6 +61,7 @@ type TaskState<'inMsg,'outMsg> = {
         cuaPrompt       : string
         steps           : CuaSteps
         reasonerItems   : IOitem list
+        cuaItems        : IOitem list
         reasonerPrevId  : string option
         reasonerPrompt  : string option
         driver          : IUIDriver
@@ -80,6 +82,7 @@ type TaskState<'inMsg,'outMsg> = {
                                reasonerPrompt = reasonerPrompt
                                kernel = kernel
                                reasonerItems = []
+                               cuaItems = []
                                reasonerPrevId = None
                                actions = []
                                bus = bus
@@ -90,6 +93,7 @@ type TaskState<'inMsg,'outMsg> = {
 
         member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerItems items = {this with reasonerItems = items}
+        member this.prependCuaItems items = {this with cuaItems = items}
         member this.setPrevId id = {this with reasonerPrevId = Some id}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
         member this.setSteps xs = {this with steps = {this.steps with steps = xs}}
@@ -116,3 +120,5 @@ type TaskState<'inMsg,'outMsg> = {
 
         ///Reset local reasoner state (full state is kept on server with.responses api 'save=true')
         member this.resetReasonerState id = {this with reasonerPrevId = Some id; reasonerItems = []}
+        member this.resetCuaItems() = {this with cuaItems = []}
+        member this.resetReasonerItems() = {this with reasonerItems = []}

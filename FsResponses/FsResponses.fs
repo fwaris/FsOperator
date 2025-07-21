@@ -336,6 +336,9 @@ with static member Create id =
 
 exception ApiError of ResponseErrorObj
 
+///This indicates that a request was sent to the API without addressing the function calls from an earlier response
+exception NoFuncCallOuput of ResponseErrorObj
+
 module RUtils =
     open System.Text.Json.Schema
 
@@ -452,7 +455,10 @@ module Api =
                 let err =
                     try
                         let err = JsonSerializer.Deserialize<ResponseErrorObj>(str,options=serOpts)
-                        Some (ApiError err)
+                        if err.error.message.Contains("No tool output found for function call",StringComparison.CurrentCultureIgnoreCase) then 
+                            Some (NoFuncCallOuput err)
+                        else
+                            Some (ApiError err)
                     with ex ->
                         None
                 match err with
