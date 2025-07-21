@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open FsResponses
+open System.Text.Json
 
 //functions for Cua model
 module Cua =
@@ -66,13 +67,12 @@ module Cua =
     }
 
     ///send the function call results back to CUA model
-    let postCuaFuncResults id task (cuaResp:FsResponses.Response) fnouts =
+    let postCuaFuncResults task (cuaResp:FsResponses.Response) fnouts =
         async {
             let req = {Request.Default with
                             input = fnouts
                             previous_response_id = Some cuaResp.id
                             store = true
-                            metadata = [C.CORR_ID,id] |> Map.ofList |> Some
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
@@ -133,3 +133,21 @@ module Cua =
             FlResps.postCuaRequest task.bus.PostInput {CuaReq.Default with instructions=Some instruction; visualState=snapshot; chatHistory=chatHistory}
         }
         |> FlResps.catch task.bus.PostInput
+
+    let startStep visualState task =
+        let step = task.steps.CurrentStep().Value
+        let prompt = 
+            [
+                Vars.currentStep, JsonSerializer.Serialize(step,options=FlUtils.openAIResponseSerOpts) :> obj
+                Vars.taskSteps, JsonSerializer.Serialize(task.steps.steps,options=FlUtils.openAIResponseSerOpts)
+                Vars.memory, FlUtils.getMemory task.kernel
+            ]
+            |> Prompts.kernelArgs
+            |> Prompts.renderPrompt Prompts.``cua prompt`` 
+        let req =
+            {CuaReq.Default with 
+                instructions=(Some prompt)                                                          
+                visualState=visualState
+                nonCuaTools=task.toolDefs |> List.map Tool.Function
+            }
+        FlResps.postCuaRequest task.bus.PostInput req

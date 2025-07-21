@@ -69,7 +69,7 @@ module Reasoner =
         async {
             let req =
                 {Request.Default with
-                    input = [IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}]
+                    input = [IOitem.Message (Message.OfText prompt)]
                     model = Models.o4_mini
                     metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                     text = responseFormat |> Option.map (fun t -> RUtils.structuredFormat t) 
@@ -114,13 +114,12 @@ module Reasoner =
                     Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
                 ]
                 |> Prompts.kernelArgs
-                |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
+                |> Prompts.renderPrompt Prompts.``review steps``
             
             let inp = IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}
 
             let req = {Request.Default with
-                                input = inp :: List.rev task.reasonerItems
-                                tools = task.toolDefs |> List.map Tool.Function
+                                input = inp :: List.rev task.reasonerItems                                
                                 previous_response_id = task.reasonerPrevId
                                 store = true
                                 model=Models.o4_mini

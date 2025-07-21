@@ -119,6 +119,7 @@ type OutputText = {
     annotations : JsonElement option
 }
 
+[<RequireQualifiedAccess>]
 type Content =
   | [<JsonName "output_text">] Output_text of OutputText // {|text : string; annotations : JsonElement option|}
   | [<JsonName "input_text">] Input_text of {|text : string|}
@@ -131,12 +132,14 @@ type Message = {
     role : string
     content : Content list
 }
-with static member Default = {
+with 
+    static member Default = {
         id = None
         status = None
         role = "user"
         content = []
     }
+    static member OfText text = {Message.Default with content = [Content.Input_text {|text = text|}]}
 
 type SafetyCheck = {
     id : string
@@ -396,7 +399,7 @@ module RUtils =
             | IOitem.Message m ->
                 for c in m.content do
                     match c with
-                    | Output_text t -> yield t.text
+                    | Content.Output_text t -> yield t.text
                     | _ -> ()
             | _ -> ()
         ]
@@ -537,11 +540,11 @@ module Api =
                 | None  -> return failwith $"{str}"
     }        
 
+    ///Send a text prompt to create a response, using default values for other request items.
     let createWithDefaults (input:string) =
         create
             ({Request.Default with
                 input=[
-                   IOitem.Message {Message.Default with content=[Input_text {|text=input|}]}
+                   IOitem.Message {Message.Default with content=[Content.Input_text {|text=input|}]}
                 ]})
             (defaultClient())
-

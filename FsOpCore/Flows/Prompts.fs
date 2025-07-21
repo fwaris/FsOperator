@@ -84,7 +84,7 @@ Use the memory functions to save any additional content as per [TASK_STEPS].
     /// - <see cref="Vars.taskSteps" />
     /// - <see cref="Vars.memory" />
     ///</summary>
-    let ``review states`` = $"""
+    let ``review steps`` = $"""
 Your job is to review the steps and the accompanying screenshots to determine which of the steps have been completed.
 
 # Schema of the Step
@@ -290,6 +290,8 @@ Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into more gran
 Assume that the CUA is starting at the target page.
 
 Stay true to the [TASK_INSTRUCTIONS].
+
+Ask CUA to use memory tools so save and retrieve information - rather than using copy-paste.
 
 [TASK_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}

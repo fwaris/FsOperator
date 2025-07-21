@@ -28,7 +28,7 @@ with
     static member Default = {stepIndex=0; steps=[]}
     member this.NextToDo() = this.steps |> List.tryFind (fun x -> x.step.step_status = Status.ToDo)
     member this.SetCurrentStep i = {this with stepIndex = i |> max 0 |> min this.steps.Length};
-    member this.CurrentStep() = if this.stepIndex < this.stepIndex then Some this.steps.[this.stepIndex] else None
+    member this.CurrentStep() = this.steps |> List.tryFind (fun s->s.step.step_num = this.stepIndex)
     member this.CurrentInstruction() =
         match this.CurrentStep() with
         | Some s -> s.step.step_instructions

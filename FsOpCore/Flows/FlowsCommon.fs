@@ -165,11 +165,11 @@ parseMemory "a:b:c"
         |> List.exists (fun x -> x.IsFunction_call)
 
     ///convenience 'active pattern' to match a W_Reasoner msg
-    ///with the given correlation id and with at least one function call
-    let (|FuncCall|_|) corrId msg =
+    ///with at least one function call
+    let (|FuncCall|_|)msg =
         match msg with
-        | Reasoner corrId (resp) when hasFunction resp -> Some resp
-        | _                                            -> None
+        | W_Reasoner (id,resp) when hasFunction resp -> Some (id,resp)
+        | _                                          -> None
 
     ///convenience 'active pattern' to match a W_Reasoner msg
     ///with the given correlation id and with at least one function call
@@ -219,8 +219,8 @@ module FlResps =
     let toMessages (chatMsgs:ChatMsg list) =
         chatMsgs
         |> List.map (function
-            | ChatMsg.User m -> {id = None; role="user"; content = [Input_text {| text = m |}]; status = None}
-            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Output_text {text = m.content; annotations=None}] ; status = None})
+            | ChatMsg.User m -> {id = None; role="user"; content = [Content.Input_text {| text = m |}]; status = None}
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Content.Output_text {text = m.content; annotations=None}] ; status = None})
 
     let truncateHistory messages =
         List.rev messages
@@ -294,12 +294,12 @@ module FlResps =
     let postCuaRequest replyChannel cuaReq =
        let vs = cuaReq.visualState
        async {
-            let contImg = Input_image {|image_url = vs.snapshot|}
+            let contImg = Content.Input_image {|image_url = vs.snapshot|}
             let input = { Message.Default with content=[contImg]}
             let cuaTool = Tool.Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
             let req = {Request.Default with
                             input = [IOitem.Message input] @ (cuaReq.chatHistory |> List.map IOitem.Message)
-                            tools= cuaTool :: cuaReq.nonCuaTools
+                            tools = cuaTool :: cuaReq.nonCuaTools
                             instructions = cuaReq.instructions
                             previous_response_id = None
                             store = true
