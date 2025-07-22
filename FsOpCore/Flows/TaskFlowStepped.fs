@@ -36,7 +36,7 @@ module TaskFlowStepped =
         error               : WErrorType option
         cuaResp             : FsResponses.Response option
         pendingRsnrReq      : FsResponses.Request option
-        mutable isDone      : bool
+        isDone              : Ref<bool>
     }
         with
             static member Create task =
@@ -51,14 +51,16 @@ module TaskFlowStepped =
                         error = None
                         cuaResp = None
                         pendingRsnrReq = None
-                        isDone = false
+                        isDone = ref false
                     }
                 SubState.hookTaskTools t
                 t
 
             static member hookTaskTools (ss:SubState) =
                 let tasktools = ss.task.kernel.GetRequiredService<Functions.FsOpTaskTools>()
-                tasktools.SetFunctions({Functions.TaskToolImpl.taskDone = fun ()->async{ss.isDone<-true}}) //wire task tools plugin to this instance
+                tasktools.SetFunctions({Functions.TaskToolImpl.taskDone = fun ()->async{
+                    Log.info $"Done call for task {ss.task.id}"
+                    ss.isDone.Value <- true}}) //wire task tools plugin to this instance
 
             member this.setTask v : SubState = {this with task = v} // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this v
             member this.setTask2 (v,x)  = {this with task = v},x // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this
@@ -103,18 +105,7 @@ module TaskFlowStepped =
                 }
 
             member this.updateSteps (newSteps:CuaInstructionStep list) = 
-                let steps = 
-                    if this.task.steps.steps.IsEmpty then 
-                        newSteps |> List.map CuaStep.Create
-                    else                   
-                        let m = newSteps |> List.map (fun x -> x.step_num,x) |> Map.ofList
-                        this.task.steps.steps 
-                        |> List.map (fun y -> 
-                            m
-                            |> Map.tryFind y.step.step_num 
-                            |> Option.map (fun s -> {y with step = s})
-                            |> Option.defaultValue y)
-                {this with task.steps.steps = steps}
+                {this with task.steps = {steps = newSteps}}
 
             member this.postUpdateSteps() = 
                 if this.stepCorrIds.IsEmpty |> not then 
@@ -151,28 +142,21 @@ module TaskFlowStepped =
         let (|GotSteps|_|) (ss:SubState) msg =
             match msg with
             | W_Reasoner (id,resp) when ss.stepCorrIds.Contains id ->
+                    let ss = ss.removeCorrId id
+                    let ss = ss.setTask (ss.task.setPrevId resp.id)
                     let text = RUtils.outputText resp
-                    try 
-                        let s = Text.Json.JsonSerializer.Deserialize<CuaInstructions>(text, FlUtils.openAIResponseSerOpts) 
-                        let ss' = ss.updateSteps s.steps
-                        let sMap = ss'.task.steps.steps |> List.map (fun x-> x.step.step_num,  x.step) |> Map.ofList
-                        s.steps 
-                        |> List.iter (fun s -> 
-                            match sMap |> Map.tryFind s.step_num with 
-                            | Some s' when s<>s' -> let isDone = if s'.step_status = Status.Done || s.step_status = Status.Done then "*" else ""
-                                                    Log.info $"{isDone}{s.step_num}: {s.step_instructions}"  //log changes
-                            | _                  -> ())
-
-                        let sMap = s.steps |> List.map(fun x->x.step_num, x) |> Map.ofList
-                        
-                        s.steps |> List.iter (fun x -> Log.info $"{x.step_num}: {x.step_instructions}")
-                        let ss =  ss.updateSteps s.steps
-                        let ss = ss.removeCorrId id
-                        let ss = ss.setTask (ss.task.setPrevId resp.id)
-                        Some ss
-                    with ex -> 
-                        Log.exn(ex,nameof GotSteps)
-                        Some ss
+                    match checkEmpty text with 
+                    | Some text -> 
+                        try 
+                            let s = JsonSerializer.Deserialize<CuaInstructions>(text, FlUtils.openAIResponseSerOpts) 
+                            let ss = ss.updateSteps s.steps
+                            let s2 = formatJson s + Environment.NewLine
+                            prependToFile s2 @"c:\s\cua\step.txt"
+                            Some ss
+                        with ex -> 
+                            Log.exn(ex,nameof GotSteps)
+                            Some ss
+                    | None -> Some ss
             | _ ->  None
 
 
@@ -216,6 +200,8 @@ module TaskFlowStepped =
 
         and s_start ss msg = async {
             Log.info $"in {nameof s_start} task '{ss.task.id}'"
+            let fn = @"c:\s\cua\step.txt"
+            if System.IO.File.Exists(fn) then System.IO.File.Delete(fn)
             match s_start,ss,msg with
             | Txn st                         -> return! st
             | Cont (W_App TFi_Start,ssa)     -> let! ss,ms = ssa ss
@@ -240,14 +226,13 @@ module TaskFlowStepped =
             | Cont (GotSteps ss ss',ssa)     -> let! ss',ms = ssa ss'
                                                 ss'.task.bus.PostInput (W_App TFi_Step)
                                                 return F(s_step ss',ms)
-            | Cont (W_App TFi_Step,ssa)  when ss.isDone    
+            | Cont (W_App TFi_Step,ssa)  when ss.isDone.Value
                                              -> let! ss,ms = ssa ss
                                                 return F(s_terminate ss,TFo_Done ss.task::ms)
             | Cont (W_App TFi_Step,ssa)      -> let! ss,ms = ssa ss
                                                 match ss.task.steps.NextToDo() with
                                                 | Some step ->
-                                                    Log.info $"starting step: {step.step.step_num}: {step.step.step_instructions |> shorten 120}"
-                                                    let ss = {ss with task.steps = ss.task.steps.SetCurrentStep step.step.step_num}
+                                                    Log.info $"ToDo: {step.step_instructions |> shorten 120}"                                                    
                                                     let! ss = ss.snapshot()
                                                     Cua.startStep ss.visualState.Value ss.task
                                                     return F(s_cua ss,ms)
@@ -266,17 +251,17 @@ module TaskFlowStepped =
                                                 return F(s_cua ss',ms)
 
             | Cont (NoComputerCall resp,ssa) -> let! ss,ms = ssa ss
-                                                let ss,t = ss.setTask2 (Cua.stepPrependAsstMsg ss.task resp)
+                                                let ss,t = ss.setTask2 (Cua.prependAsstMsg ss.task resp)
                                                 Log.info $"no computer call got '{t}'"
                                                 let ss = ss.postUpdateSteps()
                                                 ss.task.bus.PostInput (W_App TFi_Step) //start next step, if any
                                                 return F(s_step ss,ms)
             | Cont (W_Cua resp,ssa)          -> let! ss,ms = ssa ss
-                                                let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //msg from CUA
+                                                let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //capture any msg from CUA
                                                 let! ss = ss.doActionAndSnapshot resp
                                                 let ss = ss.postCuaNext resp
                                                 let outMsgs = if ss.visualState.IsSome then ss.lastActionM() else []
-                                                let ss = ss.postUpdateSteps()                                                
+                                                let ss = ss.postUpdateSteps()
                                                 return F(s_cua ss,outMsgs @ ms) //increment count
             | Cont(x,ssa)                    -> let! ss,ms = ssa ss 
                                                 return ignoreMsg (s_cua ss) x (nameof s_step)

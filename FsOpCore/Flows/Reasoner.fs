@@ -71,6 +71,7 @@ module Reasoner =
                 {Request.Default with
                     input = [IOitem.Message (Message.OfText prompt)]
                     model = Models.o4_mini
+                    parallel_tool_calls = true
                     store = true
                     metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
                     text = responseFormat |> Option.map (fun t -> RUtils.structuredFormat t) 
@@ -112,16 +113,17 @@ module Reasoner =
         async {
             let prompt = 
                 [
-                    Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
+                    Vars.steps, JsonSerializer.Serialize(task.steps.steps, FlUtils.openAIResponseSerOpts) :> obj
                     Vars.memory, FlUtils.getMemory task.kernel
+                    Vars.actionHistory, task.actionsString()
                 ]
                 |> Prompts.kernelArgs
                 |> Prompts.renderPrompt Prompts.``review steps``
             
             let inp = IOitem.Message {Message.Default with content = [Content.Input_text {|text = prompt|}]}
-
+            let inp = inp::List.rev task.reasonerItems |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
             let req = {Request.Default with
-                                input = inp :: List.rev task.reasonerItems
+                                input = inp
                                 tools = task.toolDefs |> List.map Tool.Function
                                 previous_response_id = task.reasonerPrevId
                                 store = true
@@ -136,46 +138,6 @@ module Reasoner =
         |> FlResps.catch task.bus.PostInput
         correlationId
 
-
-    ///ask reasoner to break the CUA instructions into multiple smaller steps
-    let postUpdateSteps_ task =
-        let id = newId()
-        async {
-            [
-                Vars.steps, JsonSerializer.Serialize(task.steps.steps |> List.map _.step, FlUtils.openAIResponseSerOpts) :> obj
-            ]
-            |> Prompts.kernelArgs
-            |> Prompts.renderPrompt Prompts.``divide cua instructions into steps``
-            |> postPromptToReasoner id task (Some typeof<CuaInstructions>)
-        }
-        |> FlResps.catch task.bus.PostInput
-        id
-
-    ///send message to reasoner to get guidance for cua for
-    let getGuidanceForCuaStep task reasonerPrompt =
-        let id = newId()
-        async {
-            let cuaMessageHistory =
-                task.steps.CurrentStep()
-                |> Option.map(fun s -> s.cuaMessages)
-                |> Option.defaultValue []
-                |> List.map (function
-                    | User c -> $"user: {c}"
-                    | Assistant m -> $"assistant: {m.content}")
-                |> String.concat System.Environment.NewLine
-            let args =
-                Prompts.kernelArgs
-                    [
-                        Vars.cuaInstructions, task.steps.CurrentInstruction()
-                        Vars.actionHistory,task.actionsString()
-                        Vars.cuaMessageHistory,cuaMessageHistory
-                        Vars.memory, FlUtils.getMemory task.kernel
-                    ]
-            let instructions = Prompts.renderPrompt reasonerPrompt args
-            postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
-        }
-        |> FlResps.catch task.bus.PostInput
-        id
 
     ///send message to reasoner to get guidance for cua for the next action
     let getGuidanceForCuaNextAction task reasonerPrompt =
@@ -215,33 +177,6 @@ module Reasoner =
                 Prompts.kernelArgs
                     [
                         Vars.cuaInstructions, task.cuaPrompt
-                        Vars.actionHistory,task.actionsString()
-                        Vars.cuaMessageHistory,cuaMessageHistory
-                        Vars.memory, FlUtils.getMemory task.kernel
-                    ]
-            let instructions = Prompts.renderPrompt Prompts.``resume cua after pause`` args
-            postToReasoner id task (Some typeof<CuaInstructionsResponse>) (Some instructions)
-        }
-        |> FlResps.catch task.bus.PostInput
-        id
-
-    ///ask reasoner to respond to cua as a user would, to continue cua after pause in the current step
-    let getGuidanceAfterCuaStepPause task =
-        let id = newId()
-        async {
-            let cuaMessageHistory =
-                task.steps.CurrentStep()
-                |> Option.map(fun step ->
-                    step.cuaMessages
-                    |> List.map (function
-                        | User c -> $"user: {c}"
-                        | Assistant m -> $"assistant: {m.content}")
-                    |> String.concat System.Environment.NewLine)
-                |> Option.defaultValue ""
-            let args =
-                Prompts.kernelArgs
-                    [
-                        Vars.cuaInstructions, task.steps.CurrentInstruction()
                         Vars.actionHistory,task.actionsString()
                         Vars.cuaMessageHistory,cuaMessageHistory
                         Vars.memory, FlUtils.getMemory task.kernel

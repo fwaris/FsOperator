@@ -46,7 +46,6 @@ module Prompts =
     //a modification of OAI sample: see https://github.com/openai/openai-testing-agent-demo
     ///<summary>
     ///Template variables: <br />
-    /// - <see cref="Vars.currentStep" /><br />
     /// - <see cref="Vars.taskSteps" />
     /// - <see cref="Vars.memory" />
     ///</summary>
@@ -54,16 +53,23 @@ module Prompts =
 You will be given a list of instructions with steps to operate a web application. 
 The complete steps in the current task are given under [TASK_STEPS].
 
+Focus on the 'ToDo' steps as 'Done' steps should already be completed.
+
 Try to accomplish the steps in the simplest way possible.
 Once you believe your are done with all the tasks required or you are blocked and cannot progress
 (for example, you have tried multiple times to accomplish a task but keep getting errors or blocked),
 use the task_done tool to let the user know you have finished the task.
 
+**Note: You only have access to the 'task_done' tool. Don't attempt to call any other tools, even if instructed. **
+
 # Normally, you do not need to authenticate on user's behalf, the user will authenticate and your flow starts after that.
 
 # Memory:
-You can read/write from/to memory using the **xxx_memory tools** provided to save relevant facts for later tasks and steps.
-However, any existing memory saved before this step is already provided in [MEMORY_CONTENTS].
+During the execution of the steps, any memory saved by current and previous tasks is given [MEMORY_CONTENTS].
+
+Some steps may require information from [MEMORY_CONTENTS]. Refer to memory, as needed, to complete steps.
+
+Follow instructions given in the [TASK_STEPS]. Don't enter any content unless instructed to do so in one of the steps.
 
 # [TASK_STEPS]
 {{{{${Vars.taskSteps}}}}}
@@ -98,11 +104,12 @@ type CuaInstructionStep =
 Do not add or remove any steps. 
 Keep the same step_number order.
 Do not modify any step that already has a "Done" status. 
-if you think a step is done then mark it as 'Done'. 
-You may modify the instructions of the ToDo steps as per the current context.
+**if you think a step is done then mark it as 'Done'. **
+You may modify the instructions of the ToDo steps to guide CUA as appropriate.
 
 # Memory instructions
-If you feel CUA is not commiting the facts to memory, use the xxx_memory tools to save relevant facts to memory for future needs.
+** CUA cannot use the memory tools so don't instruct CUA to do so**
+Just use the memory tools yourself to save relevant facts to memory for future needs.
 
 [STEPS]
 {{{{${Vars.steps}}}}}
@@ -299,13 +306,13 @@ instructions for a COMPUTER USE AGENT (CUA) task.
 CUA has the capability to perform computer actions if instructed, e.g. goto web pages and take actions such as click, type, keystrokes, etc.
 Look at the CUA instructions [TASK_INSTRUCTIONS] and divide these into more granular instructions, if required.
 
-Create the minimum number of steps possible. If the task is very simple, create only one step.
+Do not exceed 7 steps. If the task is very simple, create only one step otherwise try keep the number of steps as low as possible without overloading one step with too broad a scope.
 
 Assume that the CUA is starting at the target page.
 
 Stay true to the [TASK_INSTRUCTIONS].
 
-Ask CUA to use memory tools so save and retrieve information - rather than using copy-paste.
+**Do not put tool calls in instructions**
 
 [TASK_INSTRUCTIONS]
 {{{{${Vars.cuaInstructions}}}}}

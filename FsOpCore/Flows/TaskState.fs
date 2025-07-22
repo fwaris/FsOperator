@@ -13,40 +13,9 @@ type CuaInstructionStep =
 type CuaInstructions = {
     steps: CuaInstructionStep list
 }
-
-type CuaStep = {
-    cuaMessages : ChatMsg list
-    step : CuaInstructionStep
-}
-    with static member Create step = {cuaMessages=[]; step = step}
-
-type CuaSteps = {
-    stepIndex : int
-    steps: CuaStep list
-}
 with
-    static member Default = {stepIndex=0; steps=[]}
-    member this.NextToDo() = this.steps |> List.tryFind (fun x -> x.step.step_status = Status.ToDo)
-    member this.SetCurrentStep i = {this with stepIndex = i |> max 0 |> min this.steps.Length};
-    member this.CurrentStep() = this.steps |> List.tryFind (fun s->s.step.step_num = this.stepIndex)
-    member this.CurrentInstruction() =
-        match this.CurrentStep() with
-        | Some s -> s.step.step_instructions
-        | None -> "no instruction available"
-    member this.PrependCuaMessage msg =
-        this.CurrentStep()
-        |> Option.map (fun s ->
-            let s = {s with cuaMessages = msg::s.cuaMessages}
-            {this with steps = this.steps |> List.map(fun s' -> if s'.step.step_num = this.stepIndex then s else s')})
-        |> Option.defaultValue this
-    member this.AdvanceStep() =
-        let pairs = this.steps |> List.pairwise |> List.filter (fun (p,n) -> p.step.step_num = this.stepIndex)
-        match List.tryHead pairs with 
-        | Some(p,n) -> 
-            let p = {p with step.step_status = Status.Done}
-            let steps = this.steps |> List.map(fun p' -> if p'.step.step_num = p.step.step_num then p else p')
-            {this with steps = steps; stepIndex = n.step.step_num}
-        | None -> this
+    member this.NextToDo() = this.steps |> List.tryFind (fun x -> x.step_status = Status.ToDo)
+
 
 type CuaInstructionsResponse = {
     task_complete : bool
@@ -59,7 +28,7 @@ type TaskState<'inMsg,'outMsg> = {
         target          : string
         cuaMessages     : ChatMsg list
         cuaPrompt       : string
-        steps           : CuaSteps
+        steps           : CuaInstructions
         reasonerItems   : IOitem list
         cuaItems        : IOitem list
         reasonerPrevId  : string option
@@ -86,14 +55,14 @@ type TaskState<'inMsg,'outMsg> = {
                                reasonerPrevId = None
                                actions = []
                                bus = bus
-                               steps = CuaSteps.Default
+                               steps = {steps=[]}
                                usage = Map.empty
                                toolDefs = tools
                             }
 
-        member this.prependCuaMessage msg = {this with cuaMessages = msg::this.cuaMessages}
-        member this.prependReasonerItems items = {this with reasonerItems = items}
-        member this.prependCuaItems items = {this with cuaItems = items}
+        member this.prependCuaMessage (msg:ChatMsg) = {this with cuaMessages = msg::this.cuaMessages}
+        member this.prependReasonerItems items = {this with reasonerItems = items @ this.reasonerItems}
+        member this.prependCuaItems items = {this with cuaItems = items @ this.cuaItems}
         member this.setPrevId id = {this with reasonerPrevId = Some id}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
         member this.setSteps xs = {this with steps = {this.steps with steps = xs}}

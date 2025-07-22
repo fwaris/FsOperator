@@ -1,7 +1,10 @@
 ﻿namespace FsOpCore
 open System
 open System.IO
+open System.Text.Json
 open System.Runtime.InteropServices
+open System.Text.Encodings.Web
+open System.Text.Json.Serialization
 
 [<AutoOpen>]
 module Utility =
@@ -51,3 +54,23 @@ module Utility =
     let isMac() = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
 
     let ddict xs = System.Collections.Generic.Dictionary(dict xs)
+
+    ///Format json for inspection (not safe for serialization)
+    let formatJson<'t>(j:'t) =
+    ///</summary>
+        let opts =
+            let o = JsonSerializerOptions(JsonSerializerDefaults.General)
+            o.Converters.Add(JsonStringEnumConverter())
+            o.WriteIndented <- true
+            o.Encoder <- JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            o.ReadCommentHandling <- JsonCommentHandling.Skip
+            let opts = JsonFSharpOptions.Default()
+            opts
+                .WithSkippableOptionFields(true)
+                .AddToJsonSerializerOptions(o)
+            o
+        JsonSerializer.Serialize(j,opts)
+
+    let prependToFile (t:string) (f:string) =
+        let pText = if File.Exists f then File.ReadAllText f else ""
+        File.WriteAllText(f,t + pText)
