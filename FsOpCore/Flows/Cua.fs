@@ -48,7 +48,7 @@ module Cua =
                 | _                       -> None)
         let mutable fouts = []
         for f in fns do
-            let! rslt = FlUtils.invokeFunction task.kernel f.name f.arguments
+            let! rslt = Toolbox.invokeFunction task.kernel f.name f.arguments
             let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
             fouts <- fout::fouts
         return task.prependCuaItems fouts
@@ -110,7 +110,7 @@ module Cua =
         match vs, FlUtils.computerCall cuaResp with
         | Some vs, Some cc ->
             let cuaTool = Tool.Computer_use {|display_height = vs.height; display_width = vs.width; environment = vs.environment|}
-            let otherTools = FlUtils.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
+            let otherTools = Toolbox.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
             let cc_out =
                 {
                     call_id = cc.call_id
@@ -155,6 +155,6 @@ module Cua =
             {CuaReq.Default with 
                 instructions = (Some prompt)                                                          
                 visualState  = visualState
-                nonCuaTools  = FlUtils.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
+                nonCuaTools  = Toolbox.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
             }
         FlResps.postStartCuaRequest task.bus.PostInput req

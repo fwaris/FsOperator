@@ -5,6 +5,9 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.SemanticKernel
 open FsOpCore
 
+let t1 = T2.testType()
+
+
 let runPlan = SpreadsheetToEmailPlan.create()
 //let runPlan = TimesheetPlan.create()
 //let runPlan = OPlan.sample()

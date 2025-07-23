@@ -9,9 +9,9 @@ let tGetEmails =
         description = "Get emails ids from Excel"
         target = OLink "https://tmobileusa-my.sharepoint.com/:x:/r/personal/faisal_waris1_t-mobile_com/_layouts/15/Doc.aspx?sourcedoc=%7B24864620-6e64-454e-a50c-9bf02f98761c%7D&action=edit&wdPreviousSession=bc554659-d29a-64c8-7b5b-ca6e932a7d3c"
         tools = 
-            FlUtils.makeFunctionTools<Functions.FsOpMemory>() 
-            @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>() 
-            @ FlUtils.makeFunctionTools<Functions.FsOpTaskTools>()
+            Toolbox.makeFunctionTools<Functions.FsOpMemory>() 
+            @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>() 
+            @ Toolbox.makeFunctionTools<Functions.FsOpTaskTools>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """You goal is to note down the names and email ids of persons in the Excel sheet and save them to memory for the next task. Scroll as need to get all the data.
 Note: If required, use Faisal.Waris1@t-mobile.com as login email id.
@@ -24,9 +24,9 @@ let tSendEmails =
         description = "Send emails"
         target = OLink "https://outlook.office.com/mail/"
         tools = 
-            FlUtils.makeFunctionTools<Functions.FsOpMemory>() 
-            @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>() 
-            @ FlUtils.makeFunctionTools<Functions.FsOpTaskTools>()
+            Toolbox.makeFunctionTools<Functions.FsOpMemory>() 
+            @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>() 
+            @ Toolbox.makeFunctionTools<Functions.FsOpTaskTools>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """
 Obtain the names and email address of all contacts from memory (use memory_get_all).

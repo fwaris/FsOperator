@@ -21,6 +21,7 @@
 		<Compile Include="Flows\Workflow.fs" />
 		<Compile Include="Flows\ChatMsg.fs" />
 		<Compile Include="Flows\Functions.fs" />
+		<Compile Include="Flows\Toolbox.fs" />
 		<Compile Include="Flows\FlowsCommon.fs" />
 		<Compile Include="Flows\TaskState.fs" />
 		<Compile Include="Flows\Reasoner.fs" />

@@ -61,7 +61,7 @@ module OPlan =
             { OTask.Create() with
                 target = OLink "https://www.linkedin.com"
                 description = "find people who post about generative ai"
-                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
+                tools = Toolbox.makeFunctionTools<Functions.FsOpMemory>()
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 cua = Some """find individuals who have original posts
 related to generative AI and record their linkedin names and profile links.
@@ -71,7 +71,7 @@ Make sure to collect at least 5 names."""
         let tw =
             { OTask.Create() with
                 target = OLink "https://www.twitter.com"
-                tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>()
+                tools = Toolbox.makeFunctionTools<Functions.FsOpMemory>()
                 description = "retrieve linkedIn people info from memory and get twitter handles"
                 reasoner = Some Prompts.``reasoner prompt for cua guidance``
                 cua = Some """Get the list of names and linked-in profile links from memory.

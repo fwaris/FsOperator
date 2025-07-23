@@ -57,7 +57,7 @@ module Voice =
         |> SessionUpdate
 
     let voiceTools = lazy(
-        let tools = FlUtils.makeFunctionTools<Functions.FsOpVoice>() |> List.map FsResponses.Tool.Function
+        let tools = Toolbox.makeFunctionTools<Functions.FsOpVoice>() |> List.map FsResponses.Tool.Function
         tools |> List.choose (function FsResponses.Tool.Function f -> toVoiceTool f |> Some | _ -> None))
 
     let sendUpdateSession instructions conn session =
@@ -90,7 +90,7 @@ module Voice =
 
     let callFunction (conn:Connection) (kernel:Kernel) (callId,name,arguments) =
         async {
-            let! rslt = FlUtils.invokeFunction kernel name arguments
+            let! rslt = Toolbox.invokeFunction kernel name arguments
             sendFunctionResponse conn callId rslt
         }
 

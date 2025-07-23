@@ -23,7 +23,7 @@ module Flows =
                         Vars.startUrl, model.opTask.target.TargetString()
                     ])
             |> Option.map (fun (t,args) -> Prompts.renderPrompt t args)
-        let taskState = {taskState with toolDefs = taskState.toolDefs @ FlUtils.makeFunctionTools<Functions.FsOpVoice>()}
+        let taskState = {taskState with toolDefs = taskState.toolDefs @ Toolbox.makeFunctionTools<Functions.FsOpVoice>()}
         let flow = TaskFlowInteractive.create taskState (Some conn) voicePrompt
         let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
         async {
@@ -55,7 +55,9 @@ module Flows =
             let driver = PlaywrightDriver.create()
             let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
             let kernel = OPlan.defaultKernel Map.empty (Some (configVoice driver.driver bus ))
-            let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
+            let tools = 
+                Toolbox.makeFunctionTools<Functions.FsOpMemory>() 
+                @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()
             FsOpCore.TaskState.Create<_,_>  //initial task state
                         model.opTask.id
                         (model.opTask.target.TargetString())

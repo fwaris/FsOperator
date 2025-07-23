@@ -33,7 +33,7 @@ module TaskRunner =
             let driver = PlaywrightDriver.create()
             let bus = WBus.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut> model.wfReceiver.Current.Value
             let kernel = OPlan.defaultKernel memory None
-            let tools = (FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()) 
+            let tools = (Toolbox.makeFunctionTools<Functions.FsOpMemory>() @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()) 
             TaskState.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut>  //initial task state
                         task.id
                         (task.target.TargetString())

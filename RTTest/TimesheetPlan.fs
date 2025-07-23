@@ -8,7 +8,7 @@ let tHours =
         id = "load_hours"
         description = "save task and daily hours from jira"
         target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
-        tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()
+        tools = Toolbox.makeFunctionTools<Functions.FsOpMemory>() @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """Your goal is to record Jira task ids and associated daily hours
 from Jira’s Timesheet view for the "Timesheet Week".
@@ -48,7 +48,7 @@ let tCapability =
         id = "get_capability_ids"
         description = "get capability ids for each task in jira"
         target = OLink "https://t-mobile.atlassian.net/projects/AGAP?selectedItem=com.atlassian.plugins.atlassian-connect-plugin:is.origo.jira.tempo-plugin__tempo-project-centric-timesheet-panel"
-        tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()
+        tools = Toolbox.makeFunctionTools<Functions.FsOpMemory>() @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some """Your goal is to save the Capability ID for each jira task
 
@@ -72,7 +72,7 @@ let t_tTime =
         { OTask.Create() with
             id = "enter_hours_into_t-time"
             target = OLink "https://apps.powerapps.com/play/e/7ccae0f5-3b24-4e97-a2a1-0171636f64ff/a/e9ecf476-d164-41f6-b24b-84d14f4a3b6f"
-            tools = FlUtils.makeFunctionTools<Functions.FsOpMemory>() @ FlUtils.makeFunctionTools<Functions.FsOpNavigator>()
+            tools = Toolbox.makeFunctionTools<Functions.FsOpMemory>() @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()
             description = "Enter capability hours into T-Time"
             allowedSec = 60*20
             reasoner = Some Prompts.``reasoner prompt for cua guidance``

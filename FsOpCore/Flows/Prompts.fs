@@ -1,7 +1,6 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
 open Microsoft.SemanticKernel.Plugins.Core
-
 ///Names of variables used in prompt templates
 module Vars =
     let cuaInstructions = "cuaInstructions"

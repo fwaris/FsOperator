@@ -15,7 +15,7 @@ module Reasoner =
                 | _                       -> None)
         let mutable fouts = []
         for f in fns do
-            let! rslt = FlUtils.invokeFunction task.kernel f.name f.arguments
+            let! rslt = Toolbox.invokeFunction task.kernel f.name f.arguments
             let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
             fouts <- fout::fouts
         return task.prependReasonerItems fouts
