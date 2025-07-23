@@ -1,4 +1,6 @@
 ﻿namespace FsOpCore
+open System.Reflection
+open Microsoft.FSharp.Reflection
 open System
 open System.Reflection
 open Microsoft.SemanticKernel
@@ -56,36 +58,19 @@ module Toolbox =
 
     ///call an individual function
     let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
-        let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
-        let args = args |> Map.toSeq |> Prompts.kernelArgs
-        let! rslt = kernel.InvokeAsync(pluginName=null,functionName=name,arguments=args) |> Async.AwaitTask
-        let str = rslt.GetValue()
-        let rsltStr = JsonSerializer.Serialize(str)
-        return rsltStr
+        try
+            let args = JsonSerializer.Deserialize<Map<string,obj>>(arguments)
+            let args = args |> Map.toSeq |> Prompts.kernelArgs
+            let! rslt = kernel.InvokeAsync(pluginName=null,functionName=name,arguments=args) |> Async.AwaitTask
+            let str = rslt.GetValue()
+            let rsltStr = JsonSerializer.Serialize(str)
+            return rsltStr
+        with ex -> 
+            Log.exn (ex,"invokeFunction")
+            return "unable to invoke function"
     }
 
-    (*
-    let tools (xs:Type list) = 
-        xs
-        |> List.map makeFunctionTools
-
-type Marker = interface end
-
-module rec T2 = 
-    let invokeGenericFunction<'t> () =
-        let methodInfo = typeof<FsOpCore.Marker>.DeclaringType
-        
-        //>.GetMethod("functionMetadata")
-        let genericMethod = methodInfo.MakeGenericMethod(typeof<'t>)
-        genericMethod.Invoke(null, [||])
-    let m = FSharp.Reflection.FSharpType.IsModule (typeof<FsOpCore.T2>)
-    *)
-
-module T2 = 
-    open System.Reflection
-    open Microsoft.FSharp.Reflection
-
-    let toolboxType = lazy (
+    let internal toolboxType = lazy (
         let assembly = Assembly.GetExecutingAssembly()
         // Find all F# modules in the assembly:
         let moduleTypes = assembly.GetTypes() |> Array.filter FSharpType.IsModule
@@ -93,12 +78,11 @@ module T2 =
         moduleTypes |> Array.find (fun t -> t.Name = "Toolbox"))
 
 
-    let fmMethod = lazy(toolboxType.Value.GetMethod("functionMetadata"))
+    let internal fmMethod = lazy(toolboxType.Value.GetMethod("makeFunctionTools"))
     
-    let get (t:Type) = fmMethod.Value.MakeGenericMethod([|t|]).Invoke(null,[||])
+    let internal get (t:Type) = 
+        fmMethod.Value.MakeGenericMethod([|t|]).Invoke(null,[||])
+        :?> Function list
 
-    let testType() = get(typeof<Functions.FsOpMemory>)
-
-
-
+    let tools (ts:Type list) = ts |> List.collect get
 

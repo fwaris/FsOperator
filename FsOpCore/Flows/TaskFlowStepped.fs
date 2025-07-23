@@ -33,6 +33,7 @@ module TaskFlowStepped =
         stepCorrIds         : Set<string>
         otherCorrId         : string
         cuaLoopCount        : int
+        reasonerLoopCount   : int
         error               : WErrorType option
         cuaResp             : FsResponses.Response option
         pendingRsnrReq      : FsResponses.Request option
@@ -47,6 +48,7 @@ module TaskFlowStepped =
                         stepCorrIds = Set.empty
                         otherCorrId = ""
                         cuaLoopCount = 0
+                        reasonerLoopCount = 0
                         visualState = None
                         error = None
                         cuaResp = None
@@ -66,6 +68,7 @@ module TaskFlowStepped =
             member this.setTask2 (v,x)  = {this with task = v},x // TaskState<PlanFLowMsgIn,PlanFLowMsgOut>.upd this
             member this.lastActionM() = this.task.lastAction() |> List.map TFo_Action
             member this.setCorrIdAndReasonserCache id = {this with stepCorrIds = id; task.reasonerItems = []}
+            member this.incrReasonerLoopCount()  = {this with reasonerLoopCount = this.reasonerLoopCount + 1}
             member this.incrCuaLoopCount()  = {this with cuaLoopCount = this.cuaLoopCount + 1}
             member this.resetCuaLoopCount() = {this with cuaLoopCount = 0}
             member this.setVisualState vs = {this with visualState = vs}
@@ -110,9 +113,10 @@ module TaskFlowStepped =
             member this.postUpdateSteps() = 
                 if this.stepCorrIds.IsEmpty |> not then 
                     this //there are already messages in play so wait
-                else
+                else                    
                     let corrId = Reasoner.postUpdateSteps this.task 
                     let ss = this.addCorrId corrId 
+                    let ss = ss.incrCuaLoopCount()
                     let ss = ss.setTask (ss.task.resetReasonerItems())
                     ss
 
@@ -171,7 +175,7 @@ module TaskFlowStepped =
             | W_Err e                        -> Txn (async {
                                                         let ss = ss.appendUsage msg
                                                         let ss = ss.setError e                                                
-                                                        return (F(s_terminate ss, [TFo_Usage ss.task.usage]))
+                                                        return (F(s_terminate ss, [TFo_Error e; TFo_Usage ss.task.usage]))
                                                     })
             | W_App TFi_EndAndReport         -> Txn (async {
                                                         let corrId = Reasoner.stopAndSummarizeStep ss.task
@@ -220,7 +224,8 @@ module TaskFlowStepped =
         }
 
         and s_step ss msg = async {
-            Log.info $"in {nameof s_step} task '{ss.task.id}'"
+            let ss = ss.resetCuaLoopCount()
+            Log.info $"in {nameof s_step} {ss.cuaLoopCount} {ss.reasonerLoopCount} task '{ss.task.id}'"
             match s_step,ss,msg with
             | Txn st                         -> return! st
             | Cont (GotSteps ss ss',ssa)     -> let! ss',ms = ssa ss'
@@ -244,7 +249,7 @@ module TaskFlowStepped =
 
         and s_cua ss msg = async {
             let ss = ss.incrCuaLoopCount()
-            Log.info $"in {nameof s_cua} {ss.cuaLoopCount} task '{ss.task.id}'"
+            Log.info $"in {nameof s_cua} {ss.cuaLoopCount} {ss.reasonerLoopCount} task '{ss.task.id}'"
             match s_step,ss,msg with
             | Txn st                         -> return! st
             | Cont (GotSteps ss ss',ssa)     -> let! ss',ms = ssa ss'                                                
@@ -257,18 +262,21 @@ module TaskFlowStepped =
                                                 ss.task.bus.PostInput (W_App TFi_Step) //start next step, if any
                                                 return F(s_step ss,ms)
             | Cont (W_Cua resp,ssa)          -> let! ss,ms = ssa ss
-                                                let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //capture any msg from CUA
-                                                let! ss = ss.doActionAndSnapshot resp
-                                                let ss = ss.postCuaNext resp
-                                                let outMsgs = if ss.visualState.IsSome then ss.lastActionM() else []
-                                                let ss = ss.postUpdateSteps()
-                                                return F(s_cua ss,outMsgs @ ms) //increment count
+                                                match ss.task.steps.NextToDo() with 
+                                                | None -> return F(s_terminate ss,TFo_Done ss.task::ms)
+                                                | Some _ -> 
+                                                    let ss,_ = ss.setTask2 (Cua.prependAsstMsg ss.task resp) //capture any msg from CUA
+                                                    let! ss = ss.doActionAndSnapshot resp
+                                                    let ss = ss.postCuaNext resp
+                                                    let outMsgs = if ss.visualState.IsSome then ss.lastActionM() else []
+                                                    let ss = ss.postUpdateSteps()
+                                                    return F(s_cua ss,outMsgs @ ms) //increment count
             | Cont(x,ssa)                    -> let! ss,ms = ssa ss 
                                                 return ignoreMsg (s_cua ss) x (nameof s_step)
         }
 
         and s_summarizing (ss:SubState) msg = async {
-            Log.info $"in {nameof s_summarizing} task '{ss.task.id}'"
+            Log.info $"in {nameof s_summarizing} {ss.cuaLoopCount} {ss.reasonerLoopCount} task '{ss.task.id}'"
             match s_summarizing,ss,msg with
             | Txn st                                  -> return! st
             | Cont (Reasoner ss.otherCorrId resp,ssa) -> let! ss,ms = ssa ss 
@@ -279,10 +287,10 @@ module TaskFlowStepped =
         }
 
         and s_terminate ss msg = async {
-            Log.info $"in s_terminate task '{ss.task.id}'"
+            Log.info $"in s_terminate task {ss.cuaLoopCount} {ss.reasonerLoopCount} '{ss.task.id}'"
+            ss.cts.CancelAfter(1000)
             ss.error
             |> Option.iter (fun e ->
-                ss.task.bus.postOutput (TFo_Error e)
                 Log.error (string e)
                 ss.cts.CancelAfter(1000))
             Log.info $"s_terminate: message ignored {msg}"
