@@ -1,11 +1,14 @@
 ﻿namespace FsOpCore
 open FsResponses
+open System.Text.Json
 open Microsoft.SemanticKernel
 
-type Status =  ToDo = 0 | Done = 1
+type Status =  ToDo = 0 | Done = 2
+type Requirement = Optional = 0 | Required = 1
 type CuaInstructionStep =
     {
         step_num: int
+        step_required : Requirement
         step_instructions: string
         step_status : Status
     }
@@ -14,8 +17,10 @@ type CuaInstructions = {
     steps: CuaInstructionStep list
 }
 with
-    member this.NextToDo() = this.steps |> List.tryFind (fun x -> x.step_status = Status.ToDo)
-
+    member this.NextToDo() = 
+        this.steps 
+        |> List.filter (fun x -> x.step_required = Requirement.Required) 
+        |> List.tryFind (fun x -> x.step_status = Status.ToDo)
 
 type CuaInstructionsResponse = {
     task_complete : bool
@@ -28,7 +33,7 @@ type TaskState<'inMsg,'outMsg> = {
         target          : string
         cuaMessages     : ChatMsg list
         cuaPrompt       : string
-        steps           : CuaInstructions
+        steps           : CuaInstructions option
         reasonerItems   : IOitem list
         cuaItems        : IOitem list
         reasonerPrevId  : string option
@@ -55,7 +60,7 @@ type TaskState<'inMsg,'outMsg> = {
                                reasonerPrevId = None
                                actions = []
                                bus = bus
-                               steps = {steps=[]}
+                               steps = None
                                usage = Map.empty
                                toolDefs = tools
                             }
@@ -65,7 +70,9 @@ type TaskState<'inMsg,'outMsg> = {
         member this.prependCuaItems items = {this with cuaItems = items @ this.cuaItems}
         member this.setPrevId id = {this with reasonerPrevId = Some id}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
-        member this.setSteps xs = {this with steps = {this.steps with steps = xs}}
+        member this.setSteps xs = {this with steps = match this.steps with Some s -> Some {s with steps = xs} | None -> Some {steps=xs}}
+        member this.serializeSteps() = match this.steps with Some s -> JsonSerializer.Serialize(s.steps,FlUtils.openAIResponseSerOpts) | _ -> ""
+        member this.NextToDo() = match this.steps with None -> Choice1Of2 () | Some s -> Choice2Of2 (s.NextToDo())
         member this.clearReasonerHistory() = {this with reasonerPrevId = None; reasonerItems = []}
 
         member this.appendUsage (modelId,(usage:FsResponses.Usage)) =

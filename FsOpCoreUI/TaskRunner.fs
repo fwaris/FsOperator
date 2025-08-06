@@ -151,13 +151,13 @@ module TaskRunner =
             let running = ctx.usePassed running
             let sendToMe = ctx.usePassedRead sendToMe 
             
-            let wfSendToMe = ctx.useStateLazy((fun () ->ref(fun m -> printfn $"TaskRunner.view default got {m}")), renderOnChange=false)
+            let wfSendToMe = ctx.useStateLazy((fun () ->ref(fun m -> printfn $"Dummy handler got {m}")), renderOnChange=false)
             //also create a subscription to post messages to the dispatch loop of this control,
             //from outside the control
             let sub _ = 
                 Subscriptions.create $"taskRunner {task.Current.id}" 
-                    (fun poster ->                                              //this function is invoked when the scription is created
-                        sendToMe.Current.Value <- (TaskRunner.MsgIn>>poster)    //Wire the 'poster' function to parent so parent can send messages to this
+                    (fun poster ->                                              //this function is invoked when the subscription is created
+                        sendToMe.Current.Value <- (TaskRunner.MsgIn>>poster)    //Wire the poster to receive messages from parent
                         wfSendToMe.Current.Value <- (TaskRunner.MsgFromFlow>>poster)) //Wire the poster to receive mesages from workflow
 
             let model, dispatch = ctx.useElmish (TaskRunner.init (task,running,wfSendToMe),  TaskRunner.update dispatchOut, Program.withSubscription sub)

@@ -104,7 +104,36 @@ module Cua =
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch task.bus.PostInput
 
-    ///send the results of performing action to cua (along with optional additional guidance)
+    ///resume with a new cua loop (after the old loop ended with no 'computer call')
+    let postResumeCua task snapshot =
+        async {
+            let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
+            FlResps.postStartCuaRequest task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
+        }
+        |> FlResps.catch task.bus.PostInput
+
+    let startStep visualState (task:TaskState<_,_>) =
+        let instructions = 
+            [
+                Vars.steps, task.serializeSteps():> obj
+                Vars.memory,FlUtils.getMemory task.kernel
+            ]
+            |> Prompts.renderPrompt Prompts_Stepped.``cua loop``
+        let developerPrompt = 
+            [
+                Vars.cuaInstructions, task.cuaPrompt :> obj
+            ]
+            |> Prompts.renderPrompt Prompts_Stepped.``cua step start``
+        let chatHistory = [Developer developerPrompt] |> FlResps.toMessages
+        let req =
+            {CuaReq.Default with 
+                chatHistory = chatHistory
+                instructions = (Some instructions)                                                          
+                visualState  = visualState
+                nonCuaTools  = Toolbox.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
+            }
+        FlResps.postStartCuaRequest task.bus.PostInput req
+
     let postCuaNextStep task vs (cuaResp:Response) =
 
         match vs, FlUtils.computerCall cuaResp with
@@ -119,12 +148,19 @@ module Cua =
                     current_url = vs.url
                 }
                 |> IOitem.Computer_call_output
-            let inp = cc_out::List.rev task.cuaItems |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
+            let inp = cc_out::List.rev task.cuaItems |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function call outputs first
+            let instructions = 
+                [
+                    Vars.steps, task.serializeSteps() :> obj
+                    Vars.memory,FlUtils.getMemory task.kernel
+                ]
+                |> Prompts.renderPrompt Prompts_Stepped.``cua loop``
             let req = {Request.Default with
                             input = inp
+                            instructions = Some instructions
                             tools = cuaTool::otherTools |> List.rev
                             previous_response_id = Some cuaResp.id
-                            parallel_tool_calls = false
+                            parallel_tool_calls = true
                             store = true
                             tool_choice = ToolChoice.Required
                             model=Models.computer_use_preview
@@ -134,27 +170,3 @@ module Cua =
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
         |> FlResps.catch task.bus.PostInput
-
-    ///resume with a new cua loop (after the old loop ended with no 'computer call')
-    let postResumeCua task snapshot =
-        async {
-            let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
-            FlResps.postStartCuaRequest task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
-        }
-        |> FlResps.catch task.bus.PostInput
-
-    let startStep visualState task =
-        let prompt = 
-            [
-                Vars.taskSteps, JsonSerializer.Serialize(task.steps.steps,options=FlUtils.openAIResponseSerOpts) :> obj
-                Vars.memory, FlUtils.getMemory task.kernel
-            ]
-            |> Prompts.kernelArgs
-            |> Prompts.renderPrompt Prompts.``cua prompt`` 
-        let req =
-            {CuaReq.Default with 
-                instructions = (Some prompt)                                                          
-                visualState  = visualState
-                nonCuaTools  = Toolbox.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
-            }
-        FlResps.postStartCuaRequest task.bus.PostInput req

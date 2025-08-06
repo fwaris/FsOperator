@@ -132,7 +132,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
     let startTimer (n:int) (f:IFlow<_>) =
         async {
             do! Async.Sleep (n * 1000)
-            f.Post TaskFlowStepped.TFi_EndAndReport
+            f.Post TaskFlowDynamic.TFi_EndAndReport
         }
         |> Async.Start
 
@@ -170,11 +170,11 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let driver = (PlaywrightDriver.create().driver)
             let post = fun p ->
                 match p with
-                | TaskFlowStepped.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
-                | TaskFlowStepped.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | TaskFlowStepped.TFo_Action a -> printfn "%A" a
-                | TaskFlowStepped.TFo_Paused msgs -> printfn "%A" msgs
-                | TaskFlowStepped.TFo_Usage us -> printTaskUsage us
+                | TaskFlowDynamic.TFo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
+                | TaskFlowDynamic.TFo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | TaskFlowDynamic.TFo_Action a -> printfn "%A" a
+                | TaskFlowDynamic.TFo_Paused msgs -> printfn "%A" msgs
+                | TaskFlowDynamic.TFo_Usage us -> printTaskUsage us
             let bus = WBus.Create<_,_> post
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
@@ -188,8 +188,8 @@ Use memory_save function to save each person's linked-in and twitter data into m
             //match ot.task.target with
             //| OLink url -> do! driver.start url
             //| OProcess (a,b) -> ()
-            let flow = TaskFlowStepped.create t0
-            flow.Post TaskFlowStepped.TFi_Start
+            let flow = TaskFlowDynamic.create t0
+            flow.Post TaskFlowDynamic.TFi_Start
             startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with

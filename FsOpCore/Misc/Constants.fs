@@ -23,3 +23,5 @@ module C =
     let MAX_ACTIONS = 3
     let FUNCTION_CALL = "function_call"
     
+    let INITIAL="initial"
+    let YES="yes"

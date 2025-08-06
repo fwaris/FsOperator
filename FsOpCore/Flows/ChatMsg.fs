@@ -8,6 +8,7 @@ type AsstMsg = {
 
 type ChatMsg = 
     | User of string 
+    | Developer of string
     | Assistant of AsstMsg 
 
 

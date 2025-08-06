@@ -17,9 +17,8 @@ module Flows =
             checkEmpty model.opTask.voiceAsstInstructions
             |> Option.orElse (Some Prompts.``starting voice prompt``)
             |> Option.map (fun t -> 
-                t, Prompts.kernelArgs
-                    [
-                        Vars.taskInstructions, model.opTask.textModeInstructions
+                t,  [
+                        Vars.taskInstructions, model.opTask.textModeInstructions :> obj
                         Vars.startUrl, model.opTask.target.TargetString()
                     ])
             |> Option.map (fun (t,args) -> Prompts.renderPrompt t args)

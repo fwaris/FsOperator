@@ -164,7 +164,8 @@ module FlResps =
         chatMsgs
         |> List.map (function
             | ChatMsg.User m -> {id = None; role="user"; content = [Content.Input_text {| text = m |}]; status = None}
-            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Content.Output_text {text = m.content; annotations=None}] ; status = None})
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Content.Output_text {text = m.content; annotations=None}] ; status = None}
+            | ChatMsg.Developer m -> {id = None; role="developer"; content = [Content.Input_text {|text = m|}] ; status = None})
 
     let truncateHistory messages =
         List.rev messages
