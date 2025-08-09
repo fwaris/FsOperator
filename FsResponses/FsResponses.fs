@@ -268,7 +268,7 @@ type Request = {
             tool_choice = ToolChoice.Auto
             tools = []
             top_p = 1.0f
-            truncation = None
+            truncation = Some Truncation.auto
             user  = None
         }
 

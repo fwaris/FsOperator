@@ -5,6 +5,8 @@ open RTOpenAI.Api.Events
 open System.Text.Json
 open Microsoft.SemanticKernel
 open FSharp.Control
+()
+(*
 
 module Voice =
 
@@ -31,14 +33,14 @@ module Voice =
 
         }
 
-    ///Matches function call request from Voice Assistant
-    let (|FuncCall|_|) msg =
-        match msg with
-        | W_Voice ( ResponseOutputItemDone ev) -> if ev.item.``type`` = C.FUNCTION_CALL && ev.item.name.IsSome && ev.item.arguments.IsSome then
-                                                        Some(ev.item.call_id, ev.item.name.Value,ev.item.arguments.Value)
-                                                    else
-                                                        None
-        | _                                    -> None
+    /////Matches function call request from Voice Assistant
+    //let (|FuncCall|_|) msg =
+    //    match msg with
+    //    | W_Voice ( ResponseOutputItemDone ev) -> if ev.item.``type`` = C.FUNCTION_CALL && ev.item.name.IsSome && ev.item.arguments.IsSome then
+    //                                                    Some(ev.item.call_id, ev.item.name.Value,ev.item.arguments.Value)
+    //                                                else
+    //                                                    None
+    //    | _                                    -> None
 
     let reconfigure tools instructions (s:Session) =
         { s with
@@ -100,13 +102,13 @@ module Voice =
         let comp =
             conn.WebRtcClient.OutputChannel.Reader.ReadAllAsync()
             |> AsyncSeq.ofAsyncEnum
-            |> AsyncSeq.iter(fun m -> task.bus.PostInput(W_Voice (Exts.toEvent m)))
+            |> AsyncSeq.iter(fun m -> task.bus.PostToFlow(W_Voice (Exts.toEvent m)))
         async{
             match! Async.Catch comp with
             | Choice1Of2 _ -> Log.info "Voice connection endded"
             | Choice2Of2 ex ->
                 Log.exn(ex,nameof startMessagePump)
-                task.bus.PostInput (W_Err (WE_Exn ex))
+                task.bus.PostToFlow (W_Err (WE_Exn ex))
         }
         |> Async.Start
 
@@ -117,3 +119,4 @@ module Voice =
         let! ephemKey = RTOpenAI.Api.Exts.getOpenAIEphemKey key keyReq |> Async.AwaitTask
         do! Connection.connect ephemKey conn |> Async.AwaitTask
     }
+*)

@@ -35,8 +35,6 @@ type TaskState<'inMsg,'outMsg> = {
         cuaPrompt       : string
         steps           : CuaInstructions option
         reasonerItems   : IOitem list
-        cuaItems        : IOitem list
-        reasonerPrevId  : string option
         reasonerPrompt  : string option
         driver          : IUIDriver
         actions         : string list
@@ -44,6 +42,7 @@ type TaskState<'inMsg,'outMsg> = {
         bus             : WBus<'inMsg,'outMsg>
         usage           : Map<string,FsResponses.Usage list>
         toolDefs        : Function list
+        visualState     : VisualState option
     }
     with
         static member Create id target bus driver cuaPrompt reasonerPrompt kernel tools =
@@ -56,33 +55,27 @@ type TaskState<'inMsg,'outMsg> = {
                                reasonerPrompt = reasonerPrompt
                                kernel = kernel
                                reasonerItems = []
-                               cuaItems = []
-                               reasonerPrevId = None
                                actions = []
                                bus = bus
                                steps = None
                                usage = Map.empty
                                toolDefs = tools
+                               visualState = None
                             }
 
         member this.prependCuaMessage (msg:ChatMsg) = {this with cuaMessages = msg::this.cuaMessages}
         member this.prependReasonerItems items = {this with reasonerItems = items @ this.reasonerItems}
-        member this.prependCuaItems items = {this with cuaItems = items @ this.cuaItems}
-        member this.setPrevId id = {this with reasonerPrevId = Some id}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
         member this.setSteps xs = {this with steps = match this.steps with Some s -> Some {s with steps = xs} | None -> Some {steps=xs}}
         member this.serializeSteps() = match this.steps with Some s -> JsonSerializer.Serialize(s.steps,FlUtils.openAIResponseSerOpts) | _ -> ""
         member this.NextToDo() = match this.steps with None -> Choice1Of2 () | Some s -> Choice2Of2 (s.NextToDo())
-        member this.clearReasonerHistory() = {this with reasonerPrevId = None; reasonerItems = []}
+        member this.clearReasonerHistory() = {this with reasonerItems = []}
 
         member this.appendUsage (modelId,(usage:FsResponses.Usage)) =
             let us = this.usage |> Map.tryFind modelId |> Option.map(fun us -> usage::us) |> Option.defaultWith (fun _ -> [usage])
             let usage = this.usage |> Map.add modelId us
             {this with usage=usage}
 
-        member this.prependSnapshot snapshot =
-            let imageCntnt = Content.Input_image {|image_url = snapshot|}
-            [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerItems
 
         member this.lastAction() = this.actions |> List.tryHead |> Option.map(fun x-> [x]) |> Option.defaultValue []
 
@@ -95,6 +88,19 @@ type TaskState<'inMsg,'outMsg> = {
 
 
         ///Reset local reasoner state (full state is kept on server with.responses api 'save=true')
-        member this.resetReasonerState id = {this with reasonerPrevId = Some id; reasonerItems = []}
-        member this.resetCuaItems() = {this with cuaItems = []}
         member this.resetReasonerItems() = {this with reasonerItems = []}
+
+        member this.acceptVisualState vs = let t = {this with visualState = Some vs} in t.prependSnapshot vs.snapshot
+
+        member this.prependSnapshot snapshot =
+            let imageCntnt = Content.Input_image {|image_url = snapshot|}
+            [IOitem.Message {Message.Default with content = [imageCntnt]}] |> this.prependReasonerItems
+
+        member this.performActionAndCapture (cc:ComputerCall) = async {
+                do! Actions.doAction 2 this.driver cc.action
+                let! vs = FlUtils.snapshot this.driver
+                let actStr = Actions.actionToString cc.action
+                let t = this.acceptVisualState vs
+                let t = t.prependAction actStr
+                return t
+            }

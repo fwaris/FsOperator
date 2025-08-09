@@ -1,13 +1,12 @@
 ﻿namespace FsOpCore
 open FsResponses
 open System.Text.Json
-
-//functions for Cua model
+(*
 module Cua =
     ///if there is text content in resp then add that to chat history as asst. msg, also return the text
     let prependAsstMsg (task:TaskState<_,_>) resp =
         FlResps.extractText resp
-        |> Option.map (fun text -> task.prependCuaMessage (Assistant {id=resp.id; content=text}),Some text)
+        |> Option.map (fun text -> task.prependCuaMessage (Assistant text),Some text)
         |> Option.defaultValue (task,None)
 
     ///if there is text content in resp then add that to chat history as user msg
@@ -20,6 +19,15 @@ module Cua =
         let! visualState = FlUtils.snapshot task.driver
         let task = task.prependSnapshot visualState.snapshot //save screenshot for reasoner also
         return task,visualState
+    }
+
+    ///handle Cua respones to potentially perform a computer call
+    let performAction task (cc:ComputerCall) = async {
+        do! Actions.doAction 2 task.driver cc.action
+        let! task,visualState = snapshot task
+        let actStr = Actions.actionToString cc.action
+        let task = task.prependAction actStr
+        return task,Some visualState
     }
 
     ///handle Cua respones to potentially perform a computer call
@@ -55,7 +63,7 @@ module Cua =
     }
 
     ///send the function call results back to CUA model
-    let postCuaFuncResults task (cuaResp:FsResponses.Response) fnouts =
+    let postCuaFuncResults task responseMapper (cuaResp:FsResponses.Response) fnouts =
         async {
             let req = {Request.Default with
                             input = fnouts
@@ -64,13 +72,13 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! FlResps.postRequestAndReplyToChannel W_Cua task.bus.PostInput req
+            do! FlResps.postRequestAndReplyToChannel responseMapper task.bus.PostToFlow req
         }
-        |> FlResps.catch task.bus.PostInput
+        |> FlResps.catch task.bus.PostToFlow
 
 
     ///send the results of performing action to cua (along with optional additional guidance)
-    let postCuaNext task vs (cuaResp:Response) cuaInstr =
+    let postCuaNext msgMapper task vs (cuaResp:Response) cuaInstr =
 
         match vs, FlUtils.computerCall cuaResp with
         | Some vs, Some cc ->
@@ -99,20 +107,20 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            FlResps.postRequestAndReplyToChannel W_Cua task.bus.PostInput req
+            FlResps.postRequestAndReplyToChannel msgMapper task.bus.PostToFlow req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
-        |> FlResps.catch task.bus.PostInput
+        |> FlResps.catch task.bus.PostToFlow
 
     ///resume with a new cua loop (after the old loop ended with no 'computer call')
-    let postResumeCua task snapshot =
+    let postResumeCua msgMapper task snapshot =
         async {
             let chatHistory = FlResps.truncatedChatHistory task.cuaMessages
-            FlResps.postStartCuaRequest task.bus.PostInput {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
+            FlResps.postStartCuaRequest msgMapper task.bus.PostToFlow {CuaReq.Default with instructions=(Some task.cuaPrompt); visualState=snapshot; chatHistory=chatHistory}
         }
-        |> FlResps.catch task.bus.PostInput
+        |> FlResps.catch task.bus.PostToFlow
 
-    let startStep visualState (task:TaskState<_,_>) =
+    let startStep msgMapper visualState (task:TaskState<_,_>) =
         let instructions = 
             [
                 Vars.steps, task.serializeSteps():> obj
@@ -132,9 +140,9 @@ module Cua =
                 visualState  = visualState
                 nonCuaTools  = Toolbox.makeFunctionTools<Functions.FsOpTaskTools>() |> List.map Tool.Function
             }
-        FlResps.postStartCuaRequest task.bus.PostInput req
+        FlResps.postStartCuaRequest msgMapper task.bus.PostToFlow req
 
-    let postCuaNextStep task vs (cuaResp:Response) =
+    let postCuaNextStep msgMapper task vs (cuaResp:Response) =
 
         match vs, FlUtils.computerCall cuaResp with
         | Some vs, Some cc ->
@@ -166,7 +174,9 @@ module Cua =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                       }
-            FlResps.postRequestAndReplyToChannel W_Cua task.bus.PostInput req
+            FlResps.postRequestAndReplyToChannel msgMapper task.bus.PostToFlow req
         | None,_ -> async {return failwith "no 'visual state' e.g. sceenshot width, height, given"}
         | _,None -> async {return failwith "no computer call output found in response"}
-        |> FlResps.catch task.bus.PostInput
+        |> FlResps.catch task.bus.PostToFlow
+*)
+//functions for Cua model

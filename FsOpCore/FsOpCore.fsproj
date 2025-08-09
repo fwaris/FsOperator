@@ -27,11 +27,11 @@
 		<Compile Include="Flows\Reasoner.fs" />
 		<Compile Include="Flows\Cua.fs" />
 		<Compile Include="Flows\Voice.fs" />
-		<Compile Include="Flows\TaskFlowInteractive.fs" />
-		<Compile Include="Flows\Dynamic.fs" />
-		<Compile Include="Flows\TaskFlowDynamic.fs" />
-		<Compile Include="Flows\TaskFlowStepped.fs" />
-		<Compile Include="Flows\TaskFlow.fs" />
+		<Compile Include="Flows\Dynamic\Dynamic_Messages.fs" />
+		<Compile Include="Flows\Dynamic\Reasoner_Dynamic.fs" />
+		<Compile Include="Flows\Dynamic\Cua_Dynamic.fs" />
+		<Compile Include="Flows\Dynamic\TaskFlow_Dynamic.fs" />
+		<Compile Include="Flows\Dynamic\_TaskFlowDynamic.fs" />
 		<Compile Include="Flows\OTask.fs" />
 		<Compile Include="Flows\OPlan.fs" />
 	</ItemGroup>
@@ -39,16 +39,16 @@
 	<ItemGroup>
 		<PackageReference Include="FSharp.Control.AsyncSeq" Version="3.2.1" />
 		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.6" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.6" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.6" />
-		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.4.25258.110" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
-		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.57.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
+		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.61.0" />
 		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.57.0-preview" />
 		<PackageReference Include="SkiaSharp" Version="3.119.0" />
-		<PackageReference Include="System.Text.Json" Version="9.0.6" />
-		<PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
+		<PackageReference Include="System.Text.Json" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.54.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -61,7 +61,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
+	  <PackageReference Update="FSharp.Core" Version="9.0.303" />
 
 	</ItemGroup>
 

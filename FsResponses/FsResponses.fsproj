@@ -16,13 +16,13 @@
 
 	<ItemGroup>
 		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
-		<PackageReference Include="Microsoft.Extensions.AI" Version="9.6.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
-		<PackageReference Include="System.Text.Json" Version="9.0.6" />
+		<PackageReference Include="Microsoft.Extensions.AI" Version="9.7.1" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
+		<PackageReference Include="System.Text.Json" Version="9.0.8" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Update="FSharp.Core" Version="9.0.300" />
+	  <PackageReference Update="FSharp.Core" Version="9.0.303" />
 	</ItemGroup>	
 
 </Project>

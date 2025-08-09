@@ -93,7 +93,7 @@ module TaskRunner =
                 | MsgFromFlow (TaskFlow.TFo_Action action) -> model |> appendLog $"action: {action}"
                 | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.WE_Exn e)) -> model, Cmd.ofMsg (Error $"Flow exception: {e}")
                 | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.Other e)) -> model, Cmd.ofMsg (Error $"Flow error: {e}")
-                | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.WE_Responses e)) -> model, Cmd.ofMsg (Error $"Api error: {e}")
+                | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.WE_Error e)) -> model, Cmd.ofMsg (Error $"Api error: {e}")
                 | MsgFromFlow (TaskFlow.TFo_Done t) -> {model with memory = getMemory t}, Cmd.ofMsg Stop
                 | MsgFromFlow (TaskFlow.TFo_Usage u) -> model,Cmd.none
                 | MsgFromFlow (TaskFlow.TFo_Paused u) -> model,Cmd.none

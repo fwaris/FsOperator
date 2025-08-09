@@ -23,4 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FsOpPlanEditor\FsOpPlanEditor.fsproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="9.0.303" />
+  </ItemGroup>
 </Project>

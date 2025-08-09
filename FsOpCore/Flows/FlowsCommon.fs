@@ -28,6 +28,8 @@ type CuaReq =
         visualState  : VisualState
         chatHistory  : Message list
         nonCuaTools  : Tool list
+        kernel       : Kernel
+        computerCall : FsResponses.ComputerCall option
     }
     with static member Default =
                         {
@@ -35,8 +37,9 @@ type CuaReq =
                             visualState = VisualState.Default
                             chatHistory = []
                             nonCuaTools = []
+                            computerCall = None
+                            kernel = Unchecked.defaultof<_>
                         }
-
 
 module FlUtils =
     open System.Text.Json.Serialization
@@ -80,7 +83,6 @@ parseMemory "a:b"
 parseMemory "a:b:c"
 *)
 
-
     ///extracts 'computer call' from response
     let computerCall (response:FsResponses.Response) =
         response.output
@@ -97,34 +99,9 @@ parseMemory "a:b:c"
         Log.warn $"{name}: ignored message {msg}"
         F(s,[])
 
-    ///convenience 'active pattern' to match a W_Reasoner msg
-    ///with the given correlation id
-    let (|Reasoner|_|) corrId msg =
-        match msg with
-        | W_Reasoner (id,resp) when id = corrId -> Some resp
-        | _                                     -> None
-
     let hasFunction (resp:Response) =
         resp.output
         |> List.exists (fun x -> x.IsFunction_call)
-
-    ///convenience 'active pattern' to match a W_Reasoner msg
-    ///with at least one function call
-    let (|FuncCall|_|)msg =
-        match msg with
-        | W_Reasoner (id,resp) when hasFunction resp -> Some (id,resp)
-        | _                                          -> None
-
-    ///convenience 'active pattern' to match a W_Reasoner msg
-    ///with the given correlation id and with at least one function call
-    let (|Cua_FuncCall|_|) = function
-        | W_Cua (resp) when hasFunction resp -> Some resp
-        | _                                  -> None
-
-    ///Cua message with no computer call requested
-    let (|NoComputerCall|_|) = function
-        | W_Cua (resp) when noCC resp -> Some resp
-        | _                           -> None
 
     let getUsage (resp:Response) = resp.model,resp.usage
 
@@ -164,8 +141,7 @@ module FlResps =
         chatMsgs
         |> List.map (function
             | ChatMsg.User m -> {id = None; role="user"; content = [Content.Input_text {| text = m |}]; status = None}
-            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Content.Output_text {text = m.content; annotations=None}] ; status = None}
-            | ChatMsg.Developer m -> {id = None; role="developer"; content = [Content.Input_text {|text = m|}] ; status = None})
+            | ChatMsg.Assistant m -> {id = None; role="assistant"; content = [Content.Output_text {text = m; annotations=None}] ; status = None})
 
     let truncateHistory messages =
         List.rev messages
@@ -212,7 +188,7 @@ module FlResps =
             Log.exn(ex, errMsg)
 
     ///send a request to the responses api (with retry) and post response back to input channel
-    let rec private sendWithRetry count (req:Request) =
+    let rec sendWithRetry count (req:Request) =
         async {
             try
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
@@ -238,7 +214,7 @@ module FlResps =
         }
 
     ///send a new cua request with 'computer tool call' - no prev state or history
-    let postStartCuaRequest replyChannel cuaReq =
+    let postStartCuaRequest msgMapper replyChannel cuaReq =
        let vs = cuaReq.visualState
        async {
             let contImg = Content.Input_image {|image_url = vs.snapshot|}
@@ -256,7 +232,7 @@ module FlResps =
                             model=Models.computer_use_preview
                             truncation = Some Truncation.auto
                         }
-            do! postRequestAndReplyToChannel W_Cua replyChannel req
+            do! postRequestAndReplyToChannel msgMapper replyChannel req
         }
         |> catch replyChannel
 
