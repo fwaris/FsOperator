@@ -35,9 +35,11 @@ type WBus<'input,'output> =
     with 
         static member QUEUE_MAX = 20
         static member Create<'appIn,'appOut>() = 
+            let inOpts = BoundedChannelOptions(WBus<_,_>.QUEUE_MAX, SingleReader=true, SingleWriter=false)
+            let outOpts = BoundedChannelOptions(WBus<_,_>.QUEUE_MAX, SingleReader=false, SingleWriter=false)
             {
-                _flowChannel  = Channel.CreateBounded<W_Msg_In<'appIn>>(WBus<_,_>.QUEUE_MAX)
-                agentChannel = Channel.CreateBounded<'output>(WBus<_,_>.QUEUE_MAX)
+                _flowChannel  = Channel.CreateBounded<W_Msg_In<'appIn>>(inOpts)
+                agentChannel = Channel.CreateBounded<'output>(outOpts)
             }
         member this.Close() = 
             this._flowChannel.Writer.TryComplete() |> ignore

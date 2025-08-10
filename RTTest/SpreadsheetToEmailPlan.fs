@@ -3,19 +3,27 @@ open FsOpCore
 open System.Text.Json
 open Microsoft.SemanticKernel
 
+let link,login = 
+    if true then 
+        "https://excel.cloud.microsoft/open/onedrive/?docId=932B65600EEDADE8%21s004ffc0fd572449793439c9ead82dec2&driveId=932B65600EEDADE8",
+        "FaisalWaris@live.com"
+    else
+        "https://tmobileusa-my.sharepoint.com/:x:/r/personal/faisal_waris1_t-mobile_com/_layouts/15/Doc.aspx?sourcedoc=%7B24864620-6e64-454e-a50c-9bf02f98761c%7D&action=edit&wdPreviousSession=bc554659-d29a-64c8-7b5b-ca6e932a7d3c",
+        "Faisal.Waris1@t-mobile.com"
+
 let tGetEmails =
     { OTask.Create() with
         id = "get_emails"
         description = "Get emails ids from Excel"
-        target = OLink "https://tmobileusa-my.sharepoint.com/:x:/r/personal/faisal_waris1_t-mobile_com/_layouts/15/Doc.aspx?sourcedoc=%7B24864620-6e64-454e-a50c-9bf02f98761c%7D&action=edit&wdPreviousSession=bc554659-d29a-64c8-7b5b-ca6e932a7d3c"
+        target = OLink $"{link}"
         tools = Toolbox.tools [
                     typeof<Functions.FsOpMemory>
                     typeof<Functions.FsOpNavigator>
                     typeof<Functions.FsOpTaskTools>
                 ]
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
-        cua = Some """You goal is to note down the names and email ids of persons in the Excel sheet and save them to memory for the next task. Scroll as need to get all the data.
-Note: If required, use Faisal.Waris1@t-mobile.com as login email id.
+        cua = Some $"""You goal is to note down the names and email ids of persons in the Excel sheet and save them to memory for the next task. Scroll as need to get all the data.
+Note: If required, use {login} as login email id.
 """
         }
 
@@ -30,7 +38,7 @@ let tSendEmails =
                     typeof<Functions.FsOpTaskTools>
                 ]
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
-        cua = Some """
+        cua = Some $"""
 Obtain the names and email address of all contacts from memory (use memory_get_all).
 
 For each contact:
@@ -48,7 +56,7 @@ Cua model
 6. Click "Send" to send the mail
 
 Notes: 
-    - If required, use Faisal.Waris1@t-mobile.com as login email id.
+    - If required, use {login} as login email id.
     - Dismiss any reminders and pop ups, if requried.
     - Use 'home' function to get back to main page
     - To clear a field, you can as Cua to issue 'CTRL-A' and then 'Delete' key.

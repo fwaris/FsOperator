@@ -191,7 +191,9 @@ module FlResps =
     let rec sendWithRetry count (req:Request) =
         async {
             try
+                Log.info $"r {req.model} -->"
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
+                Log.info $"r {req.model} <--"
                 return response
             with ex -> 
                 match ex with 

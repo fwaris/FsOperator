@@ -17,16 +17,25 @@ module TaskFlow_Dynamic =
     }
         with 
             static member Create task = 
+                let t = 
                             {
                                 task                = task
                                 cts                 = new CancellationTokenSource()
                                 cuaLoopCount        = 0
                                 reasonerLoopCount   = 0
                             }
+                SubState.hookTaskTools t
+                t
+
             member this.incrReasonerLoopCount()  = {this with reasonerLoopCount = this.reasonerLoopCount + 1}
             member this.incrCuaLoopCount()  = {this with cuaLoopCount = this.cuaLoopCount + 1}
             member this.resetCuaLoopCount() = {this with cuaLoopCount = 0}    
 
+            static member hookTaskTools (ss:SubState) =
+                let tasktools = ss.task.kernel.GetRequiredService<Functions.FsOpTaskTools>()
+                tasktools.SetFunctions({Functions.TaskToolImpl.taskDone = fun ()->async{                    
+                    Log.info $"Done call for task {ss.task.id}"
+                    ss.task.bus.PostToFlow (W_Msg TaskFlowMsgIn.APi_TerminateTask)}}) //wire task tools plugin to this instance
 
     module States = 
         ///log that a message was ignored in some state
@@ -90,6 +99,7 @@ module TaskFlow_Dynamic =
             | W_Msg msg                      -> M msg                                                              //to be handled by the state 
 
         and s_start ss msg = async {
+            Log.info $"{nameof s_start}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
             match s_start,ss,msg with 
             | Txn s                         -> return s
             | M APi_Start                   -> let ss,req = reasonerRequestAndClear ss
@@ -104,6 +114,7 @@ module TaskFlow_Dynamic =
         }
         
         and s_cua ss msg = async {
+            Log.info $"{nameof s_cua}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
             match s_cua,ss,msg with 
             | Txn s                         -> return s
             | M (RSNRi_Steps steps)         -> let ss = {ss with task = ss.task.setSteps steps}.incrReasonerLoopCount() //update steps and count
@@ -118,12 +129,13 @@ module TaskFlow_Dynamic =
                                                let ss = {ss with task = t}
                                                let! vs = snapshot ss.task.driver                                      //take a snapshot
                                                let ss = {ss with task = ss.task.acceptVisualState vs}                 //store snapshot
-                                               let req = cuaStartRequest ss                                           //need to 're start cua as history is lost when no cc
+                                               let req = cuaStartRequest ss                                           //need to 're start datecua as history is lost when no cc
                                                return F(s_cua ss,[CUAo_Req req])                                      //txn back to s_cua; send new req to cua
             | x                             -> return ignoreMsg (s_cua ss) x (nameof s_cua)
         }
 
         and s_summarize ss msg = async {
+            Log.info $"{nameof s_summarize}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
             match s_start,ss,msg with         
             | Txn s                         -> return s
             | M (RSNRi_Summary s)           -> let ss = {ss with task = ss.task.prependCuaMessage (Assistant s)}
@@ -132,7 +144,7 @@ module TaskFlow_Dynamic =
         }
 
         and s_terminate ss msg = async {
-            Log.info $"in s_terminate task {ss.cuaLoopCount} {ss.reasonerLoopCount} '{ss.task.id}'"
+            Log.info $"{nameof s_terminate}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
             ss.cts.CancelAfter(1000)
             Log.info $"s_terminate: message ignored {msg}"
             return !!(s_terminate ss)
@@ -140,6 +152,7 @@ module TaskFlow_Dynamic =
 
     ///construct flow and also start it
     let create task : IFlow<TaskFlowMsgIn> =
+        
         ///initial substate
         let ss0 = SubState.Create task
 

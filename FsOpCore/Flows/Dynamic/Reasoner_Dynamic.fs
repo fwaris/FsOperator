@@ -87,21 +87,6 @@ in relation to the original [TASK_INSTRUCTIONS].
 
 module ReasonerAgent =
 
-    //Handle all function calls found in response message.
-    let callFunctions kernel resp = async {
-        let fns =
-            resp.output
-            |> List.choose (function
-                | IOitem.Function_call fn -> Some fn
-                | _                       -> None)
-        let mutable fouts = []
-        for f in fns do
-            let! rslt = Toolbox.invokeFunction kernel f.name f.arguments
-            let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
-            fouts <- fout::fouts
-        return fouts
-    }
-
     type internal State =
         {
             prevId             : string option
@@ -113,96 +98,72 @@ module ReasonerAgent =
                             bus = bus
                         }
 
-    ///ask reasoner to break the CUA instructions into initial steps
-    let internal getInitialSteps state (req:ReasonerReq) =
-        let correlationId = newId()
-        let comp =
-            async {
-                let msg =
-                    [
-                        Vars.cuaInstructions, req.cuaPrompt :> obj
-                    ]
-                    |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[dvlpr] reasoner start instructions``
-                let msg = {Message.Default with content = [Content.Input_text {|text = msg|}]; role="developer"}
-                let instr =
-                    [Vars.memory, req.memory :> obj]
-                    |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] initial steps``
-                let req =
-                    {Request.Default with
-                        input = [IOitem.Message msg]
-                        model=Models.o4_mini
-                        instructions = Some instr
-                        store = true
-                        text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
-                        metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
-                    }
-                try
-                    let! resp = FlResps.sendWithRetry 0 req
-                    FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
-                    return Some resp
-                with _ ->
-                    return None
+    let internal createReqInitial state (req:ReasonerReq) = 
+        let msg =
+            [
+                Vars.cuaInstructions, req.cuaPrompt :> obj
+            ]
+            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[dvlpr] reasoner start instructions``
+        let msg = {Message.Default with content = [Content.Input_text {|text = msg|}]; role="developer"}
+        let instr =
+            [Vars.memory, req.memory :> obj]
+            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] initial steps``
+        let req =
+            {Request.Default with
+                input = [IOitem.Message msg]
+                model=C.REASONER_MODEL
+                instructions = Some instr
+                store = true
+                text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
             }
-        correlationId,comp
+        req
 
-    let internal getNextSteps state (req:ReasonerReq) =
-        let correlationId = newId()
-        let comp =
-            async {
-                let instructions =
-                    [
-                        Vars.memory, req.memory :> obj
-                        Vars.actionHistory, req.actions
-                        Vars.cuaMessageHistory, (string req.cuaMessages)
-                    ]
-                    |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] get next steps``
+    let internal createReqNextSteps state (req:ReasonerReq) =
+        let instructions =
+            [
+                Vars.memory, req.memory :> obj
+                Vars.actionHistory, req.actions
+                Vars.cuaMessageHistory, (string req.cuaMessages)
+            ]
+            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] get next steps``
 
-                let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
-                let req =
-                    {Request.Default with
-                        input = inp
-                        instructions = Some instructions
-                        tools = req.toolDefs |> List.map Tool.Function
-                        previous_response_id = state.prevId
-                        store = true
-                        parallel_tool_calls = true
-                        model=Models.o4_mini
-                        text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
-                        truncation = Some Truncation.auto
-                        metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
-                    }
-                try
-                    let! resp = FlResps.sendWithRetry 0 req
-                    FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
-                    return Some resp
-                with _ ->
-                    return None
+        let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
+        let req =
+            {Request.Default with
+                input = inp
+                instructions = Some instructions
+                tools = req.toolDefs |> List.map Tool.Function
+                previous_response_id = state.prevId
+                store = true
+                parallel_tool_calls = true
+                model=C.REASONER_MODEL
+                text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
+                truncation = Some Truncation.auto
             }
-        correlationId,comp
+        req
 
-    let internal summarize state req =
-        let correlationId = newId()
-        let comp =
-            async {
-                let summarizeMsg = Message.OfText Reasoner_Dynamic_Prompts.``cua early termination prompt``
-                let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
-                let req =
-                    {Request.Default with
-                        input = inp @ [IOitem.Message summarizeMsg]
-                        previous_response_id = state.prevId
-                        store = true
-                        tool_choice = ToolChoice.None
-                        model=Models.o4_mini
-                        metadata = [C.CORR_ID,correlationId] |> Map.ofList |> Some
-                    }
-                try
-                    let! resp = FlResps.sendWithRetry 0 req
-                    FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
-                    return Some resp
-                with _ ->
-                    return None
+    let internal invokeApi state req =
+        async {
+            try
+                let! resp = FlResps.sendWithRetry 0 req
+                FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
+                return Some resp
+            with _ ->
+                return None
+        }
+
+    let internal createSummarizeReq state req =
+        let summarizeMsg = Message.OfText Reasoner_Dynamic_Prompts.``cua early termination prompt``
+        let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
+        let req =
+            {Request.Default with
+                input = inp @ [IOitem.Message summarizeMsg]
+                previous_response_id = state.prevId
+                store = true
+                tool_choice = ToolChoice.None
+                model=C.REASONER_MODEL
             }
-        correlationId,comp
+        req
 
     let extractSteps resp =
         let text = RUtils.outputText resp
@@ -218,8 +179,23 @@ module ReasonerAgent =
             Log.info $"Empty steps from reasoner call"
             []
 
+    //Handle all function calls found in response message.
+    let callFunctions kernel resp = async {
+        let fns =
+            resp.output
+            |> List.choose (function
+                | IOitem.Function_call fn -> Some fn
+                | _                       -> None)
+        let mutable fouts = []
+        for f in fns do
+            let! rslt = Toolbox.invokeFunction kernel f.name f.arguments
+            let fout = IOitem.Function_call_output {call_id = f.call_id; output = rslt}
+            fouts <- fout::fouts
+        return fouts
+    }
+
     let MAX_SEQUENTIAL_FUNC_CALLS = 5
-    let rec internal callFunctionLoop count state kernel resp =
+    let rec internal callFunctionLoop state kernel protoReq resp count =
         async {
             if count > MAX_SEQUENTIAL_FUNC_CALLS then 
                 state.bus.PostToFlow( W_Err (WE_Error $"max repeated function calls count exceeded: {count}"))
@@ -227,9 +203,10 @@ module ReasonerAgent =
             else 
                 let! rslts = callFunctions kernel resp
                 try 
-                    let! resp = FlResps.sendWithRetry 0 {Request.Default with previous_response_id=Some resp.id; input=rslts}
+                    let req = {protoReq with input=rslts; previous_response_id=Some resp.id}
+                    let! resp = FlResps.sendWithRetry 0 req
                     if FlUtils.hasFunction resp then 
-                        return! callFunctionLoop (count + 1) state kernel resp
+                        return! callFunctionLoop state kernel protoReq resp (count + 1)
                     else
                         return Some resp
                 with ex ->
@@ -237,13 +214,13 @@ module ReasonerAgent =
                     return None
         }
 
-    let internal processRequest state comp kernel =
+    let internal processRequest state kernel req =
         async {
-            let! resp = comp
+            let! resp = invokeApi state req
             match resp with
             | Some resp ->
                 if FlUtils.hasFunction resp then 
-                    let! resp' = callFunctionLoop 0 state kernel resp //handle function calls till no more (or max count reached)
+                    let! resp' = callFunctionLoop state kernel req resp 0 //handle function calls till no more (or max count reached)
                     return resp'
                 else
                     return Some resp
@@ -256,9 +233,8 @@ module ReasonerAgent =
         async {
             match msg with
             | RSNRo_GetSteps r ->
-                let stepFn = if state.prevId.IsNone then getInitialSteps else getNextSteps
-                let id,comp = stepFn state r
-                match! processRequest state comp r.kernel with 
+                let req = if state.prevId.IsNone then createReqInitial state r else createReqNextSteps state r                
+                match! processRequest state r.kernel req with 
                 | Some resp ->
                     let state = {state with prevId = Some resp.id}
                     let steps = extractSteps resp
@@ -267,8 +243,8 @@ module ReasonerAgent =
                 | None -> 
                     return state
             | RSNRo_Summarize r -> 
-                    let id,comp = summarize state r
-                    match! processRequest state comp r.kernel with 
+                    let req = createSummarizeReq state r
+                    match! processRequest state r.kernel req with 
                     | Some resp -> 
                         resp |> RUtils.outputText |> RSNRi_Summary |> W_Msg |> state.bus.PostToFlow
                         return {state with prevId = Some resp.id}
@@ -284,4 +260,3 @@ module ReasonerAgent =
         |> AsyncSeq.scanAsync update (State.Create bus)
         |> AsyncSeq.iter(fun _ -> ())
         |> FlResps.catch bus.PostToFlow
-
