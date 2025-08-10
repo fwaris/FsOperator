@@ -168,6 +168,7 @@ module CuaAgent =
         async {
             match msg with
             | CUAo_Req r ->
+                Log.info "cua: req"
                 let comp = match r.computerCall with Some cc -> sendReqLoop state r | _ -> sendReqStart state r 
                 match! processRequest state comp r.kernel  with 
                 | Some resp -> match FlUtils.computerCall resp with
@@ -181,7 +182,8 @@ module CuaAgent =
         }
             
     let startCuaAgent (bus:WBus<TaskFlowMsgIn,TaskFlowMsgOut>) =
-        bus.agentChannel.Reader.ReadAllAsync()
+        let channel = bus.agentChannel.Subscribe("cua")
+        channel.Reader.ReadAllAsync()
         |> AsyncSeq.ofAsyncEnum
         |> AsyncSeq.scanAsync update (State.Create bus)
         |> AsyncSeq.iter(fun _ -> ())

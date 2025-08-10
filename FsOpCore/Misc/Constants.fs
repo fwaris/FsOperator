@@ -1,6 +1,8 @@
 ﻿namespace FsOpCore
 
 module C =
+    let MAX_BUS_QUEUE_DEPTH = 29
+    
     let DEBUG_PORT = 9222
     let REMOTE_BROWSER_PORT = 51400
 

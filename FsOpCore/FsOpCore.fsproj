@@ -18,6 +18,7 @@
 		<Compile Include="UIDrivers\PlaywrightDriver.fs" />
 		<Compile Include="Flows\Prompts.fs" />
 		<Compile Include="Flows\Actions.fs" />
+		<Compile Include="Flows\Bus.fs" />
 		<Compile Include="Flows\Workflow.fs" />
 		<Compile Include="Flows\ChatMsg.fs" />
 		<Compile Include="Flows\Functions.fs" />

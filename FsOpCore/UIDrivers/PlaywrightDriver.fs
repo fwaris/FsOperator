@@ -404,5 +404,12 @@ module PlaywrightDriver =
                 member _.url () = url()
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.browser
                 member _.start (arg: string) = goToPage arg
+                member _.saveState() = async {
+                    try 
+                        let! page = page()
+                        do! saveState page.Context
+                    with ex ->
+                        Log.exn(ex,"saveState")
+                }
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

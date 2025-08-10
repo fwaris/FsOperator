@@ -1,5 +1,6 @@
 ﻿namespace FsOpCore
 open Microsoft.SemanticKernel
+open FSharp.Control
 open System.Threading
 open Microsoft.Extensions.DependencyInjection
 open FsOpCore.Dynamic
@@ -161,6 +162,25 @@ Use memory_save function to save each person's linked-in and twitter data into m
         sumUsages us
         |> Map.iter (fun m u -> printfn $"{m} inp:{u.input_tokens}, out:{u.output_tokens}, tot:{u.total_tokens}")
 
+    let monitorTask (h:ManualResetEvent) (completedTask:Ref<TaskState<_,_> option>) (bus:WBus<_,_>) =
+        let comp =
+            let channel = bus.agentChannel.Subscribe("app")
+            channel.Reader.ReadAllAsync()
+            |> AsyncSeq.ofAsyncEnum
+            |> AsyncSeq.iter (function 
+                    | TaskFlowMsgOut.APo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore; 
+                    | TaskFlowMsgOut.APo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                    | TaskFlowMsgOut.APo_Action a -> printfn "%A" a
+                    | TaskFlowMsgOut.APo_Usage us -> printTaskUsage us
+                    | _ -> () //ignore messages for other agents
+                )
+        async {
+            match! Async.Catch(comp) with
+            | Choice1Of2 _ -> Log.info "task ended"
+            |  Choice2Of2 ex -> Log.exn(ex,"monitorTask")
+        }
+        |> Async.Start
+    
     ///Runs the current task set in planRun
     let runCurrentTask (planRun:OPlanRun) = async{
         match planRun.currentTask with
@@ -169,12 +189,6 @@ Use memory_save function to save each person's linked-in and twitter data into m
             use h = new ManualResetEvent(false)
             let completedTask = ref None
             let driver = (PlaywrightDriver.create().driver)
-            let post = fun p ->
-                match p with
-                | TaskFlowMsgOut.APo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore
-                | TaskFlowMsgOut.APo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                | TaskFlowMsgOut.APo_Action a -> printfn "%A" a
-                | TaskFlowMsgOut.APo_Usage us -> printTaskUsage us
             let bus = WBus.Create<_,_>()
             let t0 = TaskState.Create<_,_>  //initial task state
                         ot.task.id
@@ -185,11 +199,9 @@ Use memory_save function to save each person's linked-in and twitter data into m
                         ot.task.reasoner
                         planRun.kernel
                         ot.task.tools
-            //match ot.task.target with
-            //| OLink url -> do! driver.start url
-            //| OProcess (a,b) -> ()
             let flow = TaskFlow_Dynamic.create t0
             flow.Post TaskFlowMsgIn.APi_Start
+            monitorTask h completedTask bus
             startTimer ot.task.allowedSec flow //sends task terminate message when this timer expires
             let! r = Async.AwaitWaitHandle(h,ot.task.allowedSec * 1000 * 3) //max wait for task to finish in case its stuck
             match completedTask.Value with

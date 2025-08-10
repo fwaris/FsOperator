@@ -33,3 +33,12 @@ and TaskFlowMsgOut =
     | RSNRo_GetSteps of ReasonerReq
     | RSNRo_Summarize of ReasonerReq 
     | CUAo_Req of CuaReq
+    with override this.ToString() =
+            match this with
+            | APo_Error _ -> "APo_Error"
+            | APo_Action _ -> "APo_Action"
+            | APo_Done _ -> "APo_Done"
+            | APo_Usage _ -> "APo_Usage"
+            | RSNRo_GetSteps _ -> "RSNRo_GetSteps"
+            | RSNRo_Summarize _ -> "RSNRo_Summarize"
+            | CUAo_Req _ -> "CUAo_Req"

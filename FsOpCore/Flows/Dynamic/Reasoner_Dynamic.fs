@@ -233,6 +233,7 @@ module ReasonerAgent =
         async {
             match msg with
             | RSNRo_GetSteps r ->
+                Log.info "rsnr: get steps"
                 let req = if state.prevId.IsNone then createReqInitial state r else createReqNextSteps state r                
                 match! processRequest state r.kernel req with 
                 | Some resp ->
@@ -242,7 +243,8 @@ module ReasonerAgent =
                     return state
                 | None -> 
                     return state
-            | RSNRo_Summarize r -> 
+            | RSNRo_Summarize r ->
+                    Log.info "rsnr: summarize"
                     let req = createSummarizeReq state r
                     match! processRequest state r.kernel req with 
                     | Some resp -> 
@@ -255,7 +257,8 @@ module ReasonerAgent =
         }
 
     let startReasonerAgent (bus:WBus<TaskFlowMsgIn,TaskFlowMsgOut>) =
-        bus.agentChannel.Reader.ReadAllAsync()
+        let channel = bus.agentChannel.Subscribe("reasoner")
+        channel.Reader.ReadAllAsync()
         |> AsyncSeq.ofAsyncEnum
         |> AsyncSeq.scanAsync update (State.Create bus)
         |> AsyncSeq.iter(fun _ -> ())
