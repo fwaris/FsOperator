@@ -403,7 +403,7 @@ module PlaywrightDriver =
                 member _.typeText text = typeText text
                 member _.url () = url()
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.browser
-                member _.start (arg: string) = goToPage arg
+                member _.start (arg: string) = if isEmpty arg then async{return()} else goToPage arg
                 member _.saveState() = async {
                     try 
                         let! page = page()

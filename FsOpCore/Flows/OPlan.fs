@@ -46,6 +46,7 @@ type OPlanRun = {
     kernel : Kernel
     completedTasks : OTaskRun list
     currentTask : OTaskRun option
+    driver : IUIDriver
 }
 with
     static member Create plan kernel =
@@ -54,6 +55,7 @@ with
                         kernel = kernel
                         completedTasks = []
                         currentTask = None
+                        driver = PlaywrightDriver.create().driver
                     }
 
 module OPlan =
@@ -167,13 +169,17 @@ Use memory_save function to save each person's linked-in and twitter data into m
             let channel = bus.agentChannel.Subscribe("app")
             channel.Reader.ReadAllAsync()
             |> AsyncSeq.ofAsyncEnum
-            |> AsyncSeq.iter (function 
-                    | TaskFlowMsgOut.APo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore; t.driver.saveState() |> Async.Start
-                    | TaskFlowMsgOut.APo_Error e -> printfn "%A" e;  h.Set() |> ignore
-                    | TaskFlowMsgOut.APo_Action a -> printfn "%A" a
-                    | TaskFlowMsgOut.APo_Usage us -> printTaskUsage us
-                    | _ -> () //ignore messages for other agents
-                )
+            |> AsyncSeq.iterAsync (fun msg -> async {
+                match msg with
+                | TaskFlowMsgOut.APo_Done t -> 
+                    completedTask.Value <- Some t
+                    h.Set() |> ignore
+                    do! t.driver.saveState()
+                | TaskFlowMsgOut.APo_Error e -> printfn "%A" e;  h.Set() |> ignore
+                | TaskFlowMsgOut.APo_Action a -> printfn "%A" a
+                | TaskFlowMsgOut.APo_Usage us -> printTaskUsage us
+                | _ -> () //ignore messages for other agents
+            })
         async {
             match! Async.Catch(comp) with
             | Choice1Of2 _ -> Log.info "task ended"
@@ -218,7 +224,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
                     currentTask = None
                     completedTasks = appendTask planRun.currentTask planRun.completedTasks}
         | Some t ->
-                let tr = OTaskRun.Create t (PlaywrightDriver.create().driver)
+                let tr = OTaskRun.Create t (planRun.driver)
                 let planRun =
                         {planRun with
                             currentTask = Some tr
@@ -252,5 +258,6 @@ Use memory_save function to save each person's linked-in and twitter data into m
         if planRun.currentTask.IsSome then
             return! run planRun
         else
+            do! PlaywrightDriver.shutdown() 
             return planRun
     }

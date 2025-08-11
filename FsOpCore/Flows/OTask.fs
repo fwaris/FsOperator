@@ -6,10 +6,12 @@ open System.Collections.Generic
 type OTaskTarget =
     | OProcess of string*string option
     | OLink of string
+    | ONone
     with member this.TargetString() =
             match this with
             | OProcess (a,b) -> $"{a} {b}"
             | OLink s -> s
+            | ONone -> ""
 
 module OTaskTarget =
     let private _parseTarget (xs:string array) =
@@ -17,7 +19,9 @@ module OTaskTarget =
         let b = if xs.Length > 1 then Some xs.[1] else None
         if a.EndsWith ".exe" then 
             OProcess (a,b)
-        else 
+        elif isEmpty a then 
+            ONone
+        else
             let a = if a.StartsWith("http") then a else "https://" + a
             OLink a
 
@@ -43,7 +47,7 @@ type OTask = {
         ///creates a new empty task with unique id assigned
         static member Create() =  {
                 id = newId()
-                target = OLink ""
+                target = ONone
                 description = ""
                 cua = None
                 reasoner = None
