@@ -171,7 +171,7 @@ module ReasonerAgent =
         match checkEmpty text with
         | Some text ->
             try
-                let xs = JsonSerializer.Deserialize<CuaInstructions>(text, FlUtils.openAIResponseSerOpts)
+                let xs = JsonSerializer.Deserialize<CuaInstructions>(text, Utility.openAIResponseSerOpts)
                 xs.steps
             with ex ->
                 Log.exn (ex,"ReasonerAgent.extractSteps")

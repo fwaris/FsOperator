@@ -17,6 +17,11 @@ module Vars =
 ///a collection of default prompts for various uses and some prompt utilities
 module Prompts =
 
+    ///string encode json content for proper template handling
+    let toJson<'t>(o:'t) =
+        let str = Utility.formatJson o
+        System.Text.Json.JsonSerializer.Serialize(str, Utility.openAIResponseSerOpts)
+
     ///create a KernelArguments instance which holds the
     ///values for prompt template variable names
     let kernelArgs (args:(string*obj) seq) =
@@ -34,8 +39,8 @@ module Prompts =
             let b = Kernel.CreateBuilder()
             b.Plugins.AddFromType<TimePlugin>("time") |> ignore
             let k = b.Build()
-            let fac = KernelPromptTemplateFactory()
-            let cfg = PromptTemplateConfig(template = promptTemplate)
+            let fac = KernelPromptTemplateFactory( AllowDangerouslySetContent=true)
+            let cfg = PromptTemplateConfig(template = promptTemplate,AllowDangerouslySetContent=true)
             let pt = fac.Create(cfg)
             let! rslt = pt.RenderAsync(k,args) |> Async.AwaitTask
             return rslt

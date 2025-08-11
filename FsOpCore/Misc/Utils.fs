@@ -9,44 +9,44 @@ open System.Text.Json.Serialization
 [<AutoOpen>]
 module Utility =
 
-    
-    let getApiKey() = Environment.GetEnvironmentVariable("OPENAI_API_KEY") 
-  
+
+    let getApiKey() = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+
 
     let homePath = lazy(
-        match Environment.OSVersion.Platform with 
-        | PlatformID.Unix 
-        | PlatformID.MacOSX -> Environment.GetEnvironmentVariable("HOME") 
+        match Environment.OSVersion.Platform with
+        | PlatformID.Unix
+        | PlatformID.MacOSX -> Environment.GetEnvironmentVariable("HOME")
         | _                 -> Environment.GetEnvironmentVariable("USERPROFILE"))
 
-    let debug (msg:string) = 
+    let debug (msg:string) =
         System.Diagnostics.Debug.WriteLine(msg)
 
-    let shorten n (s:string) = 
-        if s.Length < n then 
-            s 
+    let shorten n (s:string) =
+        if s.Length < n then
+            s
         else
             let left = s.Substring(0,n/2)
             let right = s.Substring(s.Length - n/2)
             left + " [\u2026] " + right
 
-    let isEmpty (s:string) = 
+    let isEmpty (s:string) =
         String.IsNullOrWhiteSpace s
-     
+
     let checkEmpty s = if isEmpty s then None else Some s
 
     let fixEmpty s = if isEmpty s then "" else s
-    
-    let newId() = 
-        Guid.NewGuid().ToByteArray() 
-        |> Convert.ToBase64String 
-        |> Seq.takeWhile (fun c -> c <> '=') 
+
+    let newId() =
+        Guid.NewGuid().ToByteArray()
+        |> Convert.ToBase64String
+        |> Seq.takeWhile (fun c -> c <> '=')
         |> Seq.map (function '/' -> 'a' | c -> c)
-        |> Seq.toArray 
+        |> Seq.toArray
         |> String
 
     let (@@) (a:string) (b:string) = Path.Combine(a,b)
-    
+
     /// String comparison that ignores case
     let (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
 
@@ -55,21 +55,25 @@ module Utility =
 
     let ddict xs = System.Collections.Generic.Dictionary(dict xs)
 
-    ///Format json for inspection (not safe for serialization)
-    let formatJson<'t>(j:'t) =
+    ///<summary>
+    ///Json serialization options suitable for deserializing OpenAI 'structured output'.<br />
+    ///Note: can use simple enums, in such types but not F# DUs
     ///</summary>
-        let opts =
-            let o = JsonSerializerOptions(JsonSerializerDefaults.General)
-            o.Converters.Add(JsonStringEnumConverter())
-            o.WriteIndented <- true
-            o.Encoder <- JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            o.ReadCommentHandling <- JsonCommentHandling.Skip
-            let opts = JsonFSharpOptions.Default()
-            opts
-                .WithSkippableOptionFields(true)
-                .AddToJsonSerializerOptions(o)
-            o
-        JsonSerializer.Serialize(j,opts)
+    let openAIResponseSerOpts =
+        let o = JsonSerializerOptions(JsonSerializerDefaults.General)
+        o.Converters.Add(JsonStringEnumConverter())
+        o.WriteIndented <- true
+        o.Encoder <- JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        o.ReadCommentHandling <- JsonCommentHandling.Skip
+        let opts = JsonFSharpOptions.Default()
+        opts
+            .WithSkippableOptionFields(true)
+            .AddToJsonSerializerOptions(o)
+        o
+
+    ///Serialize object to json with minimal escaping
+    let formatJson<'t>(j:'t) =
+        JsonSerializer.Serialize(j,openAIResponseSerOpts)
 
     let prependToFile (t:string) (f:string) =
         let pText = if File.Exists f then File.ReadAllText f else ""

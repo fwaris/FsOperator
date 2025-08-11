@@ -57,7 +57,7 @@ module TaskFlow_Dynamic =
             ss,req
 
         let cuaLoopRequest (ss:SubState) cc = 
-            let steps = ss.task.serializeSteps()
+            let steps = ss.task.steps |> Option.map Prompts.toJson |> Option.defaultValue "" 
             printfn "%s" steps
             let instr =                
                 [
@@ -77,7 +77,7 @@ module TaskFlow_Dynamic =
             let instr =                
                 [
                     Vars.memory, FlUtils.getMemory ss.task.kernel :> obj
-                    Vars.steps, ss.task.serializeSteps()
+                    Vars.steps, (ss.task.steps |> Option.map Prompts.toJson |> Option.defaultValue "") :> obj
                 ]
                 |> Prompts.renderPrompt Cua_Dynamic_Prompts.``cua loop``
             //initial request has 'developer' prompt that is persistent

@@ -4,7 +4,7 @@ open System.Text.Json
 open Microsoft.SemanticKernel
 
 let link,login = 
-    if true then 
+    if false then 
         "https://excel.cloud.microsoft/open/onedrive/?docId=932B65600EEDADE8%21s004ffc0fd572449793439c9ead82dec2&driveId=932B65600EEDADE8",
         "FaisalWaris@live.com"
     else

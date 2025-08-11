@@ -114,24 +114,10 @@ parseMemory "a:b:c"
             else
                 let svc = svc :?> Functions.FsOpMemory
                 svc.getMemory()
-        Functions.FsOpMemory.Serialize(mem)
+        Prompts.toJson mem
 
 
-    ///<summary>
-    ///Json serialization options suitable for deserializing OpenAI 'structured output'.<br />
-    ///Note: can use simple enums, in such types but not F# DUs
-    ///</summary>
-    let openAIResponseSerOpts =
-        let o = JsonSerializerOptions(JsonSerializerDefaults.General)
-        o.Converters.Add(JsonStringEnumConverter())
-        o.WriteIndented <- true
-        o.Encoder <- JavaScriptEncoder.Default
-        o.ReadCommentHandling <- JsonCommentHandling.Skip
-        let opts = JsonFSharpOptions.Default()
-        opts
-            .WithSkippableOptionFields(true)
-            .AddToJsonSerializerOptions(o)
-        o
+
 
 //utility functions for working Responses API messages
 module FlResps =
@@ -197,10 +183,10 @@ module FlResps =
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
                 Log.trace $"r {req.model} <--"
                 return response
-            with ex -> 
-                match ex with 
+            with ex ->
+                match ex with
                 | :? NoFuncCallOuput as ex -> Log.info "Api was expecting function call output(s) which are not provided"
-                | _                        -> ()                
+                | _                        -> ()
                 if count < 5 then
                     logApiException ex
                     do! Async.Sleep 3000

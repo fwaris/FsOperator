@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
 		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
@@ -9,7 +9,7 @@
 
 	<ItemGroup>
 		<None Include="scripts\packages.fsx" />
-		<None Include="scripts\testflow.fsx" />
+		<None Include="scripts\testPromptSerialization.fsx" />
 		<Compile Include="Misc\Constants.fs" />
 		<Compile Include="Misc\Log.fs" />
 		<Compile Include="Misc\Utils.fs" />
