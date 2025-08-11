@@ -157,7 +157,6 @@ module CuaAgent =
                         truncation = Some Truncation.auto
                     }
         try
-            let instr = req.instructions |> Option.iter  (printfn "%s")
             let! resp = FlResps.sendWithRetry 0 req
             FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
             return Some resp

@@ -57,12 +57,10 @@ module TaskFlow_Dynamic =
             ss,req
 
         let cuaLoopRequest (ss:SubState) cc = 
-            let steps = ss.task.steps |> Option.map Prompts.toJson |> Option.defaultValue "" 
-            printfn "%s" steps
             let instr =                
                 [
                     Vars.memory, FlUtils.getMemory ss.task.kernel :> obj
-                    Vars.steps, steps
+                    Vars.steps, ss.task.steps |> Option.map Prompts.toJson |> Option.defaultValue "" :> obj
                 ]
                 |> Prompts.renderPrompt Cua_Dynamic_Prompts.``cua loop``
             {CuaReq.Default with

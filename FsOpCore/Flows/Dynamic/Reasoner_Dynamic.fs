@@ -60,7 +60,7 @@ given the [TASK_INSTRUCTIONS] and the current [MEMORY] content. Mark optional st
     /// - <see cref="Vars.actionHistory" /><br />
     /// - <see cref="Vars.cuaMessageHistory" />
     ///</summary>
-    let ``[instr] get next steps`` = $"""Given the [TASK_INSTRUCTIONS], the current [MEMORY], snapshot / action / message histories, generate the immediate next step(s) that CUA should follow. Do not exceed 3 steps. If you think the task
+    let ``[instr] get next steps`` = $"""Given the [TASK_INSTRUCTIONS], the current [MEMORY], snapshot / action / message histories, generate the immediate next step(s) that CUA should follow. Do not exceed 2 steps. If you think the task
     is done, return an empty list.
 
 # [MEMORY]
