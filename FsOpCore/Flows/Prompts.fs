@@ -39,8 +39,8 @@ module Prompts =
             let b = Kernel.CreateBuilder()
             b.Plugins.AddFromType<TimePlugin>("time") |> ignore
             let k = b.Build()
-            let fac = KernelPromptTemplateFactory( AllowDangerouslySetContent=true)
-            let cfg = PromptTemplateConfig(template = promptTemplate,AllowDangerouslySetContent=true)
+            let fac = KernelPromptTemplateFactory( AllowDangerouslySetContent=true)                        //<--- need to set it in both places
+            let cfg = PromptTemplateConfig(template = promptTemplate,AllowDangerouslySetContent=true)      //<--- for it to work
             let pt = fac.Create(cfg)
             let! rslt = pt.RenderAsync(k,args) |> Async.AwaitTask
             return rslt

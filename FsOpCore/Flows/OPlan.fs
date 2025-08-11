@@ -168,7 +168,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
             channel.Reader.ReadAllAsync()
             |> AsyncSeq.ofAsyncEnum
             |> AsyncSeq.iter (function 
-                    | TaskFlowMsgOut.APo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore; 
+                    | TaskFlowMsgOut.APo_Done t -> completedTask.Value <- Some t; h.Set() |> ignore; t.driver.saveState() |> Async.Start
                     | TaskFlowMsgOut.APo_Error e -> printfn "%A" e;  h.Set() |> ignore
                     | TaskFlowMsgOut.APo_Action a -> printfn "%A" a
                     | TaskFlowMsgOut.APo_Usage us -> printTaskUsage us
@@ -244,6 +244,7 @@ Use memory_save function to save each person's linked-in and twitter data into m
         //some of the plugins are also added as services so that they can be accessed internally
         b.Services.AddSingleton(nav) |> ignore 
         b.Services.AddSingleton(ttls) |> ignore
+        b.Services.AddSingleton(mem) |> ignore
         b.Build()
 
     let rec run planRun = async {
