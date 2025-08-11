@@ -3,6 +3,7 @@ open System.Threading
 open Microsoft.SemanticKernel
 open FsResponses
 open System.Text.Json
+open System.Text.Encodings.Web
 
 type VisualState =
     {
@@ -124,6 +125,7 @@ parseMemory "a:b:c"
         let o = JsonSerializerOptions(JsonSerializerDefaults.General)
         o.Converters.Add(JsonStringEnumConverter())
         o.WriteIndented <- true
+        o.Encoder <- JavaScriptEncoder.Default
         o.ReadCommentHandling <- JsonCommentHandling.Skip
         let opts = JsonFSharpOptions.Default()
         opts
@@ -191,9 +193,9 @@ module FlResps =
     let rec sendWithRetry count (req:Request) =
         async {
             try
-                Log.info $"r {req.model} -->"
+                Log.trace $"r {req.model} -->"
                 let! response = Api.create req (Api.defaultClient()) |> Async.AwaitTask
-                Log.info $"r {req.model} <--"
+                Log.trace $"r {req.model} <--"
                 return response
             with ex -> 
                 match ex with 

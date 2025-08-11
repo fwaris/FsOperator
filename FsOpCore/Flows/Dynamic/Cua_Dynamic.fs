@@ -157,6 +157,7 @@ module CuaAgent =
                         truncation = Some Truncation.auto
                     }
         try
+            let instr = req.instructions |> Option.iter  (printfn "%s")
             let! resp = FlResps.sendWithRetry 0 req
             FlUtils.getUsage resp |> AGi_Usage |> W_Msg |> state.bus.PostToFlow
             return Some resp
@@ -168,7 +169,6 @@ module CuaAgent =
         async {
             match msg with
             | CUAo_Req r ->
-                Log.info "cua: req"
                 let comp = match r.computerCall with Some cc -> sendReqLoop state r | _ -> sendReqStart state r 
                 match! processRequest state comp r.kernel  with 
                 | Some resp -> match FlUtils.computerCall resp with

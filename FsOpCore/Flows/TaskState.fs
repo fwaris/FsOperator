@@ -67,7 +67,8 @@ type TaskState<'inMsg,'outMsg> = {
         member this.prependReasonerItems items = {this with reasonerItems = items @ this.reasonerItems}
         member this.prependAction a = {this with actions = a::this.actions |> List.truncate C.MAX_ACTIONS }
         member this.setSteps xs = {this with steps = match this.steps with Some s -> Some {s with steps = xs} | None -> Some {steps=xs}}
-        member this.serializeSteps() = match this.steps with Some s -> JsonSerializer.Serialize(s.steps,FlUtils.openAIResponseSerOpts) | _ -> ""
+        member this.serializeSteps() = match this.steps with Some s -> Utility.formatJson s | _-> ""
+        //JsonSerializer.Serialize(s.steps,FlUtils.openAIResponseSerOpts) | _ -> ""
         member this.NextToDo() = match this.steps with None -> Choice1Of2 () | Some s -> Choice2Of2 (s.NextToDo())
         member this.clearReasonerHistory() = {this with reasonerItems = []}
 

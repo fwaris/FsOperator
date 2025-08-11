@@ -109,6 +109,7 @@ module NativeDriver =
                 member _.url () = async{ return None}
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.windows
                 member _.start cmd = startProcess cmd
+                member _.saveState (): Async<unit> = async{ return ()}
             }
         Na {|driver=userInteraction; processName = name; arg=arg|}        
 

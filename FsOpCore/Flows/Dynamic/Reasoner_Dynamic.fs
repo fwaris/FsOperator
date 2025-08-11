@@ -25,12 +25,13 @@ Drive CUA to accomplish the task described in [TASK_INSTRUCTIONS].
 ```
 
 ## Miscellaneous:
-CUA does not have the ability to call functions. Instead of asking CUA to invoke functions, you just invoke the functions directly.
-To save and retrieve memory, use the functions provided.
-Extract relevant textual information from the screenshots images provided and save to memory if needed
-CUA cannot focus on the browser's address bar; to get the browser page url use the 'get_url' function.
+- CUA does not have the ability to call tools. Instead of asking CUA to invoke tools, you just invoke the tools directly.
+- CUA cannot focus on the browser's address bar; to get the browser page url use the 'get_url' tool.
+- If you think CUA is waiting for home page to load, use the 'home' tool to load it.
+- If the web page is asking for the user to login, ask CUA to issue 'wait', till the login process is complete
 
 ## Memory:
+Extract relevant textual information from the screenshots images provided and save to memory if needed
 You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
 However, any existing memory saved before this task is already provided in [MEMORY].
 
@@ -233,7 +234,6 @@ module ReasonerAgent =
         async {
             match msg with
             | RSNRo_GetSteps r ->
-                Log.info "rsnr: get steps"
                 let req = if state.prevId.IsNone then createReqInitial state r else createReqNextSteps state r                
                 match! processRequest state r.kernel req with 
                 | Some resp ->
@@ -244,7 +244,6 @@ module ReasonerAgent =
                 | None -> 
                     return state
             | RSNRo_Summarize r ->
-                    Log.info "rsnr: summarize"
                     let req = createSummarizeReq state r
                     match! processRequest state r.kernel req with 
                     | Some resp -> 

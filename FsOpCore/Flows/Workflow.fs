@@ -60,8 +60,8 @@ module Workflow =
     ///returns nextState and publishes any output events
     let private transition (bus:WBus<_,'output>) state event = async {
         let! (F(nextState,outEvents)) = state event
-        outEvents |> List.iter (fun m -> Log.info $"agnt: {m}"; bus.PostToAgent m)
-        //outEvents |> List.iter bus.PostToAgent
+        //outEvents |> List.iter (fun m -> Log.info $"agnt: {m}"; bus.PostToAgent m)
+        outEvents |> List.iter bus.PostToAgent
         return nextState
     }
 

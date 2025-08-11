@@ -57,10 +57,12 @@ module TaskFlow_Dynamic =
             ss,req
 
         let cuaLoopRequest (ss:SubState) cc = 
+            let steps = ss.task.serializeSteps()
+            printfn "%s" steps
             let instr =                
                 [
                     Vars.memory, FlUtils.getMemory ss.task.kernel :> obj
-                    Vars.steps, ss.task.serializeSteps()
+                    Vars.steps, steps
                 ]
                 |> Prompts.renderPrompt Cua_Dynamic_Prompts.``cua loop``
             {CuaReq.Default with
