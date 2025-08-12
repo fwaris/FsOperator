@@ -72,6 +72,7 @@ module Truncation =
 module Models =
     let gpt_41 = "gpt-4.1"
     let o4_mini = "o4-mini"
+    let gpt_5 = "gpt-5"
     let gpt_41_nano = "gpt-4.1-nano"
     let gpt_41_mini = "gpt-4.1-mini"
     let computer_use_preview = "computer-use-preview"

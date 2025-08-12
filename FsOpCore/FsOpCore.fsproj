@@ -33,6 +33,10 @@
 		<Compile Include="Flows\Dynamic\Cua_Dynamic.fs" />
 		<Compile Include="Flows\Dynamic\TaskFlow_Dynamic.fs" />
 		<Compile Include="Flows\Dynamic\_TaskFlowDynamic.fs" />
+		<Compile Include="Flows\Interactive\Interactive_Messages.fs" />
+		<Compile Include="Flows\Interactive\Cua_Interactive.fs" />
+		<Compile Include="Flows\Interactive\Reasoner_Interactive.fs" />
+		<Compile Include="Flows\Interactive\TaskFlow_Interactive.fs" />
 		<Compile Include="Flows\OTask.fs" />
 		<Compile Include="Flows\OPlan.fs" />
 	</ItemGroup>

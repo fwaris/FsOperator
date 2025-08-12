@@ -10,7 +10,7 @@ module C =
     let OPENAI_SESSION_API = "https://api.openai.com/v1/realtime/sessions"
     let OPENAI_RT_MODEL_GPT4O = "gpt-4o-realtime-preview"
     let OPENAI_RT_MODEL_GPT4O_MINI = "gpt-4o-mini-realtime-preview"
-    let REASONER_MODEL = FsResponses.Models.o4_mini // FsResponses.Models.gpt_41
+    let REASONER_MODEL = FsResponses.Models.gpt_5// FsResponses.Models.o4_mini // FsResponses.Models.gpt_41
 
     let WIN_TITLE = "FsOperator"
 

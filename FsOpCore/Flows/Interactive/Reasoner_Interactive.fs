@@ -1,11 +1,11 @@
-﻿namespace FsOpCore.Dynamic
+﻿namespace FsOpCore.Interactive
 open System
 open System.Text.Json
 open FSharp.Control
 open FsResponses
 open FsOpCore
 
-module Reasoner_Dynamic_Prompts =
+module Reasoner_Interactive_Prompts =
     //NOTE: We are assuming that 'developer' prompts don't go out scope when max context length is breached, in the 'responses' api.
 
     ///<summary>
@@ -27,8 +27,8 @@ Drive CUA to accomplish the task described in [TASK_INSTRUCTIONS].
 ## Miscellaneous:
 - CUA does not have the ability to call tools. Instead of asking CUA to invoke tools, you just invoke the tools directly.
 - CUA cannot focus on the browser's address bar; to get the browser page url use the 'get_url' tool.
-- If you think CUA is waiting too long for the home page to load, use the 'home' tool to force loading it.
-- If no login credentials are given and the web page is asking for the user to login then ask CUA to issue 'wait', till the login process is complete.
+- If you think CUA is waiting for home page to load, use the 'home' tool to load it.
+- If the web page is asking for the user to login, ask CUA to issue 'wait', till the login process is complete
 
 ## Memory:
 Extract relevant textual information from the screenshots images provided and save to memory if needed
@@ -104,11 +104,11 @@ module ReasonerAgent =
             [
                 Vars.cuaInstructions, req.cuaPrompt :> obj
             ]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[dvlpr] reasoner start instructions``
+            |> Prompts.renderPrompt Reasoner_Interactive_Prompts.``[dvlpr] reasoner start instructions``
         let msg = {Message.Default with content = [Content.Input_text {|text = msg|}]; role="developer"}
         let instr =
             [Vars.memory, req.memory :> obj]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] initial steps``
+            |> Prompts.renderPrompt Reasoner_Interactive_Prompts.``[instr] initial steps``
         let req =
             {Request.Default with
                 input = [IOitem.Message msg]
@@ -126,7 +126,7 @@ module ReasonerAgent =
                 Vars.actionHistory, req.actions
                 Vars.cuaMessageHistory, (string req.cuaMessages)
             ]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] get next steps``
+            |> Prompts.renderPrompt Reasoner_Interactive_Prompts.``[instr] get next steps``
 
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =
@@ -154,7 +154,7 @@ module ReasonerAgent =
         }
 
     let internal createSummarizeReq state req =
-        let summarizeMsg = Message.OfText Reasoner_Dynamic_Prompts.``cua early termination prompt``
+        let summarizeMsg = Message.OfText Reasoner_Interactive_Prompts.``cua early termination prompt``
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =
             {Request.Default with

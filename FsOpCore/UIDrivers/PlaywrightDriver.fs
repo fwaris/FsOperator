@@ -410,6 +410,22 @@ module PlaywrightDriver =
                         do! saveState page.Context
                     with ex ->
                         Log.exn(ex,"saveState")
+
                 }
+                member _.clearCookies() = async {
+                    try 
+                        let! page = page()
+                        do! page.Context.ClearCookiesAsync() |> Async.AwaitTask
+                    with ex ->
+                        Log.exn(ex,"saveState")
+                }
+                member _.reload() = async {
+                    try 
+                        let! page = page()
+                        let! r = page.ReloadAsync() |> Async.AwaitTask
+                        return ()
+                    with ex ->
+                        Log.exn(ex,"saveState")
+               }
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

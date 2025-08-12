@@ -73,6 +73,8 @@ type IUIDriver =
         abstract member environment : string //computer call envrionment
         abstract member start : string -> Async<unit>
         abstract member saveState: unit -> Async<unit>
+        abstract member clearCookies : unit -> Async<unit>
+        abstract member reload : unit -> Async<unit>
     end
 
 [<ReferenceEquality>]

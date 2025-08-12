@@ -21,6 +21,32 @@ type FsOpNavigator() =
         Log.info $"{nameof this.SetDriver} {drv.GetType().Name}"
         driver.Value <- drv
 
+    [<KernelFunction("clear_cookies")>]
+    [<Description("Clear the cookie cache")>]
+    member this.clearCookies() =
+        let comp = async {
+            Log.info $"{nameof this.clearCookies}"
+            if startUrl.Value <> Unchecked.defaultof<_> then 
+                do! driver.Value.clearCookies()
+                return "cookies cleared"
+            else
+                return "unable to clear cookies"
+        }
+        Async.StartAsTask comp
+
+    [<KernelFunction("reload")>]
+    [<Description("Refresh the page")>]
+    member this.reload() =
+        let comp = async {
+            Log.info $"{nameof this.reload}"
+            if startUrl.Value <> Unchecked.defaultof<_> then 
+                do! driver.Value.reload()
+                return "page reloaded"
+            else
+                return "unable to reload page"
+        }
+        Async.StartAsTask comp
+
     [<KernelFunction("home")>]
     [<Description("Load initial task page")>]
     member this.home() =
