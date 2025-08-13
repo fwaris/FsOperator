@@ -15,14 +15,11 @@ let t_Login =
                     typeof<Functions.FsOpTaskTools>
                 ]
         reasoner = None //use default
-        cua = Some $"""the user wants to 'port out pin' from att.com
-Find the location on the att.com site where that is possible.
-Try using the search option to find the required page.
-You are looking for a page that show a clickable link or button for 'requesting a transfer pin'.
-The user will need to login first. 
+        cua = Some $"""Log in to att.com.
 For login, use `{Environment.GetEnvironmentVariable("ATT_ID")}` as the login id and `{Environment.GetEnvironmentVariable("ATT")}` for password.
 Dismiss any unneeded popups and notices.
-If a web address cannot be reached, use the 'reload' and then 'home' tools to reset.
+The task ends when the user is logged in and the account page for the user is showing.
+Check the 'remember me' type box, if you see it in the login pages.
 """
         }
 
@@ -37,7 +34,11 @@ let t_FindPortOut =
                     typeof<Functions.FsOpTaskTools>
                 ]
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
-        cua = Some $"""
+        cua = Some $"""the user wants to 'port out pin' from att.com
+Find the location on the att.com site where that is possible.
+Try using the search option to find the required page.
+You are looking for a page that show a clickable link or button for 'requesting a transfer pin'.
+The task ends when such a page is reached.
 """
         }
 
@@ -45,7 +46,7 @@ let create() =
         let plan =
             { OPlan.Default with
                 description = "Port out t-mobile number"
-                root = ONode.Seq {nodes= [ONode.Leaf t_Login;]; description=None}
+                root = ONode.Seq {nodes= [ONode.Leaf t_Login; ONode.Leaf t_FindPortOut]; description=None}
                 //root = ONode.All {nodes= [ONode.One tSendEmails]; description=None}
             }
         plan

@@ -89,6 +89,7 @@ module PlaywrightDriver =
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
                 let browserOptions = BrowserTypeLaunchOptions(
                         Headless = false,
+                        Args = ["--disable-blink-features=AutomationControlled"],
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
                 let! page = initContext browser
