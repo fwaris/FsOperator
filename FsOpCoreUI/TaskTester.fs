@@ -65,7 +65,7 @@ module TaskTester =
                     (ref Unchecked.defaultof<_>)]
             let task = model.task.Current
             Grid.create [
-                Grid.rowDefinitions "30,30,150,*,30"
+                Grid.rowDefinitions "30,30,150,*,35"
                 Grid.columnDefinitions "100,*"
                 Grid.children [                
                     TextBlock.create [

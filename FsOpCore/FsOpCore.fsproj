@@ -49,7 +49,7 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
-		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.61.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.62.0" />
 		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.57.0-preview" />
 		<PackageReference Include="SkiaSharp" Version="3.119.0" />
 		<PackageReference Include="System.Text.Json" Version="9.0.8" />

@@ -219,31 +219,32 @@ type Views =
                             TextBlock.horizontalAlignment HorizontalAlignment.Center
                             TextBlock.dock Dock.Top
                         ]
-                        ScrollViewer.create [
-                            ScrollViewer.background Brushes.AntiqueWhite
-                            ScrollViewer.content (
-                                ZoomBorder.create [
-                                    ZoomBorder.enablePan true
-                                    ZoomBorder.panButton ButtonName.Right
-                                    ZoomBorder.child (
-                                        GraphPanel.create [
-                                            GraphPanel.foreground Brushes.DarkBlue
-                                            GraphPanel.dataTemplates (
-                                                let ds = DataTemplates()
-                                                ds.AddRange(
-                                                    [
-                                                        DataTemplateView<ONode>.create (fun data ->
-                                                            Views.node data dispatch
-                                                        )
-                                                    ])
-                                                ds)
-                                            GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
-                                            GraphPanel.graph (Update.graph model)
-                                        ]
-                                    )
+                        ZoomBorder.create [
+                            ZoomBorder.background Brushes.AntiqueWhite
+                            ZoomBorder.enablePan true
+                            ZoomBorder.panButton ButtonName.Right
+                            ZoomBorder.child (
+                                GraphPanel.create [
+                                    GraphPanel.foreground Brushes.DarkBlue
+                                    GraphPanel.dataTemplates (
+                                        let ds = DataTemplates()
+                                        ds.AddRange(
+                                            [
+                                                DataTemplateView<ONode>.create (fun data ->
+                                                    Views.node data dispatch
+                                                )
+                                            ])
+                                        ds)
+                                    GraphPanel.layoutMethods GraphPanel.LayoutMethods.SugiyamaScheme
+                                    GraphPanel.graph (Update.graph model)
                                 ]
                             )
                         ]
+                        //ScrollViewer.create [
+                        //    ScrollViewer.background Brushes.AntiqueWhite
+                        //    ScrollViewer.content (
+                        //    )
+                        //]
                     ]
                 ]
             )
@@ -253,7 +254,7 @@ type Views =
         DockPanel.create [
             DockPanel.children [
                 Grid.create [
-                    Grid.rowDefinitions "50,*,30"
+                    Grid.rowDefinitions "50,*"
                     Grid.horizontalAlignment HorizontalAlignment.Stretch
                     Grid.clipToBounds true
                     Grid.children [
@@ -270,7 +271,7 @@ type PlanEditor(plan:OPlan) as this =
 
     do
         base.Title <- "Plan Editor"
-        base.Width <- 400.0
+        base.Width <- 500.0
         base.Height <- 600.0
 
         Program.mkProgram Update.init (Update.update this tcs) Views.main

@@ -8,33 +8,33 @@ open Avalonia.FuncUI.DSL
 open Avalonia.FuncUI.Types
 open Avalonia.FuncUI.Elmish.ElmishHook
 open Avalonia.Media
-open System.Threading.Channels
+open FsOpCore.Interactive
 
 module TaskRunner = 
     type MsgOut = Error of string  //parent component can receive these messasges
     type MsgIn = Stop | Start      //parent component can send these messages
     
     module internal TaskRunner =
-        type Msg = Start | Stop | SetMemory of string | Error of string | MsgFromFlow of TaskFlow.TaskFlowMsgOut | MsgIn of MsgIn
+        type Msg = Start | Stop | SetMemory of string | Error of string | MsgFromFlow of TaskFlowMsgOut | MsgIn of MsgIn
         type Model = 
             {
                     task:IReadable<OTask>
                     running : IWritable<bool>
-                    flow:IFlow<TaskFlow.TaskFlowMsgIn> option; 
+                    flow:IFlow<TaskFlowMsgIn> option; 
                     memory:string
                     log : string list
                     action : string
                     error : string option
-                    wfReceiver : IReadable<Ref<TaskFlow.TaskFlowMsgOut->unit>>
+                    wfReceiver : IReadable<Ref<TaskFlowMsgOut->unit>>
             }
     
         let taskState memory (model:Model) =
             let task = model.task.Current
             let driver = PlaywrightDriver.create()
-            let bus = WBus.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut> model.wfReceiver.Current.Value
+            let bus = WBus.Create<TaskFlowMsgIn,TaskFlowMsgOut> ()
             let kernel = OPlan.defaultKernel memory None
             let tools = (Toolbox.makeFunctionTools<Functions.FsOpMemory>() @ Toolbox.makeFunctionTools<Functions.FsOpNavigator>()) 
-            TaskState.Create<TaskFlow.TaskFlowMsgIn,TaskFlow.TaskFlowMsgOut>  //initial task state
+            TaskState.Create<TaskFlowMsgIn,TaskFlowMsgOut>  //initial task state
                         task.id
                         (task.target.TargetString())
                         bus
@@ -63,9 +63,9 @@ module TaskRunner =
             | None -> 
                 let mem = FlUtils.parseMemory model.memory
                 let t = taskState mem model 
-                let flow = TaskFlow.create t
+                let flow = TaskFlow_Interactive.create t
                 model.running.Set(true)
-                flow.Post TaskFlow.TaskFlowMsgIn.TFi_Start //posting this starts the flow
+                flow.Post TaskFlowMsgIn.APi_Start //posting this starts the flow
                 {model with flow = Some flow},Cmd.none
         
         let stopFlow (model:Model) =
@@ -81,7 +81,7 @@ module TaskRunner =
         let appendLog logEntry model = 
             {model with log = logEntry::model.log }, Cmd.none
 
-        let update (dispatchOut:MsgOut -> unit) msg model = 
+        let update (dispatchOut:MsgOut -> unit) msg (model:Model) = 
             try 
                 match msg with 
                 | SetMemory m -> {model with memory=m}, Cmd.none
@@ -90,13 +90,12 @@ module TaskRunner =
                 | Error e -> dispatchOut (MsgOut.Error e); model |> appendLog e
                 | MsgIn (MsgIn.Start) -> model,Cmd.ofMsg Start
                 | MsgIn (MsgIn.Stop) -> model,Cmd.ofMsg Stop
-                | MsgFromFlow (TaskFlow.TFo_Action action) -> model |> appendLog $"action: {action}"
-                | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.WE_Exn e)) -> model, Cmd.ofMsg (Error $"Flow exception: {e}")
-                | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.Other e)) -> model, Cmd.ofMsg (Error $"Flow error: {e}")
-                | MsgFromFlow (TaskFlow.TFo_Error (WErrorType.WE_Error e)) -> model, Cmd.ofMsg (Error $"Api error: {e}")
-                | MsgFromFlow (TaskFlow.TFo_Done t) -> {model with memory = getMemory t}, Cmd.ofMsg Stop
-                | MsgFromFlow (TaskFlow.TFo_Usage u) -> model,Cmd.none
-                | MsgFromFlow (TaskFlow.TFo_Paused u) -> model,Cmd.none
+                | MsgFromFlow (APo_Action action) -> model |> appendLog $"action: {action}"
+                | MsgFromFlow (APo_Error (WErrorType.WE_Exn e)) -> model, Cmd.ofMsg (Error $"Flow exception: {e}")
+                | MsgFromFlow (APo_Error (WErrorType.WE_Error e)) -> model, Cmd.ofMsg (Error $"Flow error: {e}")
+                | MsgFromFlow (APo_Done t) -> {model with memory = getMemory t}, Cmd.ofMsg Stop
+                | MsgFromFlow (APo_Usage u) -> model,Cmd.none
+                | MsgFromFlow (APo_Paused u) -> model,Cmd.none
             with ex ->
                 Log.exn(ex,"TaskRunner")
                 model, Cmd.ofMsg (Error $"error: ex.Message")

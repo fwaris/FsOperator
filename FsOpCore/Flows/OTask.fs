@@ -30,8 +30,6 @@ module OTaskTarget =
         let xs = tgt.Split(" ", StringSplitOptions.RemoveEmptyEntries)
         _parseTarget xs
 
-
-
 ///definition of a single unit of work in a plan
 type OTask = {
     id          : string

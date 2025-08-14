@@ -24,7 +24,7 @@ type App() =
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
         | :? IClassicDesktopStyleApplicationLifetime as desktopLifetime ->
-            let win = FsOpPlanEditor.PlanEditor(SpreadsheetToEmailPlan.create())
+            let win = FsOpPlanEditor.PlanEditor(PortingPlan.create())
             //U.initNotfications(win)
             //win.Closing.Add(fun _ -> Connection.disconnect())
             //DevToolsExtensions.AttachDevTools(this)
