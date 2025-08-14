@@ -3,12 +3,13 @@ open System
 open System.Threading.Channels
 open FsResponses
 open FsOpCore
+open FsOpCore.Interactive
 
 type FlowState = 
     | FL_Init 
-    | FL_Flow of {| flow : IFlow<TaskFlowInteractive.TaskFlowMsgIn>; |}
-    | FL_Paused of {| flow : IFlow<TaskFlowInteractive.TaskFlowMsgIn>; |}
-    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlowInteractive.TaskFlowMsgIn> |}
+    | FL_Flow of {| flow : IFlow<TaskFlowMsgIn>; |}
+    | FL_Paused of {| flow : IFlow<TaskFlowMsgIn>; |}
+    | FL_Flow_Summarizing of {| flow : IFlow<TaskFlowMsgIn> |}
 
 type Flow =
     {
@@ -27,13 +28,13 @@ type Flow =
         member this.setQuestion q = {this with chat.question = Some q}
         member this.resume() = 
             match this.state with 
-            | FL_Paused f when this.chat.question.IsSome -> this.Post (TaskFlowInteractive.TFi_Resume this.chat.question.Value)
+            | FL_Paused f when this.chat.question.IsSome -> this.Post (APi_Resume this.chat.question.Value)
                                                             {this with state = FL_Flow f}
             | _                                          -> this
         member this.stopAndSummarize() = 
             match this.state with 
             | FL_Paused f 
-            | FL_Flow f -> this.Post TaskFlowInteractive.TFi_EndAndReport
+            | FL_Flow f -> this.Post APi_EndAndReport
                            {this with state = FL_Flow_Summarizing f}
             | x         -> this
         member this.Terminate () = 
@@ -82,7 +83,7 @@ type ClientMsg =
     | Flow_Terminate
     | Flow_StopAndSummarize
     | Flow_Resume
-    | Flow_Msg of TaskFlowInteractive.TaskFlowMsgOut
+    | Flow_Msg of TaskFlowMsgOut
 
     | Action_Set of string
     | Action_Flash of bool

@@ -35,7 +35,7 @@ type  ChatHistoryView =
             :> Types.IView
         | Assistant msg -> 
             SelectableTextBlock.create [
-                TextBlock.text msg.content
+                TextBlock.text msg
                 TextBlock.background Brushes.DarkSlateGray
                 TextBlock.textWrapping TextWrapping.Wrap                                            
                 TextBlock.multiline true

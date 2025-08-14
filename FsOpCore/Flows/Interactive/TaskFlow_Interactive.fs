@@ -163,8 +163,18 @@ module TaskFlow_Interactive =
             return !!(s_terminate ss)
         }
 
-    ///construct flow and also start it
-    let create task : IFlow<TaskFlowMsgIn> =
+    let createVoiceFunctions (driver:IUIDriver) (bus:WBus<_,_>) =
+        {
+            Functions.gotoUrl = fun t ->
+                async {
+                    do! driver.start t
+                    bus.PostToFlow(W_Msg (APi_Voice_SetUrl t))
+                    bus.PostToFlow(W_Msg APi_Start)
+                }
+            Functions.addGuidance = fun t -> async{bus.PostToFlow(W_Msg (AFi_Voice_AddGuidance t))}
+        }
+        ///construct flow and also start it
+    let create task (conn:obj) voicePrompt : IFlow<TaskFlowMsgIn>  =
         
         ///initial substate
         let ss0 = SubState.Create task

@@ -8,7 +8,7 @@ open Avalonia.FuncUI.DSL
 open Avalonia.FuncUI.Types
 open Avalonia.FuncUI.Elmish.ElmishHook
 open Avalonia.Media
-open FsOpCore.Interactive
+open FsOpCore.Dynamic
 
 module TaskRunner = 
     type MsgOut = Error of string  //parent component can receive these messasges
@@ -63,7 +63,7 @@ module TaskRunner =
             | None -> 
                 let mem = FlUtils.parseMemory model.memory
                 let t = taskState mem model 
-                let flow = TaskFlow_Interactive.create t
+                let flow = TaskFlow_Dynamic.create t
                 model.running.Set(true)
                 flow.Post TaskFlowMsgIn.APi_Start //posting this starts the flow
                 {model with flow = Some flow},Cmd.none
@@ -95,7 +95,6 @@ module TaskRunner =
                 | MsgFromFlow (APo_Error (WErrorType.WE_Error e)) -> model, Cmd.ofMsg (Error $"Flow error: {e}")
                 | MsgFromFlow (APo_Done t) -> {model with memory = getMemory t}, Cmd.ofMsg Stop
                 | MsgFromFlow (APo_Usage u) -> model,Cmd.none
-                | MsgFromFlow (APo_Paused u) -> model,Cmd.none
             with ex ->
                 Log.exn(ex,"TaskRunner")
                 model, Cmd.ofMsg (Error $"error: ex.Message")

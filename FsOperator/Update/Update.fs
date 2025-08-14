@@ -6,6 +6,7 @@ open FSharp.Control
 open Avalonia.FuncUI.Hosts
 open FsOpCore
 open Microsoft.SemanticKernel
+open FsOpCore.Interactive
 
 module Update =
 
@@ -83,13 +84,13 @@ module Update =
             | Flow_Terminate -> Flows.terminateFlow model
 
             //handle messages emitted by a running flow
-            | Flow_Msg (TaskFlowInteractive.TFo_Action action) -> model, Cmd.ofMsg (Action_Set action)
-            | Flow_Msg (TaskFlowInteractive.TFo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
-            | Flow_Msg (TaskFlowInteractive.TFo_ChatUpdated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
-            | Flow_Msg (TaskFlowInteractive.TFo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
-            | Flow_Msg (TaskFlowInteractive.TFo_Done msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.ofMsg Flow_Terminate
-            | Flow_Msg (TaskFlowInteractive.TFo_Log s) -> model, Cmd.ofMsg (Log_Append s)
-            | Flow_Msg (TaskFlowInteractive.TFo_Usage u) -> OPlan.printTaskUsage u; model,Cmd.none
+            | Flow_Msg (APo_Action action) -> model, Cmd.ofMsg (Action_Set action)
+            | Flow_Msg (APo_Paused msgs)   -> {model with flow = model.flow.pause().setChatMsgs msgs}, Cmd.none
+            | Flow_Msg (APo_Updated msgs) -> {model with flow = model.flow.setChatMsgs msgs}, Cmd.none
+            | Flow_Msg (APo_Error e) -> model, [(StatusMsg_Set (string e)); Flow_Terminate] |> List.map Cmd.ofMsg |> Cmd.batch
+            | Flow_Msg (APo_Done t) -> {model with flow = model.flow.setChatMsgs t.cuaMessages}, Cmd.ofMsg Flow_Terminate
+            | Flow_Msg (APo_Log s) -> model, Cmd.ofMsg (Log_Append s)
+            | Flow_Msg (APo_Usage u) -> OPlan.printTaskUsage u; model,Cmd.none
            
             | Plan_Edit -> model, Cmd.OfTask.either Plans.editPlan (win,model) Plan_Set Error
             | Plan_Set p -> {model with plan = p},Cmd.none

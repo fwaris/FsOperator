@@ -2,6 +2,7 @@
 open FsOpCore
 open Microsoft.SemanticKernel
 open Elmish
+open FsOpCore.Interactive
 
 module Flows = 
 
@@ -22,29 +23,30 @@ module Flows =
                         Vars.startUrl, model.opTask.target.TargetString()
                     ])
             |> Option.map (fun (t,args) -> Prompts.renderPrompt t args)
-        let taskState = {taskState with toolDefs = taskState.toolDefs @ Toolbox.makeFunctionTools<Functions.FsOpVoice>()}
-        let flow = TaskFlowInteractive.create taskState (Some conn) voicePrompt
+        let taskState :TaskState<TaskFlowMsgIn,TaskFlowMsgOut>= 
+            {taskState with toolDefs = taskState.toolDefs @ Toolbox.makeFunctionTools<Functions.FsOpVoice>()}
+        let flow = TaskFlow_Interactive.create taskState (Some conn) voicePrompt
         let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
         async {
             do! Async.Sleep 100
-            flow.Post TaskFlowInteractive.TFi_Prime
+            flow.Post AFi_Prime
         } 
         |> Async.Start
         model,Cmd.none
 
     let configVoice driver bus  (b:IKernelBuilder) =
-        let funcs = TaskFlowInteractive.createVoiceFunctions driver bus
+        let funcs = TaskFlow_Interactive.createVoiceFunctions driver bus
         let voice = Functions.FsOpVoice()
         voice.SetFunctions(funcs)
         b.Plugins.AddFromObject(voice) |> ignore
 
 
     let startTextFlow model taskState  =
-        let flow = TaskFlowInteractive.create taskState None None
+        let flow = TaskFlow_Interactive.create taskState None None
         let model = {model with flow = {Flow.Default with state=FL_Flow {|flow=flow|}}}            
         async {
             do! Async.Sleep 100
-            flow.Post TaskFlowInteractive.TFi_Prime
+            flow.Post AFi_Prime
         } 
         |> Async.Start
         model,Cmd.none
@@ -52,7 +54,7 @@ module Flows =
     let startFlow (model:Model) =
         let taskState = lazy(
             let driver = PlaywrightDriver.create()
-            let bus = WBus.Create<_,_> (Flow_Msg>>model.post)
+            let bus = WBus.Create<_,_> ()
             let kernel = OPlan.defaultKernel Map.empty (Some (configVoice driver.driver bus ))
             let tools = 
                 Toolbox.makeFunctionTools<Functions.FsOpMemory>() 

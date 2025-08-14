@@ -17,6 +17,9 @@ and TaskFlowMsgIn =
     | APi_EndAndReport
     | APi_TerminateTask
     | APi_Resume of string
+    | AFi_Prime
+    | APi_Voice_SetUrl of string
+    | AFi_Voice_AddGuidance of string
     //agent messages into flow
     | AGi_Usage of string*Usage
     | RSNRi_Steps of CuaInstructionStep list
@@ -32,6 +35,7 @@ and TaskFlowMsgOut =
     | APo_Updated of ChatMsg list
     | APo_Usage of Map<string,FsResponses.Usage list>
     | APo_Done of TaskState<TaskFlowMsgIn,TaskFlowMsgOut>
+    | APo_Log of string
     //messages from flow to agents
     | RSNRo_GetSteps of ReasonerReq
     | RSNRo_Summarize of ReasonerReq 
