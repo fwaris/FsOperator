@@ -54,19 +54,10 @@ module Update =
     let doDrag (e,t) =
         task {
             let dragData = DataObject()
-            dragData.Set(DataFormats.Text,"this the text")
+            dragData.Set(DataFormats.Text,t)
 
-            // let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
-            //                 (fun _ -> DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy)) |> Async.AwaitTask
-
-            //let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
-
-            let! result = 
-                try
-                    DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy) //<--- fails here
-                with ex ->
-                    printfn "Error occurred while dragging: %s" ex.Message
-                    task{return DragDropEffects.None}
+            let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
+                             (fun _ -> DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy)) |> Async.AwaitTask
 
             return match result with
                     | DragDropEffects.Copy -> "The text was copied"

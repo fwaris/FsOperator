@@ -102,8 +102,7 @@ type Views =
             Control.horizontalAlignment HorizontalAlignment.Stretch
             Panel.background Brushes.DarkSlateBlue
             Control.onPointerPressed (fun e -> 
-                //e.Handled <- true; 
-                Update.doDrag (e,n) |> ignore
+                e.Handled <- true;                 
                 dispatch (BeginDrag (e,n)))
             Control.cursor Cursors.hand
             Panel.children [

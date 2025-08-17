@@ -45,13 +45,13 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-  <PackageReference Include="PanAndZoom" Version="11.3.0.1" />
+  <PackageReference Include="PanAndZoom" Version="11.3.0.4" />
 	  <!-- <PackageReference Include="Avalonia.Controls.PanAndZoom" Version="11.3.0" /> -->		
 	  	<PackageReference Include="Avalonia.FuncUI" Version="1.5.1" />
 		<PackageReference Include="Avalonia.FuncUI.Elmish" Version="1.5.1" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.3" />
-		<PackageReference Include="Avalonia.Desktop" Version="11.3.3" />
-		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.3" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.4" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.3.4" />
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.4" />
 		<PackageReference Include="Avalonia.Labs.Lottie" Version="11.3.1" />
 		<PackageReference Include="Karambolo.Extensions.Logging.File" Version="3.6.3" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.8" />
