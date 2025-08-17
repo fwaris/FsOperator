@@ -1,0 +1,13 @@
+{
+    "tasks": [
+        {
+            "type": "msbuild",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "build",
+            "label": "build",
+            "detail": "build solution"
+        }
+    ]
+}

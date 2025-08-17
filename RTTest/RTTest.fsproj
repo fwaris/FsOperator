@@ -1,30 +1,30 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-	  <OutputType>Exe</OutputType>
-	  <IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
-	  <IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
-	  <TargetFrameworks></TargetFrameworks>
-	  <TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
-	  <TargetFrameworks Condition="$(IsOSX)">net9.0;$(TargetFrameworks)</TargetFrameworks>
-	  <PublishAot>false</PublishAot>
+    <OutputType>Exe</OutputType>
+    <IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
+    <IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
+    <TargetFrameworks>
+    </TargetFrameworks>
+    <TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks Condition="$(IsOSX)">net9.0;$(TargetFrameworks)</TargetFrameworks>
+    <PublishAot>false</PublishAot>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="SimpleCrypt.fs" />
     <Compile Include="TimesheetPlan.fs" />
     <Compile Include="PortingPlan.fs" />
     <Compile Include="SpreadsheetToEmailPlan.fs" />
     <Compile Include="ModelPricing.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="Sanbox.fs" />
+    <Compile Include="Program.fs" />    
   </ItemGroup>
-
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.1" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="9.0.303" />
+    <PackageReference Update="FSharp.Core" Version="9.0.303" />    
   </ItemGroup>
-
 </Project>

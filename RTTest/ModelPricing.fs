@@ -34,6 +34,7 @@ let prices : ModelPrice list = [
     { StableName = "computer-use-preview"; SnapshotName = "computer-use-preview-2025-03-11"; Input = Some 3.00; CachedInput = None; Output = Some 12.00 }
     { StableName = "gpt-image-1";       SnapshotName = "gpt-image-1";                  Input = Some 5.00;  CachedInput = Some 1.25;   Output = None }
     { StableName = "gpt-5"; SnapshotName = "gpt-5"; Input = Some 1.50; CachedInput = Some 0.125; Output = Some 10.00 }
+    { StableName = "gpt-5-mini"; SnapshotName = "gpt-5-mini"; Input = Some 0.25; CachedInput = Some 0.025; Output = Some 2.00 }
 ]
 
 let priceMap = lazy((prices |> List.map (fun m -> m.StableName.ToLower(),m )) @ ( prices |> List.map (fun m -> m.SnapshotName.ToLower(), m)) |> Map.ofList)

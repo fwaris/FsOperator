@@ -153,7 +153,7 @@ module ReasonerAgent =
                 return None
         }
 
-    let internal createSummarizeReq state req =
+    let internal createSummarizeReq state (req:ReasonerReq) =
         let summarizeMsg = Message.OfText Reasoner_Interactive_Prompts.``cua early termination prompt``
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =

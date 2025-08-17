@@ -5,6 +5,8 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.SemanticKernel
 open FsOpCore
 
+//Sandbox.test()
+
 let runPlan = PortingPlan.create()
 //let runPlan = SpreadsheetToEmailPlan.create()
 //let runPlan = TimesheetPlan.create()
@@ -15,8 +17,9 @@ let runPlan = PortingPlan.create()
 
 //let runPlan' = {runPlan with root = match runPlan.root with ONode.Seq all -> {all with nodes = all.nodes |> List.skip 2} |>  ONode.Seq | x -> x}
 //let s1rMem = ["Timesheet Week",["07-01-2025"]] |> Map.ofList
-let s1r = OPlanRun.Create runPlan (OPlan.defaultKernel Map.empty  None)
-//let s1r = OPlanRun.Create runPlan (TimesheetPlan.startKernel())
+//let s1r = OPlanRun.Create runPlan (OPlan.defaultKernel Map.empty None)
+let s1r = OPlanRun.Create runPlan (PortingPlan.kernel())
+
 
 let s2r = OPlan.run s1r |> Async.RunSynchronously
 

@@ -3,7 +3,6 @@ open System
 open System.Net.Http
 open System.Net.Http.Headers
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Avalonia.FuncUI.Hosts
 open Elmish
@@ -13,48 +12,64 @@ open Avalonia.Themes.Fluent
 open Avalonia.Controls.ApplicationLifetimes
 open Avalonia.FuncUI
 open Avalonia.Input
-open Avalonia.Markup.Xaml.Styling
 open Microsoft.AspNetCore.Builder
 
-type Model = {count :int}
 
 module MainView = 
-    open Avalonia.FuncUI
-    open Avalonia.FuncUI.Elmish
     open Avalonia.Controls
     open Avalonia.Layout
     open Avalonia.FuncUI.DSL
+    open Avalonia.Media
     let main model dispatch =
         DockPanel.create [
+            DockPanel.margin 5
             DockPanel.children [
                 TextBlock.create [
-                    TextBlock.text "Hello, World!"
+                    DockPanel.dock Dock.Top
+                    TextBlock.text "Running"
+                ]
+                TextBlock.create [
+                    DockPanel.dock Dock.Bottom
+                    TextBlock.text $"Count: {model.count}"
+                ]
+                ListBox.create [
+                    ListBox.dataItems model.bills
+                    ListBox.itemTemplate (
+                        DataTemplateView<Bill>.create (fun (bill:Bill) -> 
+                            TextBlock.create [
+                                TextBlock.text bill.FileName
+                                TextBlock.fontSize 12.
+                                TextBlock.horizontalAlignment HorizontalAlignment.Stretch
+                                TextBlock.maxWidth 255.
+                                TextBlock.verticalAlignment VerticalAlignment.Top
+                                TextBlock.textWrapping TextWrapping.Wrap
+                                TextBlock.multiline true
+                            ]
+                    ))
                 ]
             ]
         ]
 
 module Update = 
-    open Avalonia.FuncUI
-    open Avalonia.FuncUI.Elmish
-    open Avalonia.Controls
-    open Avalonia.Layout
-    open Avalonia.FuncUI.DSL
-    type Msg = 
-        | NoOp
-    let init() = {count=1}, Cmd.none
+ 
+    let init() = {count=0; bills=[]}, Cmd.none
     let update (window: HostWindow) msg model =
         match msg with
         | NoOp -> model, Cmd.none
+        | GotBill bill ->
+            let newBills = bill :: model.bills
+            {model with count = model.count + 1; bills = newBills}, Cmd.none
   
 type MainWindow() as this =
     inherit HostWindow()
 
     do
-        base.Title <- "Test Hosting"
+        base.Title <- "MCP Server Running"
         base.Width <- 400.0
         base.Height <- 600.0
 
         Program.mkProgram Update.init (Update.update this) MainView.main
+        |> Program.withSubscription Subscriptions.subscriptions
         |> Program.withHost this
         //|> Program.withConsoleTrace        
         |> Program.runWithAvaloniaSyncDispatch ()
@@ -88,6 +103,7 @@ module Pgm =
                 .AddMcpServer()
                 .WithHttpTransport()
                 .WithTools<JiraTools>()
+                .WithTools<PortOutTools>()
                 |> ignore
 
         builder.Logging.AddConsole(fun options ->
@@ -99,7 +115,6 @@ module Pgm =
             client.DefaultRequestHeaders.UserAgent.Add(ProductInfoHeaderValue("weather-tool", "1.0"))
             client
         ) |> ignore
-
 
         let app = builder.Build()
         app.UseHttpsRedirection() |> ignore

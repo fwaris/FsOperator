@@ -73,6 +73,7 @@ module Models =
     let gpt_41 = "gpt-4.1"
     let o4_mini = "o4-mini"
     let gpt_5 = "gpt-5"
+    let gpt_5_mini = "gpt-5-mini"
     let gpt_41_nano = "gpt-4.1-nano"
     let gpt_41_mini = "gpt-4.1-mini"
     let computer_use_preview = "computer-use-preview"
@@ -82,16 +83,50 @@ module Buttons =
     let [<Literal>] Right = "right"
     let [<Literal>] Middle = "middle"
 
+(*
 type Property =
     {
         ``type``: string
         description: string
+        properties: Map<string, Property>
+        required: string list 
+        items: Property
+        enum: string list
+        additionalProperties: bool
     }
+*)
+
+[<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+type JsDesc = {description : string option}
+
+[<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+type JsString = {description : string option; enum : string list option}
+
+[<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+type JsObj = 
+    {
+        description: string option
+        properties: Map<string, JsProperty>
+        required: string list
+        additionalProperties:bool
+    }
+
+and [<JsonFSharpConverter(SkippableOptionFields=SkippableOptionFields.Always)>]
+    JsArray = {description: string option; items: JsProperty}
+
+and [<RequireQualifiedAccess>]     
+    JsProperty =  
+    | [<JsonName "integer">] Integer of JsDesc
+    | [<JsonName "number">] Number of JsDesc
+    | [<JsonName "string">] String of JsString
+    | [<JsonName "boolean">] Boolean of JsDesc
+    | [<JsonName "array">] Array of JsArray
+    | [<JsonName "object">] Object of JsObj
 
 type Parameters =
     {
         ``type``: string
-        properties: Map<string, Property>
+        properties: Map<string, JsProperty>
         required: string list
         additionalProperties : bool
     }
@@ -418,6 +453,7 @@ module Api =
     let serOpts =
         let opts =
             JsonFSharpOptions.Default()
+                //.WithSkippableOptionFields(true)
                 .WithUnionInternalTag()
                 .WithUnionTagName("type")
                 .WithUnionUnwrapRecordCases()

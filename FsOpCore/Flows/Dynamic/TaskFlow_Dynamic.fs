@@ -99,7 +99,7 @@ module TaskFlow_Dynamic =
             | W_Msg msg                      -> M msg                                                              //to be handled by the state 
 
         and s_start ss msg = async {
-            Log.info $"{nameof s_start}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
+            Log.info $"{nameof s_start}, '{ss.task.id}', {ss.cuaLoopCount}, {ss.reasonerLoopCount}"
             match s_start,ss,msg with 
             | Txn s                         -> return s
             | M APi_Start                   -> let ss,req = reasonerRequestAndClear ss
@@ -114,7 +114,7 @@ module TaskFlow_Dynamic =
         }
         
         and s_cua ss msg = async {
-            Log.info $"{nameof s_cua}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
+            Log.info $"{nameof s_cua}, '{ss.task.id}', {ss.cuaLoopCount}, {ss.reasonerLoopCount}"
             match s_cua,ss,msg with 
             | Txn s                         -> return s
             | M (RSNRi_Steps steps)         -> let ss = {ss with task = ss.task.setSteps steps}.incrReasonerLoopCount() //update steps and count
@@ -135,7 +135,7 @@ module TaskFlow_Dynamic =
         }
 
         and s_summarize ss msg = async {
-            Log.info $"{nameof s_summarize}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
+            Log.info $"{nameof s_summarize}, '{ss.task.id}', {ss.cuaLoopCount}, {ss.reasonerLoopCount}"
             match s_start,ss,msg with         
             | Txn s                         -> return s
             | M (RSNRi_Summary s)           -> let ss = {ss with task = ss.task.prependCuaMessage (Assistant s)}
@@ -144,7 +144,7 @@ module TaskFlow_Dynamic =
         }
 
         and s_terminate ss msg = async {
-            Log.info $"{nameof s_terminate}, {ss.cuaLoopCount}, {ss.reasonerLoopCount}, {ss.task.id}"
+            Log.info $"{nameof s_terminate}, '{ss.task.id}', {ss.cuaLoopCount}, {ss.reasonerLoopCount}"
             ss.cts.CancelAfter(1000)
             Log.info $"s_terminate: message ignored {msg}"
             return !!(s_terminate ss)

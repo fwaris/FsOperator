@@ -52,12 +52,21 @@ module Update =
         g
 
     let doDrag (e,t) =
-        async {
+        task {
             let dragData = DataObject()
-            dragData.Set(DataFormats.Text,t)
+            dragData.Set(DataFormats.Text,"this the text")
 
-            let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
-                            (fun _ -> DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy)) |> Async.AwaitTask
+            // let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
+            //                 (fun _ -> DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy)) |> Async.AwaitTask
+
+            //let! result = Dispatcher.UIThread.InvokeAsync<DragDropEffects>
+
+            let! result = 
+                try
+                    DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy) //<--- fails here
+                with ex ->
+                    printfn "Error occurred while dragging: %s" ex.Message
+                    task{return DragDropEffects.None}
 
             return match result with
                     | DragDropEffects.Copy -> "The text was copied"
@@ -134,7 +143,7 @@ module Update =
     let update (win:HostWindow)  (tcs:TaskCompletionSource<OPlan option>) msg (model:Model) =
         try
             match msg with
-            | BeginDrag (e,t) -> model, Cmd.OfAsync.perform doDrag (e,t) Dragged
+            | BeginDrag (e,t) -> model, Cmd.OfTask.perform doDrag (e,t) Dragged
             | Dragged s -> model,Cmd.none
             | DroppedNodeOn (droppedNode,anchorNode) -> droppedNodeOn model (droppedNode,anchorNode)
             | Init p -> {model with plan = p},Cmd.none

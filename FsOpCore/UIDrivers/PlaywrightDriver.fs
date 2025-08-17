@@ -5,6 +5,7 @@ open SkiaSharp
 open System.Threading
 
 module PlaywrightDriver =
+    let downloadsPath =lazy(homePath.Value @@ "PrivateDownloads")
     let _connection : Ref<IBrowser option> = ref None
     let _waitHandle : Ref<ManualResetEvent option> = ref None
     let _prevUrl : Ref<string option> = ref None
@@ -47,7 +48,7 @@ module PlaywrightDriver =
 
     let initContext(browser:IBrowser) = 
         async {
-            let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value )
+            let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value, AcceptDownloads = true)
             let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask            
             ctx.Page.Add(newPageHandler)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
@@ -88,7 +89,9 @@ module PlaywrightDriver =
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
                 let browserOptions = BrowserTypeLaunchOptions(
-                        Headless = false,
+                        
+                        Headless = false,                        
+                        DownloadsPath = downloadsPath.Value,
                         Args = ["--disable-blink-features=AutomationControlled"],
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                

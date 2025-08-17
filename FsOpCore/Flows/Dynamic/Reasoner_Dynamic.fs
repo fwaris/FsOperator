@@ -22,6 +22,9 @@ Drive CUA to accomplish the task described in [TASK_INSTRUCTIONS].
 # [TASK_INSTRUCTIONS]
 ```
 {{{{${Vars.cuaInstructions}}}}}
+
+Additional Notes:
+- CUA occasionally may not be able to scroll by issuing the scroll command. If you detect that then suggest page up/down or dragging the scroll bar.
 ```
 
 ## Miscellaneous:
@@ -153,7 +156,7 @@ module ReasonerAgent =
                 return None
         }
 
-    let internal createSummarizeReq state req =
+    let internal createSummarizeReq state (req:ReasonerReq) =
         let summarizeMsg = Message.OfText Reasoner_Dynamic_Prompts.``cua early termination prompt``
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =

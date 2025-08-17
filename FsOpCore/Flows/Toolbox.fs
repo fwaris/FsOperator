@@ -9,6 +9,7 @@ open System.Text.Json
 
 module Toolbox = 
 
+(*
     /// <summary>
     /// Convert metadata to 'function' tool for use with <see cref="FsResponses.Request" />.
     /// Also see <see cref="FlUtils.functionMetadata" />.
@@ -35,6 +36,7 @@ module Toolbox =
                         |> Seq.toList
                 }
         }
+*)
         //|> Tool_Function
 
     ///<summary>
@@ -54,7 +56,7 @@ module Toolbox =
     ///The functions are extracted from a properly annotated type.<br />
     ///See <see cref="FlUtils.functionMetadata"/>.
     ///</summary>
-    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map toFunctionTool |> Seq.toList
+    let makeFunctionTools<'t>() = functionMetadata<'t>() |> Seq.map Schema.toFunctionTool |> Seq.toList
 
     ///call an individual function
     let invokeFunction (kernel:Kernel) (name:string) (arguments:string) = async {
