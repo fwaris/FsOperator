@@ -7,19 +7,17 @@ open FsOpCore
 
 //Sandbox.test()
 
-let runPlan = PortingPlan.create()
+let runPlan = PortingPlan2.create()
 //let runPlan = SpreadsheetToEmailPlan.create()
 //let runPlan = TimesheetPlan.create()
 //let runPlan = OPlan.sample()
 
 //Responses.Log.debug_logging <- true
 
-
 //let runPlan' = {runPlan with root = match runPlan.root with ONode.Seq all -> {all with nodes = all.nodes |> List.skip 2} |>  ONode.Seq | x -> x}
 //let s1rMem = ["Timesheet Week",["07-01-2025"]] |> Map.ofList
 //let s1r = OPlanRun.Create runPlan (OPlan.defaultKernel Map.empty None)
-let s1r = OPlanRun.Create runPlan (PortingPlan.kernel())
-
+let s1r = OPlanRun.Create runPlan (PortingPlan2.kernel())
 
 let s2r = OPlan.run s1r |> Async.RunSynchronously
 

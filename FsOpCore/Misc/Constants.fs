@@ -23,6 +23,7 @@ module C =
 
     let PLAYWRIGHT_DEFAULT_TIMEOUT = 60000f
 
+    let MAX_CUA_CALLS_IN_TASK = 20
     let MAX_ACTIONS = 3
     let FUNCTION_CALL = "function_call"
     

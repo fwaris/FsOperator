@@ -120,6 +120,13 @@ module TaskFlow_Dynamic =
             | M (RSNRi_Steps steps)         -> let ss = {ss with task = ss.task.setSteps steps}.incrReasonerLoopCount() //update steps and count
                                                let ss,req = reasonerRequestAndClear ss
                                                return F(s_cua ss, [RSNRo_GetSteps req])                                 //txn back to s_cua; send new steps req
+            | M (CUAi_ComputerCall cc) when ss.cuaLoopCount > C.MAX_CUA_CALLS_IN_TASK ->                                //cua is stuck in a loop
+                                               Log.warn $"{nameof s_cua}: exceeded max cua calls {ss.cuaLoopCount}"
+                                               let ss = ss.resetCuaLoopCount()                                          //reset CUA state
+                                               let! task = ss.task.performActionAndCapture cc                           //handle computer call
+                                               let ss = {ss with task=task}.incrCuaLoopCount()                          //incr cua loop count
+                                               let req = cuaStartRequest ss
+                                               return F(s_cua ss, [CUAo_Req req] )
             | M (CUAi_ComputerCall cc)      -> let! task = ss.task.performActionAndCapture cc                           //handle computer call
                                                let ss = {ss with task=task}.incrCuaLoopCount()                          //incr cua loop count
                                                let req = cuaLoopRequest ss cc

@@ -92,7 +92,7 @@ module PlaywrightDriver =
                         
                         Headless = false,                        
                         DownloadsPath = downloadsPath.Value,
-                        Args = ["--disable-blink-features=AutomationControlled"],
+                        Args = ["--disable-blink-features=AutomationControlled"; "--force-device-scale-factor=1"],
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
                 let! page = initContext browser
