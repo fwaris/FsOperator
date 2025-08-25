@@ -1,4 +1,5 @@
 ﻿namespace FsOpCore
+open System
 open Microsoft.SemanticKernel
 open FSharp.Control
 open System.Threading
@@ -47,6 +48,8 @@ type OPlanRun = {
     completedTasks : OTaskRun list
     currentTask : OTaskRun option
     driver : IUIDriver
+    startTime : DateTime option
+    endTime : DateTime option
 }
 with
     static member Create plan kernel =
@@ -56,7 +59,13 @@ with
                         completedTasks = []
                         currentTask = None
                         driver = PlaywrightDriver.create().driver
+                        startTime = None
+                        endTime = None
                     }
+    member this.Duration =
+        match this.startTime, this.endTime with
+        | Some start, Some e -> e - start
+        | _ -> TimeSpan.Zero
 
 module OPlan =
     ///minimal 2-task sample plan
@@ -254,10 +263,14 @@ Use memory_save function to save each person's linked-in and twitter data into m
         b.Build()
 
     let rec run planRun = async {
+        let t0 = DateTime.Now
+        let planRun = { planRun with startTime = Some t0 }
         let! planRun = step planRun
         if planRun.currentTask.IsSome then
             return! run planRun
         else
             do! PlaywrightDriver.shutdown() 
+            let t1 = DateTime.Now
+            let planRun = { planRun with endTime = Some t1 }
             return planRun
     }

@@ -75,6 +75,7 @@ type IUIDriver =
         abstract member saveState: unit -> Async<unit>
         abstract member clearCookies : unit -> Async<unit>
         abstract member reload : unit -> Async<unit>
+        abstract member getUrlBytes : unit -> Async<byte[]>
     end
 
 [<ReferenceEquality>]

@@ -5,6 +5,8 @@ open SkiaSharp
 open System.Threading
 
 module PlaywrightDriver =
+    open System.Net
+    open System.Net.Http
     let downloadsPath =lazy(homePath.Value @@ "PrivateDownloads")
     let _connection : Ref<IBrowser option> = ref None
     let _waitHandle : Ref<ManualResetEvent option> = ref None
@@ -34,6 +36,18 @@ module PlaywrightDriver =
         with ex ->
             Log.warn $"Error encountered when saving browser context state ${ex.Message}"
     }
+
+
+    let buildHttpClientFromPlaywrightCookies (cookies: BrowserContextCookiesResult seq) =
+        let container = new CookieContainer()
+        for c in cookies do
+            try
+                let cookie = Cookie(c.Name, c.Value, c.Path, c.Domain)
+                container.Add(cookie)
+            with ex ->
+                Log.warn $"Error encountered when adding cookie ${c.Name}: {ex.Message}"
+        let handler = new HttpClientHandler(UseCookies = true, CookieContainer = container)
+        new HttpClient(handler)    
 
     //let disconnectHook (ctx:IBrowserContext) = 
     //    saveState ctx
@@ -92,7 +106,8 @@ module PlaywrightDriver =
                         
                         Headless = false,                        
                         DownloadsPath = downloadsPath.Value,
-                        Args = ["--disable-blink-features=AutomationControlled"; "--force-device-scale-factor=1"],
+                       // Args = ["--disable-blink-features=AutomationControlled"; "--force-device-scale-factor=1"],
+                        Args = ["--disable-blink-features=AutomationControlled"],
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
                 let! page = initContext browser
@@ -430,6 +445,20 @@ module PlaywrightDriver =
                         return ()
                     with ex ->
                         Log.exn(ex,"saveState")
-               }
+                }
+                member _.getUrlBytes() = async {
+                    try 
+                        let! page = page()
+                        let! cookies = page.Context.CookiesAsync() |> Async.AwaitTask
+
+                        // build HttpClient with same cookies
+                        let client = buildHttpClientFromPlaywrightCookies cookies  
+                        let pdfUrl = page.Url
+                        let! pdfBytes = client.GetByteArrayAsync(pdfUrl) |> Async.AwaitTask
+                        return pdfBytes
+                    with ex ->
+                        Log.exn(ex,"getUrlBytes")
+                        return Array.empty<byte>
+                }
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

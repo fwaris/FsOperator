@@ -148,6 +148,7 @@ let t_Login =
         reasoner = None //use default
         cua = Some $"""Log in to {System.Environment.GetEnvironmentVariable(URL)}.
 For login, use `{Environment.GetEnvironmentVariable(ID)}` as the login id and `{Environment.GetEnvironmentVariable(PW)}` for password.
+Note: if you see the password is already entered, don't enter it again.
 Dismiss any unneeded popups and notices.
 The task ends when the user is logged in and the account page for the user is showing.
 Check the 'remember me' type box, if you see it in the login pages.
@@ -187,11 +188,10 @@ let t_GetBillDetails =
                 ]
         reasoner = Some Prompts.``reasoner prompt for cua guidance``
         cua = Some $"""Your task is to download the bill pdf.
-- Under 'Billing', look for 'Download PDF' to download the bill.
-- Peform the actions to download the bill.
+- Under 'Billing', look for 'Download PDF' to download the bill. 
+-- The main link it usually at the top.
+- * If you see the pdf of the bill rendered on the screen, use the `download_current_page_pdf` tool to download it. *
 --  Note that there is no visual indication on the page for the download, once the download is started.
--- Look for a click around the download button.
--- If you are looking at PDF view of the bill, use the save button with the disk icon.
 - If you think the download has started, invoke the 'bill_downloaded' tool.
 - If the tool response is NOT affirmative, call the tool a few more times to ensure the bill is downloaded.
 - Then end the task.
@@ -211,3 +211,6 @@ let create() =
 
 
 let kernel() = OPlan.defaultKernel Map.empty  (Some(fun b-> b.Plugins.AddFromType<BillFunctions>()|>ignore))
+
+let createWithKernel() = 
+    create(), kernel()

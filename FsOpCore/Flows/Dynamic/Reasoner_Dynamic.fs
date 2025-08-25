@@ -117,6 +117,7 @@ module ReasonerAgent =
                 input = [IOitem.Message msg]
                 model=C.REASONER_MODEL
                 instructions = Some instr
+                reasoning = Some {Reasoning.Default with effort=Some Reasoning.High}
                 store = true
                 text = RUtils.structuredFormat typeof<CuaInstructions> |> Some
             }

@@ -42,7 +42,10 @@ let priceMap = lazy((prices |> List.map (fun m -> m.StableName.ToLower(),m )) @ 
 let calcPrice (modelId:string,u:FsResponses.Usage) = 
     let modelId = modelId.ToLower()
     priceMap.Value 
-        |> Map.tryFind modelId 
+        |> Map.toSeq
+        |> Seq.tryFind(fun (k,v) -> modelId.Contains(k))
+        |> Option.map snd
+        //|> Map.tryFind modelId 
         |> Option.bind(fun m -> 
             m.Input 
             |> Option.map(fun pi -> (float u.input_tokens / 1_000_000.) * pi) 

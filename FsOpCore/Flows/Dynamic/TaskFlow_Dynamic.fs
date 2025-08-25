@@ -31,7 +31,12 @@ module TaskFlow_Dynamic =
             member this.incrCuaLoopCount()  = {this with cuaLoopCount = this.cuaLoopCount + 1}
             member this.resetCuaLoopCount() = {this with cuaLoopCount = 0}    
 
+            ///add task-specific context to tools and functions in the kernel so that the tools
+            ///can access the needed details related to the task
             static member hookTaskTools (ss:SubState) =
+                let navigator = ss.task.kernel.GetRequiredService<Functions.FsOpNavigator>()
+                navigator.SetDriver ss.task.driver
+                navigator.SetStartUrl ss.task.target
                 let tasktools = ss.task.kernel.GetRequiredService<Functions.FsOpTaskTools>()
                 tasktools.SetFunctions({Functions.TaskToolImpl.taskDone = fun ()->async{                    
                     Log.info $"Done call for task {ss.task.id}"

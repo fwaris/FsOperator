@@ -7,17 +7,8 @@ open FsOpCore
 
 //Sandbox.test()
 
-let runPlan = PortingPlan2.create()
-//let runPlan = SpreadsheetToEmailPlan.create()
-//let runPlan = TimesheetPlan.create()
-//let runPlan = OPlan.sample()
-
-//Responses.Log.debug_logging <- true
-
-//let runPlan' = {runPlan with root = match runPlan.root with ONode.Seq all -> {all with nodes = all.nodes |> List.skip 2} |>  ONode.Seq | x -> x}
-//let s1rMem = ["Timesheet Week",["07-01-2025"]] |> Map.ofList
-//let s1r = OPlanRun.Create runPlan (OPlan.defaultKernel Map.empty None)
-let s1r = OPlanRun.Create runPlan (PortingPlan2.kernel())
+let runPlan,kernel = PortingPlan2.createWithKernel()
+let s1r = OPlanRun.Create runPlan kernel
 
 let s2r = OPlan.run s1r |> Async.RunSynchronously
 
@@ -25,6 +16,7 @@ let usages = s2r.completedTasks |> List.map _.usage |> OPlan.collectUsages |> OP
 let costByModel = usages |> Map.toList |> List.map (fun (id,u) -> id,ModelPricing.calcPrice(id,u))
 for m,c in costByModel do printfn $"Cost: {m}: $%0.2f{c}"
 printfn $"Total cost: %0.2f{float(costByModel |> List.sumBy snd)}"
+printfn $"Total duration: {s2r.Duration.TotalMinutes} minutes"
 
 for t in s1r.completedTasks do
     for m in t.messages do

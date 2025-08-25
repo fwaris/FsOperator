@@ -75,6 +75,26 @@ type FsOpNavigator() =
         }
         Async.StartAsTask comp
 
+    [<KernelFunction("download_current_page_pdf")>]
+    [<Description("Download the current page as a PDF")>]
+    member this.download_current_page_pdf() =
+        let comp = async {
+            Log.info $"{nameof this.download_current_page_pdf}"
+            let noUrl = "unable to download"
+            if driver.Value <> Unchecked.defaultof<_> then 
+                match! driver.Value.url() with
+                | Some url -> 
+                    let! bytes = driver.Value.getUrlBytes()
+                    let ts = System.DateTime.Now.ToString("yyyy_MM_dd_hh_mm_ss")
+                    let path = PlaywrightDriver.downloadsPath.Value @@ $"downloaded_{ts}.pdf"
+                    System.IO.File.WriteAllBytes(path, bytes)
+                    return $"pdf saved to {path}"
+                | None     -> return noUrl
+            else
+                return noUrl
+        }
+        Async.StartAsTask comp
+
 ///semantic kernel 'plugin' class that implements memory functions
 type FsOpMemory() =
     let mutable bag = Map.empty

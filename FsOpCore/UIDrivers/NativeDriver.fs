@@ -112,6 +112,7 @@ module NativeDriver =
                 member _.saveState (): Async<unit> = async{ return ()}
                 member _.clearCookies (): Async<unit> = async{ return ()}
                 member _.reload (): Async<unit> = async{ return ()}
+                member _.getUrlBytes(): Async<byte[]> = async { return Array.empty<byte> }
             }
         Na {|driver=userInteraction; processName = name; arg=arg|}        
 
