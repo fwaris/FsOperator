@@ -53,6 +53,8 @@ module Utility =
     let isWindows() = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
     let isMac() = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
 
+    let isLinux() = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+
     let ddict xs = System.Collections.Generic.Dictionary(dict xs)
 
     ///<summary>

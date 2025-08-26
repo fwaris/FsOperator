@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  my-console-app:
+    image: fsop:latest
+    container_name: my-app-container
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PORT_OUT_ID=${PORT_OUT_ID}
+      - PORT_OUT_PW=${PORT_OUT_PW}
+      - PORT_OUT_URL=${PORT_OUT_URL}
+      - PORT_OUT_ID_2=${PORT_OUT_ID_2}
+      - PORT_OUT_PW_2=${PORT_OUT_PW_2}
+      - PORT_OUT_URL_2=${PORT_OUT_URL_2}

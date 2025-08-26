@@ -18,9 +18,13 @@ module PlaywrightDriver =
                 Some @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
             elif isMac() then
                 Some @"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+            elif isLinux() then
+                // common path for linux
+                Some "/usr/bin/microsoft-edge"
             else
                 None
         match path with
+        
         | Some p when System.IO.File.Exists(p) -> Some p
         | _ -> None
 
@@ -102,9 +106,8 @@ module PlaywrightDriver =
         async {
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
-                let browserOptions = BrowserTypeLaunchOptions(
-                        
-                        Headless = false,                        
+                let browserOptions = BrowserTypeLaunchOptions(                        
+                        Headless = isLinux(),                        
                         DownloadsPath = downloadsPath.Value,
                        // Args = ["--disable-blink-features=AutomationControlled"; "--force-device-scale-factor=1"],
                         Args = ["--disable-blink-features=AutomationControlled"],

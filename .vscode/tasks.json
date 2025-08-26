@@ -8,6 +8,26 @@
             "group": "build",
             "label": "build",
             "detail": "build solution"
+        },
+        {
+            "label": "Docker: Build (with extra context)",
+            "type": "docker-build",
+            "dockerBuild": {
+                "context": "${workspaceFolder}",
+                "dockerfile": "${workspaceFolder}/src/RTTest/Dockerfile",
+                "tag": "fsop:latest",
+                "customOptions": "--build-context ext=${workspaceFolder}/../docker_extras"
+            }
+        },
+        {
+            "label": "Docker: Build (with extra context / no cache)",
+            "type": "docker-build",
+            "dockerBuild": {
+                "context": "${workspaceFolder}",
+                "dockerfile": "${workspaceFolder}/src/RTTest/Dockerfile",
+                "tag": "fsop:latest",
+                "customOptions": "--build-context ext=${workspaceFolder}/../docker_extras --no-cache"
+            }
         }
     ]
 }
