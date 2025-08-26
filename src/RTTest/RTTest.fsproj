@@ -14,7 +14,8 @@
   <ItemGroup>
     <Compile Include="SimpleCrypt.fs" />
     <Compile Include="TimesheetPlan.fs" />
-    <Compile Include="PortingPlan.fs" /><Compile Include="PortingPlan2.fs" />
+    <Compile Include="PortingPlan.fs" />
+    <Compile Include="PortingPlan2.fs" />
     <Compile Include="SpreadsheetToEmailPlan.fs" />
     <Compile Include="ModelPricing.fs" />
     <Compile Include="Sanbox.fs" />
