@@ -1,5 +1,5 @@
 namespace RTOpenAI.WebRTC.Mac
-#if !WINDOWS
+#if OSX
 open RTOpenAI.WebRTC
 open System.IO
 open System
