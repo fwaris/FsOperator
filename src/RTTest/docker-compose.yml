@@ -1,9 +1,8 @@
-version: '3.8'
-
 services:
-  my-console-app:
+  fsop:
     image: fsop:latest
-    container_name: my-app-container
+    platform: linux/amd64
+    container_name: fsop
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PORT_OUT_ID=${PORT_OUT_ID}

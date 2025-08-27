@@ -68,6 +68,10 @@
 		<ProjectReference Include="..\FsOpWinDriver\FsOpWinDriver.fsproj" />
 	</ItemGroup>
 
+	<ItemGroup Condition="$(IsLinux)">
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.0" />
+	</ItemGroup>
+
 	<ItemGroup>
 	  <PackageReference Update="FSharp.Core" Version="9.0.303" />
 

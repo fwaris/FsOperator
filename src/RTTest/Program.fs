@@ -5,6 +5,8 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.SemanticKernel
 open FsOpCore
 
+if not (System.IO.Directory.Exists(PlaywrightDriver.downloadsPath.Value)) then
+    System.IO.Directory.CreateDirectory(PlaywrightDriver.downloadsPath.Value) |> ignore
 //Sandbox.test()
 
 let runPlan,kernel = PortingPlan2.createWithKernel()

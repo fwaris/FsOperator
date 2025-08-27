@@ -106,11 +106,12 @@ module PlaywrightDriver =
         async {
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
+                let args = ["--disable-blink-features=AutomationControlled"]
+                let args = if isLinux() then args @ ["--no-sandbox"; "--disable-setuid-sandbox"] else args
                 let browserOptions = BrowserTypeLaunchOptions(                        
                         Headless = isLinux(),                        
                         DownloadsPath = downloadsPath.Value,
-                       // Args = ["--disable-blink-features=AutomationControlled"; "--force-device-scale-factor=1"],
-                        Args = ["--disable-blink-features=AutomationControlled"],
+                        Args = args,
                         ExecutablePath = (edgePath() |> Option.defaultValue null))
                 let! browser = playwright.Chromium.LaunchAsync(browserOptions) |> Async.AwaitTask                
                 let! page = initContext browser

@@ -16,7 +16,7 @@
                 "context": "${workspaceFolder}",
                 "dockerfile": "${workspaceFolder}/src/RTTest/Dockerfile",
                 "tag": "fsop:latest",
-                "customOptions": "--build-context ext=${workspaceFolder}/../docker_extras"
+                "customOptions": "--platform linux/amd64 --build-context ext=${workspaceFolder}/../docker_extras"
             }
         },
         {
