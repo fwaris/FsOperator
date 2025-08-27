@@ -7,6 +7,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsResponses", "src\FsRespon
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCore", "src\FsOpCore\FsOpCore.fsproj", "{0C0AD2C7-1FA9-43EF-B064-26D81FDF08CB}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCoreInteractive", "src\FsOpCore.Interactive\FsOpCore.Interactive.fsproj", "{B2C0F733-9A2D-4F1B-8C2F-1F4E6B8A9C10}"
+EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCore.UnitTests", "src\FsOpCore.UnitTests\FsOpCore.UnitTests.fsproj", "{0D7773A7-E39C-49D4-9254-C2D757806CAD}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsOpCoreUI", "src\FsOpCoreUI\FsOpCoreUI.fsproj", "{467DF135-2379-452A-906C-B43863FDC8AC}"
@@ -89,6 +91,10 @@ Global
 		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3FCD5A32-6434-4FB3-AEE7-700B982CAF74}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2C0F733-9A2D-4F1B-8C2F-1F4E6B8A9C10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2C0F733-9A2D-4F1B-8C2F-1F4E6B8A9C10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2C0F733-9A2D-4F1B-8C2F-1F4E6B8A9C10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2C0F733-9A2D-4F1B-8C2F-1F4E6B8A9C10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

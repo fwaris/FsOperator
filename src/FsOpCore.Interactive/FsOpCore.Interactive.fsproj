@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
+    <IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
+    <IsLinux>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))</IsLinux>
+    <TargetFrameworks></TargetFrameworks>
+    <TargetFrameworks Condition="$(IsOSX)">net9.0;$(TargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks Condition="$(IsWindows)">net9.0-windows10.0.19041.0;$(TargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks Condition="$(IsLinux)">net9.0;$(TargetFrameworks)</TargetFrameworks>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Voice.fs" />
+		<Compile Include="Interactive_Messages.fs" />
+		<Compile Include="Cua_Interactive.fs" />
+		<Compile Include="Reasoner_Interactive.fs" />
+		<Compile Include="TaskFlow_Interactive.fs" />    
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="9.0.303" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+ 		<ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
+  </ItemGroup>
+
+</Project>

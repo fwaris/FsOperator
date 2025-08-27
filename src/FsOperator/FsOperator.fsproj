@@ -70,6 +70,7 @@
 	  <ProjectReference Include="..\FsOpPlanEditor\FsOpPlanEditor.fsproj" />
 	  <ProjectReference Include="..\FsResponses\FsResponses.fsproj" />
 	  <ProjectReference Include="..\RTOpenAI.Api\RTOpenAI.Api.fsproj" />
+	  <ProjectReference Include="..\FsOpCore.Interactive\FsOpCore.Interactive.fsproj" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-windows10.0.19041.0' OR '$(TargetFramework)' == 'net8.0-windows10.0.17763.0' ">

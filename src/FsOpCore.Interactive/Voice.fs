@@ -1,4 +1,4 @@
-namespace FsOpCore
+namespace FsOpCore.Interactive
 open System
 open RTOpenAI.Api
 open RTOpenAI.Api.Events
