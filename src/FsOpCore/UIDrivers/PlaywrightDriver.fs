@@ -12,6 +12,8 @@ module PlaywrightDriver =
     let _waitHandle : Ref<ManualResetEvent option> = ref None
     let _prevUrl : Ref<string option> = ref None
 
+    let _baseContext : Ref<BrowserNewContextOptions option> = ref None
+
     let edgePath() =
         let path =
             if isWindows() then
@@ -59,21 +61,22 @@ module PlaywrightDriver =
 
     let newPageHandler (page:IPage) = 
         task {
-            do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH, C.VIEWPORT_HEIGHT)
+            //do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH, C.VIEWPORT_HEIGHT)
             //page.Close.Add(fun p -> disconnectHook p.Context)
         }
         |> ignore
 
-    let initContext(browser:IBrowser) = 
+    let initContext (browser:IBrowser) = 
         async {
-            let ctxOpts = BrowserNewContextOptions(StorageStatePath = getStorageStatePath.Value, AcceptDownloads = true)
+            let ctxOpts = _baseContext.Value |> Option.defaultValue (BrowserNewContextOptions(AcceptDownloads=true))
+            ctxOpts.StorageStatePath <- getStorageStatePath.Value 
             let! ctx = browser.NewContextAsync(ctxOpts) |> Async.AwaitTask            
             ctx.Page.Add(newPageHandler)
             let! page = ctx.NewPageAsync() |> Async.AwaitTask
             match _prevUrl.Value with 
             | Some url -> do! page.GotoAsync(url) |> Async.AwaitTask |> Async.Ignore 
             | None     -> ()
-            do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
+            //do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
             return page
         }
 
@@ -90,8 +93,8 @@ module PlaywrightDriver =
                         |> List.sortByDescending (fun p -> p.ViewportSize.Width * p.ViewportSize.Height)
                     //sortedPages |> List.iter (fun p -> printfn $"{p.Url}")
                     let page = sortedPages.Head
-                    if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
-                        do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
+                    // if not (page.ViewportSize.Width = C.VIEWPORT_WIDTH && page.ViewportSize.Height = C.VIEWPORT_HEIGHT) then 
+                    //     do! page.SetViewportSizeAsync(C.VIEWPORT_WIDTH,C.VIEWPORT_HEIGHT) |> Async.AwaitTask 
                     return page
                 | None -> return! initContext browser
             with ex -> 
@@ -106,6 +109,8 @@ module PlaywrightDriver =
         async {
             try
                 use! playwright = Playwright.CreateAsync() |> Async.AwaitTask
+                let iphone = playwright.Devices["iPhone 13"]
+                _baseContext.Value <- Some iphone
                 let args = ["--disable-blink-features=AutomationControlled"]
                 let args = if isLinux() then args @ ["--no-sandbox"; "--disable-setuid-sandbox"] else args
                 let browserOptions = BrowserTypeLaunchOptions(                        
@@ -299,20 +304,24 @@ module PlaywrightDriver =
             ()
         }
 
-    let snapshot() =
+    let screenshot() =
         let rec loop count = 
             async {
                 try
                     let! page = page()
                     Log.trace $"taking snapshot of {page.Url}"
                     let opts = PageScreenshotOptions()
-                    opts.Animations <- ScreenshotAnimations.Disabled
-                    opts.FullPage <- true
-                    let! image = page.ScreenshotAsync() |> Async.AwaitTask
+                    //opts.Animations <- ScreenshotAnimations.Disabled
+                    //opts.FullPage <- true
+                    opts.Scale <- ScreenshotScale.Css
+                    opts.Type <- ScreenshotType.Jpeg
+                    opts.Quality <- 60
+                    let! image = page.ScreenshotAsync(opts) |> Async.AwaitTask
                     Log.trace $"done snapshot"
                     let bmp = SKBitmap.Decode(image)
                     let imgUrl = FsResponses.RUtils.toImageUri image
-                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.png"), image)
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(homePath.Value, @"screenshot.jpeg"), image)
+                    Log.info $"w:{bmp.Width},h:{bmp.Height}"
                     return imgUrl,(bmp.Width, bmp.Height)
                 with ex ->
                     Log.exn(ex, "snapshot")
@@ -420,7 +429,7 @@ module PlaywrightDriver =
                 member _.scroll (x,y) (scrollX,scrollY) = scroll (x,y) (scrollX,scrollY)
                 member _.pressKeys keys = pressKeys keys
                 member _.dragDrop (sX,sY) (tX,tY) = dragDrop (sX,sY) (tX,tY)
-                member _.snapshot() = snapshot()
+                member _.snapshot() = screenshot()
                 member _.goBack () = goBack()
                 member _.goForward () = goForward()
                 member _.typeText text = typeText text
