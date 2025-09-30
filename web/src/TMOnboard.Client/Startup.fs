@@ -1,4 +1,4 @@
-namespace CW1.Client
+namespace TMOnboad.Client
 
 open Microsoft.AspNetCore.Components.Web
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting

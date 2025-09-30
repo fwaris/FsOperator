@@ -1,34 +1,35 @@
-﻿namespace CW1.Server
+﻿namespace TMOnboad.Server
+open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.SignalR
 open FSharp.Control
-open CW1.Client
+open TMOnboad.Client
 open System.Collections.Concurrent
 open Microsoft.Extensions.Hosting
+open FsOpCore
 
 ///manage client state
 module Clients  =
-    let clientMap = ConcurrentDictionary<string,int>()
+    let clientMap = ConcurrentDictionary<string,DateTime>()
 
-    let updateClients (clients:IHubClients) = 
+    let updateClients (clients:IHubCallerClients) (msg:ServerInitiatedMessages) = 
         async {
             for kv in clientMap do
                 let cnnId = kv.Key
                 let mutable count = kv.Value
                 try 
                     let client = clients.Client(cnnId)
-                    do! client.SendAsync(ClientHub.fromServer,Srv_Count count) |> Async.AwaitTask
-                    clientMap.TryUpdate(cnnId,count+1,count) |> ignore
+                    do! client.SendAsync(ClientHub.fromServer,msg) |> Async.AwaitTask                    
                 with ex ->
                     printfn $"Error pinging client {cnnId}: {ex.Message}"
                     clientMap.TryRemove(cnnId,&count) |> ignore
         }
 
-    let addClient cnnId = clientMap.TryAdd(cnnId,0) |> ignore
+    let addClient cnnId = clientMap.TryAdd(cnnId,DateTime.UtcNow) |> ignore
 
     let resetClient cnnId = 
         match clientMap.TryGetValue (cnnId) with
-        | true, c -> clientMap.TryUpdate(cnnId,0,c) |> ignore
+        | true, c -> clientMap.TryUpdate(cnnId,DateTime.UtcNow,c) |> ignore
         | _ -> ()
 
 
@@ -52,7 +53,15 @@ type ServerHub() as this =
                 | Clnt_Connected c ->
                     printfn $"Client connected: {c.Time}"
                     Clients.addClient cnnId
-
+                    
+                | Clnt_StartFlow _ ->  
+                    match FlowRunner.app.Value with 
+                    | Some _ -> dispatch (Srv_Notification "flow already started")
+                    | None   -> 
+                        let a = FlowRunner(Clients.updateClients this.Clients)
+                        FlowRunner.app.Value <- Some a
+                        a.StartFlow() |> Async.Ignore |> Async.Start
+            
                 | Clnt_Reset _ -> 
                     Clients.resetClient cnnId
                     dispatch (Srv_Notification "Counter reset on server")
@@ -68,10 +77,10 @@ type ClientService(hub:IHubContext<ServerHub>) =
         async {
                 while go do
                     do! Async.Sleep 1000
-                    try
-                        do! Clients.updateClients (hub.Clients)
-                    with ex ->
-                        printfn $"Error in ping loop: {ex.Message}"
+                    // try
+                    //     do! Clients.updateClients (hub.Clients)
+                    // with ex ->
+                    //     printfn $"Error in ping loop: {ex.Message}"
             }
 
     interface IHostedService with

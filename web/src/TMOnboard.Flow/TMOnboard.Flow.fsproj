@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\FsOpCore\FsOpCore.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Messages.fs" />
+    <Compile Include="McpClient.fs" />
+    <Compile Include="Tools.fs" />
+    <Compile Include="Reasoner.fs" />
+    <Compile Include="CUA.fs" />
+    <Compile Include="Flow.fs" /><Compile Include="PlanRunner.fs" />
+    <Compile Include="PortPinV.fs" />
+    <Compile Include="PortPinA.fs" />
+    <Compile Include="ModelPricing.fs" />
+    
+  </ItemGroup>
+</Project>

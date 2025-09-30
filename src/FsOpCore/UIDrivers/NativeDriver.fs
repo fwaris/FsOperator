@@ -105,6 +105,7 @@ module NativeDriver =
                 member _.snapshot() = winSnapshot hWndRef name arg
                 member _.goBack () = WDriver.pressKeys [|KeyCode.Alt; KeyCode.Left|] //by convention
                 member _.goForward () = WDriver.pressKeys [|KeyCode.Alt; KeyCode.Right|]
+                member _.goto url -> async{return ()}
                 member _.typeText text = WDriver.typeText text
                 member _.url () = async{ return None}
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.windows
@@ -113,9 +114,10 @@ module NativeDriver =
                 member _.clearCookies (): Async<unit> = async{ return ()}
                 member _.reload (): Async<unit> = async{ return ()}
                 member _.getUrlBytes(): Async<byte[]> = async { return Array.empty<byte> }
+                member _.evaluateJavaScript (script:string) = async{return ""}
             }
         Na {|driver=userInteraction; processName = name; arg=arg|}        
 
 #else
-        failwith "native ui driver not implmented for non-windows platform"
+        failwith "native ui driver not implemented for non-windows platform"
 #endif

@@ -6,6 +6,10 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TMOnboard.Client", "src\TMO
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TMOnboard.Server", "src\TMOnboard.Server\TMOnboard.Server.fsproj", "{6FFA3262-96E9-4F72-8F0D-D8A48BF8B60D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{FA51B553-3642-497F-8F3F-5D756318E793}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TMOnboard.Flow", "src\TMOnboard.Flow\TMOnboard.Flow.fsproj", "{431329EA-EA67-4DC4-8CBA-C737046BD703}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,11 +24,18 @@ Global
 		{6FFA3262-96E9-4F72-8F0D-D8A48BF8B60D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6FFA3262-96E9-4F72-8F0D-D8A48BF8B60D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6FFA3262-96E9-4F72-8F0D-D8A48BF8B60D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{431329EA-EA67-4DC4-8CBA-C737046BD703}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{431329EA-EA67-4DC4-8CBA-C737046BD703}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{431329EA-EA67-4DC4-8CBA-C737046BD703}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{431329EA-EA67-4DC4-8CBA-C737046BD703}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {57638D68-41ED-4981-A968-C8621149D284}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{431329EA-EA67-4DC4-8CBA-C737046BD703} = {FA51B553-3642-497F-8F3F-5D756318E793}
 	EndGlobalSection
 EndGlobal

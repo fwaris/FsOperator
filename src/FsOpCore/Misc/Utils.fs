@@ -49,7 +49,12 @@ module Utility =
 
     /// String comparison that ignores case
     let (=*=) (a:string) (b:string) = a.Equals(b, StringComparison.OrdinalIgnoreCase)
-
+    let (====) (a:string option) (b:string option) =
+        match a,b with
+        | Some a, Some b -> a =*= b
+        | None,None      -> true
+        | _              -> false
+    
     let isWindows() = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
     let isMac() = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
 

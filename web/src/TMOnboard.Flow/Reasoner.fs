@@ -1,11 +1,11 @@
-﻿namespace FsOpCore.Dynamic
+namespace TMOnboard.Flow
 open System
 open System.Text.Json
 open FSharp.Control
 open FsResponses
 open FsOpCore
 
-module Reasoner_Dynamic_Prompts =
+module Reasoner_Prompts =
     //NOTE: We are assuming that 'developer' prompts don't go out scope when max context length is breached, in the 'responses' api.
 
     ///<summary>
@@ -38,7 +38,7 @@ Extract relevant textual information from the screenshots images provided and sa
 You can read/write from/to memory using the functions provided to save relevant facts for later tasks.
 However, any existing memory saved before this task is already provided in [MEMORY].
 
-Assume that CUA only has access to a Web Browser (not the whole computer).
+Assume that CUA only has access to a Web Brower (not the whole computer).
 
 If you believe the task is done as per [TASK_INSTRUCTIONS], invoke the task_done tool to end the task. Ensure the task is truly done.
 
@@ -107,11 +107,11 @@ module ReasonerAgent =
             [
                 Vars.cuaInstructions, req.cuaPrompt :> obj
             ]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[dvlpr] reasoner start instructions``
+            |> Prompts.renderPrompt Reasoner_Prompts.``[dvlpr] reasoner start instructions``
         let msg = {Message.Default with content = [Content.Input_text {|text = msg|}]; role="developer"}
         let instr =
             [Vars.memory, req.memory :> obj]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] initial steps``
+            |> Prompts.renderPrompt Reasoner_Prompts.``[instr] initial steps``
         let req =
             {Request.Default with
                 input = [IOitem.Message msg]
@@ -130,7 +130,7 @@ module ReasonerAgent =
                 Vars.actionHistory, req.actions
                 Vars.cuaMessageHistory, (string req.cuaMessages)
             ]
-            |> Prompts.renderPrompt Reasoner_Dynamic_Prompts.``[instr] get next steps``
+            |> Prompts.renderPrompt Reasoner_Prompts.``[instr] get next steps``
 
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =
@@ -158,7 +158,7 @@ module ReasonerAgent =
         }
 
     let internal createSummarizeReq state (req:ReasonerReq) =
-        let summarizeMsg = Message.OfText Reasoner_Dynamic_Prompts.``cua early termination prompt``
+        let summarizeMsg = Message.OfText Reasoner_Prompts.``cua early termination prompt``
         let inp = List.rev req.items |> List.sortBy (function IOitem.Function_call_output _ -> 0 | _ -> 1) //put function all outputs first
         let req =
             {Request.Default with

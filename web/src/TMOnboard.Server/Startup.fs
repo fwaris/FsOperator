@@ -1,4 +1,4 @@
-namespace CW1.Server
+namespace TMOnboad.Server
 open Microsoft.AspNetCore
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -21,7 +21,7 @@ type Startup() =
 
         services
             .AddSignalR(fun o -> o.MaximumReceiveMessageSize <- 5_000_000)
-            .AddJsonProtocol(fun o -> CW1.Client.ClientHub.configureSer o.PayloadSerializerOptions |> ignore) |> ignore
+            .AddJsonProtocol(fun o -> TMOnboad.Client.ClientHub.configureSer o.PayloadSerializerOptions |> ignore) |> ignore
 
    // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
     member this.Configure(app: IApplicationBuilder, env: IWebHostEnvironment) =
@@ -38,7 +38,7 @@ type Startup() =
             .UseEndpoints(fun endpoints ->
                 endpoints.MapBoleroRemoting() |> ignore
                 endpoints.MapBlazorHub() |> ignore
-                endpoints.MapHub<ServerHub>(CW1.Client.ClientHub.urlPath) |> ignore
+                endpoints.MapHub<ServerHub>(TMOnboad.Client.ClientHub.urlPath) |> ignore
                 endpoints.MapFallbackToBolero(Index.page) |> ignore)
         |> ignore
 

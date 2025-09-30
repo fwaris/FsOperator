@@ -1,70 +1,16 @@
-﻿module PortingPlan
+module PortPinA
 open System
 open System.IO
 open FsOpCore
 open Microsoft.SemanticKernel
 open System.ComponentModel
 open System.Text.Json
+open Microsoft.Extensions.DependencyInjection
 
 //environment variable containing credentials
 let ID = "PORT_OUT_ID"
 let PW = "PORT_OUT_PW"
 let URL = "PORT_OUT_URL"
-
-module MCP = 
-    open ModelContextProtocol.Client
-    open System.Net.Http
-    let sendBill (fileName:string, fileBytes:byte[]) = task {
-        //transport and client
-        let sseOptions = SseClientTransportOptions(Endpoint = Uri("http://localhost:5000/sse"),Name = "FSharpClient")
-        use httpClient = new HttpClient()
-        let transport = SseClientTransport(sseOptions, httpClient, ownsHttpClient = false)
-        let! client = McpClientFactory.CreateAsync(transport)
-
-        //tool call
-        let parms = readOnlyDict [
-            "fileName", fileName :> obj
-            "fileBytes",   fileBytes
-        ]    
-        let! result = client.CallToolAsync("ReceiveBill", parms)
-
-        // Extract and print the text content from the result
-        let textContent = result.Content |> Seq.tryFind (fun c -> c.Type = "text")
-        match textContent with
-        | Some content -> printfn "Tool response: %s" content.Text
-        | None -> printfn "No text content received."
-    }
-
-module FileOpener =
-    open System
-    open System.Diagnostics
-    open System.Runtime.InteropServices
-    open System.IO
-
-    /// Opens the given path with the OS default app (macOS/Windows/Linux).
-    let openWithDefaultApp (path: string) =
-        if String.IsNullOrWhiteSpace path then
-            invalidArg (nameof path) "Path is required."
-
-        let fullPath = Path.GetFullPath path
-        let psi = ProcessStartInfo()
-
-        if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
-            psi.FileName <- "open"
-            psi.ArgumentList.Add fullPath
-            psi.UseShellExecute <- false
-        elif RuntimeInformation.IsOSPlatform(OSPlatform.Windows) then
-            // On Windows you pass the file directly and enable ShellExecute
-            psi.FileName <- fullPath
-            psi.UseShellExecute <- true
-        elif RuntimeInformation.IsOSPlatform(OSPlatform.Linux) then
-            psi.FileName <- "xdg-open"
-            psi.ArgumentList.Add fullPath
-            psi.UseShellExecute <- false
-        else
-            raise (PlatformNotSupportedException())
-
-        Process.Start psi |> ignore
 
 type RecurringCharge = {
     desc : string
@@ -90,7 +36,7 @@ type BillFunctions() =
                 return "pin saved"
             with ex ->
                 Log.exn(ex, nameof this.save_pin)
-                return $"error occurred while trying to save pin"
+                return $"error occured while trying to save pin"
         }
         Async.StartAsTask comp
 
@@ -123,9 +69,8 @@ type BillFunctions() =
                     let timestamp = f.LastAccessTime.ToString("yyyy-MM-dd_HH-mm-ss");
                     let f2 = PlaywrightDriver.downloadsPath.Value @@ $"bill_{timestamp}.pdf"
                     File.Copy(f.FullName, f2)
-                    Log.info $"Bill downloaded: {f2}"
-                    FileOpener.openWithDefaultApp(f2)
-                    MCP.sendBill(f2, File.ReadAllBytes(f2)) |> ignore)
+                    Log.info $"Bill downloaded: {f2}"                    
+                    McpClient.MCP.sendBill(f2, File.ReadAllBytes(f2)) |> ignore)
                 |> Option.orElseWith (fun _ -> Log.info "No recent bill downloaded"; None)
                 |> ignore
                 return "bill downloaded"
@@ -207,7 +152,10 @@ let create() =
         plan
 
 
-let kernel() = OPlan.defaultKernel Map.empty  (Some(fun b-> b.Plugins.AddFromType<BillFunctions>()|>ignore))
-
-let createWithKernel() = 
-    create(), kernel()
+let kernel() = 
+    OPlan.defaultKernel 
+        Map.empty  
+        (Some(fun b-> 
+                    let billf = BillFunctions()
+                    b.Plugins.AddFromObject(billf) |> ignore
+                    b.Services.AddSingleton(billf) |> ignore))

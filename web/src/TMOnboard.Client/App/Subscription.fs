@@ -1,4 +1,4 @@
-namespace CW1.Client
+namespace TMOnboad.Client
 open System
 open Elmish
 open System.Threading.Channels

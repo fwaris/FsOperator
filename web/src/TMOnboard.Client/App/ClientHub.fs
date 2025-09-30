@@ -1,4 +1,4 @@
-﻿namespace CW1.Client
+﻿namespace TMOnboad.Client
 open Microsoft.AspNetCore.Components
 open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.SignalR.Client

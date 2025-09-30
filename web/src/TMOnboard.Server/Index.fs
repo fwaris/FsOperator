@@ -1,8 +1,8 @@
-module CW1.Server.Index
+module TMOnboad.Server.Index
 open Bolero
 open Bolero.Html
 open Bolero.Server.Html
-open CW1
+open TMOnboad
 
 let page = doctypeHtml {
     head {
@@ -15,7 +15,7 @@ let page = doctypeHtml {
         script {attr.src "_content/MudBlazor/MudBlazor.min.js"}
     }
     body {
-        div { attr.id "main"; comp<CW1.Client.App.MyApp> }
+        div { attr.id "main"; comp<TMOnboad.Client.App.MyApp> }
         boleroScript
     }
 }

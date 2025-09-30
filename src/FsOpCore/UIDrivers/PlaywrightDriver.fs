@@ -432,6 +432,7 @@ module PlaywrightDriver =
                 member _.snapshot() = screenshot()
                 member _.goBack () = goBack()
                 member _.goForward () = goForward()
+                member _.goto url = goToPage url
                 member _.typeText text = typeText text
                 member _.url () = url()
                 member _.environment with get (): string = FsResponses.ComputerEnvironment.browser
@@ -471,7 +472,17 @@ module PlaywrightDriver =
                         return pdfBytes
                     with ex ->
                         Log.exn(ex,"getUrlBytes")
-                        return Array.empty<byte>
+                        return Array.empty<byte>                        
                 }
+                member _.evaluateJavaScript (expression: string): Async<string> = async {
+                    let! page = page()                    
+                    let! rslt = page.EvaluateAsync(expression) |> Async.AwaitTask
+                    return
+                        if rslt.HasValue then 
+                            rslt.Value.GetRawText()
+                        else
+                            ""
+                }
+                    
             }
         Pw {|postUrl=postUrl; driver=userInteraction|}

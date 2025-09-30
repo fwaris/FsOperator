@@ -1,4 +1,4 @@
-﻿namespace CW1.Client
+﻿namespace TMOnboad.Client
 open System
 open Bolero
 
@@ -11,7 +11,15 @@ type Page =
 //Application model or state for the UI
 type Model = {
     count   : int
+    isDarkMode : bool
     page    : Page
+    credentialsRequested : bool
+    codeRequested : bool
+    email : string
+    password : string
+    code : string
+    image : string option
+    action : string 
 }
 
 //Type definition for data exchanged between client and server in a message (as JSON over the wire)
@@ -21,19 +29,31 @@ type ClientInfo = {
 
 ///Messages sent by the server to the client
 type ServerInitiatedMessages =
-    | Srv_Count of int
     | Srv_Notification of string
+    | Srv_ScreenShot of string
+    | Srv_Action of string
+    | Srv_SendCreds
+    | Srv_SendCode
+    | Srv_Usage of (int*float)
+    | Srv_DonePlan
 
 ///Messages sent by the client to the server
 type ClientInitiatedMessages =
     | Clnt_Reset of string      //need message parameter for signalR serialization (it seems)
     | Clnt_Connected of ClientInfo  //
-
+    | Clnt_StartFlow of string
+    | Clnt_Credentials of string * string
+    | Client_Code of string
+    
 ///Elmish messages handled by the update function
 type Message =
     | Reset
     | Nop of unit 
     | Error of exn
     | SetPage of Page
+    | StartFlow
     | Started 
+    | SendCredentials of string * string
+    | SendCodes of string
     | FromServer of ServerInitiatedMessages
+    | ToggleDarkMode

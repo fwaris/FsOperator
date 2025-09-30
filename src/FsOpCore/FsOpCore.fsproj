@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<IsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindows>
 		<IsOSX>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsOSX>
@@ -34,7 +34,7 @@
 		<Compile Include="Flows\Dynamic\Reasoner_Dynamic.fs" />
 		<Compile Include="Flows\Dynamic\Cua_Dynamic.fs" />
 		<Compile Include="Flows\Dynamic\TaskFlow_Dynamic.fs" />
-		<Compile Include="Flows\Dynamic\_TaskFlowDynamic.fs" />
+		
 		<Compile Include="Flows\OTask.fs" />
 		<Compile Include="Flows\OPlan.fs" />
 	</ItemGroup>

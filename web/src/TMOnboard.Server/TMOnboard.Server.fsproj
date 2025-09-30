@@ -4,18 +4,19 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="FlowRunner.fs" />
     <Compile Include="ServerHub.fs" />
     <Compile Include="Index.fs" />
     <Compile Include="Startup.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TMOnboard.Client\TMOnboard.Client.fsproj" />
+    <ProjectReference Include="..\..\..\src\FsOpCore\FsOpCore.fsproj" />
+    <ProjectReference Include="..\TMOnboard.Flow\TMOnboard.Flow.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Bolero.Server" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\src\FsOpCore\FsOpCore.fsproj" />
+    <PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.64.0" />
   </ItemGroup>
 </Project>

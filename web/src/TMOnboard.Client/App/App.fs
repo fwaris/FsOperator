@@ -1,4 +1,4 @@
-namespace CW1.Client
+namespace TMOnboad.Client
 open System
 open System.Net.Http
 open Microsoft.AspNetCore.Components
@@ -9,7 +9,7 @@ open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
 open MudBlazor
-open CW1.Client.Views
+open TMOnboad.Client.Views
 
 module App =
     let router = Router.infer SetPage (fun model -> model.page)

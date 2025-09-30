@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Scripts.fs" />
+    <Compile Include="FlowTypes.fs" /><Compile Include="Flows.fs" />
+    
+    <Compile Include="FlowDefs.fs" />
+    <Compile Include="ValidatorAgent.fs" /><Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FsOpCore\FsOpCore.fsproj" />
+  </ItemGroup>
+</Project>
